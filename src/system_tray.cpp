@@ -76,6 +76,12 @@ namespace system_tray {
   }
 
   void
+  tray_force_stop_cb(struct tray_menu *item) {
+    BOOST_LOG(info) << "Force stop from system tray"sv;
+    proc::proc.terminate();
+  }
+
+  void
   tray_restart_cb(struct tray_menu *item) {
     BOOST_LOG(info) << "Restarting from system tray"sv;
 
@@ -106,16 +112,17 @@ namespace system_tray {
       (struct tray_menu[]) {
         // todo - use boost/locale to translate menu strings
         { .text = "Open Sunshine", .cb = tray_open_ui_cb },
-        { .text = "-" },
-        { .text = "Donate",
-          .submenu =
-            (struct tray_menu[]) {
-              { .text = "GitHub Sponsors", .cb = tray_donate_github_cb },
-              { .text = "MEE6", .cb = tray_donate_mee6_cb },
-              { .text = "Patreon", .cb = tray_donate_patreon_cb },
-              { .text = "PayPal", .cb = tray_donate_paypal_cb },
-              { .text = nullptr } } },
-        { .text = "-" },
+        // { .text = "-" },
+        // { .text = "Donate",
+        //   .submenu =
+        //     (struct tray_menu[]) {
+        //       { .text = "GitHub Sponsors", .cb = tray_donate_github_cb },
+        //       { .text = "MEE6", .cb = tray_donate_mee6_cb },
+        //       { .text = "Patreon", .cb = tray_donate_patreon_cb },
+        //       { .text = "PayPal", .cb = tray_donate_paypal_cb },
+        //       { .text = nullptr } } },
+        // { .text = "-" },
+        { .text = "Force Close", .cb = tray_force_stop_cb },
         { .text = "Restart", .cb = tray_restart_cb },
         { .text = "Quit", .cb = tray_quit_cb },
         { .text = nullptr } },

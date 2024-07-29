@@ -43,6 +43,9 @@ namespace system_tray {
   void
   tray_donate_paypal_cb(struct tray_menu *item);
 
+  void
+  tray_force_stop_cb(struct tray_menu *item);
+
   /**
    * @brief Callback for restarting Sunshine from the system tray.
    * @param item The tray menu item.
