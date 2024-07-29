@@ -1,12 +1,12 @@
 Overview
 ========
-LizardByte has the full documentation hosted on `Read the Docs <https://sunshinestream.readthedocs.io/>`__.
+LizardByte has the full documentation hosted on `Read the Docs <https://sushinestream.readthedocs.io/>`__.
 
 About
 -----
-Sunshine is a self-hosted game stream host for Moonlight.
+Apollo is a self-hosted desktop stream host for Artemis.
 Offering low latency, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware
-encoding. Software encoding is also available. You can connect to Sunshine from any Moonlight client on a variety of
+encoding. Software encoding is also available. You can connect to Apollo from any Artemis client on a variety of
 devices. A web UI is provided to allow configuration, and client pairing, from your favorite web browser. Pair from
 the local server or any mobile device.
 

@@ -48,9 +48,6 @@ export default {
   mounted() {
     let el = document.querySelector("a[href='" + document.location.pathname + "']");
     if (el) el.classList.add("active")
-    let discordWidget = document.createElement('script')
-    discordWidget.setAttribute('src', 'https://app.lizardbyte.dev/js/discord.js')
-    document.head.appendChild(discordWidget)
   }
 }
 </script>
