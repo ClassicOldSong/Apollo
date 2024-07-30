@@ -26,6 +26,8 @@
     #include <dispatch/dispatch.h>
   #endif
 
+  #define TRAY_MSG_NO_APP_RUNNING "[No app is running]"
+
   // standard includes
   #include <csignal>
   #include <string>
@@ -36,10 +38,12 @@
   #include <boost/process/environment.hpp>
 
   // local includes
+  #include "config.h"
   #include "confighttp.h"
   #include "logging.h"
   #include "platform/common.h"
   #include "process.h"
+  #include "network.h"
   #include "src/entry_handler.h"
   #include "version.h"
 
@@ -53,26 +57,6 @@ namespace system_tray {
   tray_open_ui_cb(struct tray_menu *item) {
     BOOST_LOG(info) << "Opening UI from system tray"sv;
     launch_ui();
-  }
-
-  void
-  tray_donate_github_cb(struct tray_menu *item) {
-    platf::open_url("https://github.com/sponsors/LizardByte");
-  }
-
-  void
-  tray_donate_mee6_cb(struct tray_menu *item) {
-    platf::open_url("https://mee6.xyz/m/804382334370578482");
-  }
-
-  void
-  tray_donate_patreon_cb(struct tray_menu *item) {
-    platf::open_url("https://www.patreon.com/LizardByte");
-  }
-
-  void
-  tray_donate_paypal_cb(struct tray_menu *item) {
-    platf::open_url("https://www.paypal.com/paypalme/ReenigneArcher");
   }
 
   void
@@ -111,7 +95,7 @@ namespace system_tray {
     .menu =
       (struct tray_menu[]) {
         // todo - use boost/locale to translate menu strings
-        { .text = "Open Sunshine", .cb = tray_open_ui_cb },
+        { .text = "Open Apollo", .cb = tray_open_ui_cb },
         // { .text = "-" },
         // { .text = "Donate",
         //   .submenu =
@@ -122,7 +106,7 @@ namespace system_tray {
         //       { .text = "PayPal", .cb = tray_donate_paypal_cb },
         //       { .text = nullptr } } },
         // { .text = "-" },
-        { .text = "Force Close", .cb = tray_force_stop_cb },
+        { .text = TRAY_MSG_NO_APP_RUNNING, .cb = tray_force_stop_cb },
         { .text = "Restart", .cb = tray_restart_cb },
         { .text = "Quit", .cb = tray_quit_cb },
         { .text = nullptr } },
@@ -237,6 +221,11 @@ namespace system_tray {
     BOOST_LOG(info) << "system_tray() is not yet implemented for this platform."sv;
   #else  // Windows, Linux
     // create tray in separate thread
+
+    static const std::string title_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
+
+    tray.menu[0].text = title_str.c_str();
+
     std::thread tray_thread(system_tray);
     tray_thread.detach();
   #endif
@@ -260,6 +249,7 @@ namespace system_tray {
     tray.notification_cb = NULL;
     tray.notification_icon = NULL;
     tray.icon = TRAY_ICON_PLAYING;
+
     tray_update(&tray);
     tray.icon = TRAY_ICON_PLAYING;
     tray.notification_title = "Stream Started";
@@ -268,6 +258,9 @@ namespace system_tray {
     tray.notification_text = msg;
     tray.tooltip = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
+    static char force_close_msg[256];
+    snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
+    tray.menu[1].text = force_close_msg;
     tray_update(&tray);
   }
 
@@ -312,6 +305,7 @@ namespace system_tray {
     tray.notification_title = "Application Stopped";
     tray.notification_text = msg;
     tray.tooltip = PROJECT_NAME;
+    tray.menu[1].text = TRAY_MSG_NO_APP_RUNNING;
     tray_update(&tray);
   }
 

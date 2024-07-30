@@ -15,33 +15,6 @@ namespace system_tray {
   void
   tray_open_ui_cb(struct tray_menu *item);
 
-  /**
-   * @brief Callback for opening GitHub Sponsors from the system tray.
-   * @param item The tray menu item.
-   */
-  void
-  tray_donate_github_cb(struct tray_menu *item);
-
-  /**
-   * @brief Callback for opening MEE6 donation from the system tray.
-   * @param item The tray menu item.
-   */
-  void
-  tray_donate_mee6_cb(struct tray_menu *item);
-
-  /**
-   * @brief Callback for opening Patreon from the system tray.
-   * @param item The tray menu item.
-   */
-  void
-  tray_donate_patreon_cb(struct tray_menu *item);
-
-  /**
-   * @brief Callback for opening PayPal donation from the system tray.
-   * @param item The tray menu item.
-   */
-  void
-  tray_donate_paypal_cb(struct tray_menu *item);
 
   void
   tray_force_stop_cb(struct tray_menu *item);
