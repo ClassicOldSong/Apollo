@@ -341,6 +341,7 @@ namespace proc {
 #endif
 
     _app_id = -1;
+    display_name.clear();
   }
 
   const std::vector<ctx_t> &

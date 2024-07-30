@@ -67,6 +67,8 @@ namespace proc {
   public:
     KITTY_DEFAULT_CONSTR_MOVE_THROW(proc_t)
 
+    std::string display_name;
+
     proc_t(
       boost::process::environment &&env,
       std::vector<ctx_t> &&apps):

@@ -16,6 +16,7 @@ extern "C" {
 #include <libavutil/pixdesc.h>
 }
 
+#include "process.h"
 #include "cbs.h"
 #include "config.h"
 #include "globals.h"
@@ -965,7 +966,7 @@ namespace video {
    * @param current_display_index The current display index or -1 if not yet known.
    */
   void
-  refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index) {
+  refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index, std::string &preferred_display_name) {
     std::string current_display_name;
 
     // If we have a current display index, let's start with that
@@ -1003,13 +1004,23 @@ namespace video {
       BOOST_LOG(warning) << "Previous active display ["sv << current_display_name << "] is no longer present"sv;
     }
     else {
+      current_display_name = preferred_display_name;
+      if (current_display_name.empty()) {
+        current_display_name = config::video.output_name;
+      }
       for (int x = 0; x < display_names.size(); ++x) {
-        if (display_names[x] == config::video.output_name) {
+        if (display_names[x] == current_display_name) {
           current_display_index = x;
           return;
         }
       }
     }
+  }
+
+  void
+  refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index) {
+    static std::string empty_str = "";
+    refresh_displays(dev_type, display_names, current_display_index, empty_str);
   }
 
   void
@@ -1041,15 +1052,24 @@ namespace video {
     }
     capture_ctxs.emplace_back(std::move(*initial_capture_ctx));
 
-    // Get all the monitor names now, rather than at boot, to
-    // get the most up-to-date list available monitors
     std::vector<std::string> display_names;
     int display_p = -1;
-    refresh_displays(encoder.platform_formats->dev_type, display_names, display_p);
-    auto disp = platf::display(encoder.platform_formats->dev_type, display_names[display_p], capture_ctxs.front().config);
-    if (!disp) {
-      return;
+    std::shared_ptr<platf::display_t> disp;
+    if (!proc::proc.display_name.empty()) {
+      disp = platf::display(encoder.platform_formats->dev_type, proc::proc.display_name, capture_ctxs.front().config);
     }
+    if (!disp) {
+      // Get all the monitor names now, rather than at boot, to
+      // get the most up-to-date list available monitors
+      refresh_displays(encoder.platform_formats->dev_type, display_names, display_p);
+      disp = platf::display(encoder.platform_formats->dev_type, display_names[display_p], capture_ctxs.front().config);
+      if (disp) {
+        proc::proc.display_name = display_names[display_p];
+      } else {
+        return;
+      }
+    }
+
     display_wp = disp;
 
     constexpr auto capture_buffer_size = 12;
@@ -1242,6 +1262,7 @@ namespace video {
             // reset_display() will sleep between retries
             reset_display(disp, encoder.platform_formats->dev_type, display_names[display_p], capture_ctxs.front().config);
             if (disp) {
+              proc::proc.display_name = display_names[display_p];
               break;
             }
           }
