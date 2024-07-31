@@ -13,6 +13,7 @@
 #include <synchapi.h>
 
 #include <iostream>
+#include <io.h>
 
 #include "src/utility.h"
 
@@ -215,15 +216,22 @@ namespace audio {
       }
     }
 
-    std::wcout
-      << L"===== Device ====="sv << std::endl
-      << L"Device ID          : "sv << wstring.get() << std::endl
-      << L"Device name        : "sv << no_null((LPWSTR) device_friendly_name.prop.pszVal) << std::endl
-      << L"Adapter name       : "sv << no_null((LPWSTR) adapter_friendly_name.prop.pszVal) << std::endl
-      << L"Device description : "sv << no_null((LPWSTR) device_desc.prop.pszVal) << std::endl
-      << L"Device state       : "sv << device_state_string << std::endl
-      << L"Current format     : "sv << current_format << std::endl
-      << std::endl;
+    wprintf(
+      L"===== Device =====\n"
+      L"Device ID          : %ls\n"
+      L"Device name        : %ls\n"
+      L"Adapter name       : %ls\n"
+      L"Device description : %ls\n"
+      L"Device state       : %ls\n"
+      L"Current format     : %ls\n\n",
+      wstring.get(),
+      no_null((LPWSTR)device_friendly_name.prop.pszVal),
+      no_null((LPWSTR)adapter_friendly_name.prop.pszVal),
+      no_null((LPWSTR)device_desc.prop.pszVal),
+      device_state_string.c_str(),
+      current_format.c_str()
+    );
+
   }
 }  // namespace audio
 
@@ -246,6 +254,9 @@ main(int argc, char *argv[]) {
   if (argc > 1) {
     device_state_filter = 0;
   }
+
+  // Set the locale to support wide characters
+  std::setlocale(LC_ALL, "");
 
   for (auto x = 1; x < argc; ++x) {
     for (auto p = argv[x]; *p != '\0'; ++p) {
