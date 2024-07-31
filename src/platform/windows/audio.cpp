@@ -758,13 +758,15 @@ namespace platf::audio {
         return nullptr;
       }
 
-      // If this is a virtual sink, set a callback that will change the sink back if it's changed
-      auto virtual_sink_info = extract_virtual_sink_info(assigned_sink);
-      if (virtual_sink_info) {
-        mic->default_endpt_changed_cb = [this] {
-          BOOST_LOG(info) << "Resetting sink to ["sv << assigned_sink << "] after default changed";
-          set_sink(assigned_sink);
-        };
+      if (config::audio.keep_default) {
+        // If this is a virtual sink, set a callback that will change the sink back if it's changed
+        auto virtual_sink_info = extract_virtual_sink_info(assigned_sink);
+        if (virtual_sink_info) {
+          mic->default_endpt_changed_cb = [this] {
+            BOOST_LOG(info) << "Resetting sink to ["sv << assigned_sink << "] after default changed";
+            set_sink(assigned_sink);
+          };
+        }
       }
 
       return mic;
