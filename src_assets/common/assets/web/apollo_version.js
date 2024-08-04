@@ -1,4 +1,4 @@
-class SunshineVersion {
+class ApolloVersion {
   constructor(release = null, version = null) {
     if (release) {
       this.release = release;
@@ -32,12 +32,12 @@ class SunshineVersion {
 
   isGreater(otherVersion) {
     let otherVersionParts;
-    if (otherVersion instanceof SunshineVersion) {
+    if (otherVersion instanceof ApolloVersion) {
       otherVersionParts = otherVersion.versionParts;
     } else if (typeof otherVersion === 'string') {
       otherVersionParts = this.parseVersion(otherVersion);
     } else {
-      throw new Error('Invalid argument: otherVersion must be a SunshineVersion object or a version string');
+      throw new Error('Invalid argument: otherVersion must be a ApolloVersion object or a version string');
     }
 
     if (!this.versionParts || !otherVersionParts) {
@@ -52,4 +52,4 @@ class SunshineVersion {
   }
 }
 
-export default SunshineVersion;
+export default ApolloVersion;
