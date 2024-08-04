@@ -62,15 +62,15 @@
     <!-- Restart Apollo -->
     <div class="card p-2 my-4">
       <div class="card-body">
-        <h2 id="restart">{{ $t('troubleshooting.restart_sunshine') }}</h2>
+        <h2 id="restart">{{ $t('troubleshooting.restart_apollo') }}</h2>
         <br>
-        <p>{{ $t('troubleshooting.restart_sunshine_desc') }}</p>
+        <p>{{ $t('troubleshooting.restart_apollo_desc') }}</p>
         <div class="alert alert-success" v-if="restartPressed === true">
-          {{ $t('troubleshooting.restart_sunshine_success') }}
+          {{ $t('troubleshooting.restart_apollo_success') }}
         </div>
         <div>
           <button class="btn btn-warning" :disabled="restartPressed" @click="restart">
-            {{ $t('troubleshooting.restart_sunshine') }}
+            {{ $t('troubleshooting.restart_apollo') }}
           </button>
         </div>
       </div>

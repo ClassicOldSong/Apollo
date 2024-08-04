@@ -818,7 +818,7 @@ namespace platf {
   platform_caps::caps_t
   get_capabilities();
 
-#define SERVICE_NAME "Sunshine"
+#define SERVICE_NAME "Apollo"
 #define SERVICE_TYPE "_nvstream._tcp"
 
   namespace publish {

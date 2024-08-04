@@ -16,12 +16,12 @@ BEGIN
     BEGIN
         BLOCK "040904E4"
         BEGIN
-            VALUE "CompanyName",      "LizardByte\0"
-            VALUE "FileDescription",  "Sunshine\0"
+            VALUE "CompanyName",      "YukiWorkshop\0"
+            VALUE "FileDescription",  "Apollo\0"
             VALUE "FileVersion",      "@PROJECT_VERSION@\0"
-            VALUE "InternalName",     "Sunshine\0"
-            VALUE "LegalCopyright",   "https://raw.githubusercontent.com/LizardByte/Sunshine/master/LICENSE\0"
-            VALUE "ProductName",      "Sunshine\0"
+            VALUE "InternalName",     "Apollo\0"
+            VALUE "LegalCopyright",   "https://raw.githubusercontent.com/ClassicOldSong/Apollo/master/LICENSE\0"
+            VALUE "ProductName",      "Apollo\0"
             VALUE "ProductVersion",   "@PROJECT_VERSION@\0"
         END
     END

@@ -9,20 +9,20 @@
     #define WIN32_LEAN_AND_MEAN
     #include <accctrl.h>
     #include <aclapi.h>
-    #define TRAY_ICON WEB_DIR "images/sunshine.ico"
-    #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing.ico"
-    #define TRAY_ICON_PAUSING WEB_DIR "images/sunshine-pausing.ico"
-    #define TRAY_ICON_LOCKED WEB_DIR "images/sunshine-locked.ico"
+    #define TRAY_ICON WEB_DIR "images/apollo.ico"
+    #define TRAY_ICON_PLAYING WEB_DIR "images/apollo-playing.ico"
+    #define TRAY_ICON_PAUSING WEB_DIR "images/apollo-pausing.ico"
+    #define TRAY_ICON_LOCKED WEB_DIR "images/apollo-locked.ico"
   #elif defined(__linux__) || defined(linux) || defined(__linux)
-    #define TRAY_ICON "sunshine-tray"
-    #define TRAY_ICON_PLAYING "sunshine-playing"
-    #define TRAY_ICON_PAUSING "sunshine-pausing"
-    #define TRAY_ICON_LOCKED "sunshine-locked"
+    #define TRAY_ICON "apollo-tray"
+    #define TRAY_ICON_PLAYING "apollo-playing"
+    #define TRAY_ICON_PAUSING "apollo-pausing"
+    #define TRAY_ICON_LOCKED "apollo-locked"
   #elif defined(__APPLE__) || defined(__MACH__)
-    #define TRAY_ICON WEB_DIR "images/logo-sunshine-16.png"
-    #define TRAY_ICON_PLAYING WEB_DIR "images/sunshine-playing-16.png"
-    #define TRAY_ICON_PAUSING WEB_DIR "images/sunshine-pausing-16.png"
-    #define TRAY_ICON_LOCKED WEB_DIR "images/sunshine-locked-16.png"
+    #define TRAY_ICON WEB_DIR "images/logo-apollo-16.png"
+    #define TRAY_ICON_PLAYING WEB_DIR "images/apollo-playing-16.png"
+    #define TRAY_ICON_PAUSING WEB_DIR "images/apollo-pausing-16.png"
+    #define TRAY_ICON_LOCKED WEB_DIR "images/apollo-locked-16.png"
     #include <dispatch/dispatch.h>
   #endif
 
