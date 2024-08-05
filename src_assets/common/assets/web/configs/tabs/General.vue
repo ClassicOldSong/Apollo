@@ -110,7 +110,7 @@ function removeCmd(index) {
             <div class="form-check">
               <input type="checkbox" class="form-check-input" :id="'prep-cmd-admin-' + i" v-model="c.elevated"
                      true-value="true" false-value="false" />
-              <label :for="'prep-cmd-admin-' + i" class="form-check-label">{{ $t('config.elevated') }}</label>
+              <label :for="'prep-cmd-admin-' + i" class="form-check-label">{{ $t('_common.elevated') }}</label>
             </div>
           </td>
           <td>
