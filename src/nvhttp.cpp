@@ -130,6 +130,7 @@ namespace nvhttp {
   struct pair_session_t {
     struct {
       std::string uniqueID;
+      std::string deviceName;
       std::string cert;
     } client;
 
@@ -325,6 +326,7 @@ namespace nvhttp {
       if (x == 2) launch_session->fps = atoi(segment.c_str());
       x++;
     }
+    launch_session->device_name = (get_arg(args, "devicename", "unknown"));
     launch_session->unique_id = (get_arg(args, "uniqueid", "unknown"));
     launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
@@ -557,7 +559,12 @@ namespace nvhttp {
     }
 
     auto uniqID { get_arg(args, "uniqueid") };
+    auto deviceName { get_arg(args, "devicename") };
     auto sess_it = map_id_sess.find(uniqID);
+
+    if (deviceName == "roth"sv) {
+      deviceName = "Legacy Moonlight Client";
+    }
 
     args_t::const_iterator it;
     if (it = args.find("phrase"); it != std::end(args)) {
@@ -565,6 +572,7 @@ namespace nvhttp {
         pair_session_t sess;
 
         sess.client.uniqueID = std::move(uniqID);
+        sess.client.deviceName = std::move(deviceName);
         sess.client.cert = util::from_hex_vec(get_arg(args, "clientcert"), true);
 
         BOOST_LOG(debug) << sess.client.cert;
@@ -639,7 +647,7 @@ namespace nvhttp {
     // set up named cert
     client_t &client = client_root;
     named_cert_t named_cert;
-    named_cert.name = name;
+    named_cert.name = name.empty() ? sess.client.deviceName : name;
     named_cert.cert = sess.client.cert;
     named_cert.uuid = uuid_util::uuid_t::generate().string();
     client.named_devices.emplace_back(named_cert);

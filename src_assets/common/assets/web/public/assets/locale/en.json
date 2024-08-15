@@ -55,6 +55,8 @@
     "env_client_height": "The Height requested by the client (int)",
     "env_client_host_audio": "The client has requested host audio (true/false)",
     "env_client_width": "The Width requested by the client (int)",
+    "env_client_uid": "UID of the client starting the stream (string)",
+    "env_client_name": "Name of the client starting the stream (string)",
     "env_displayplacer_example": "Example - displayplacer for Resolution Automation:",
     "env_qres_example": "Example - QRes for Resolution Automation:",
     "env_qres_path": "qres path",
@@ -356,7 +358,7 @@
     "success_msg": "Password has been changed successfully! This page will reload soon, your browser will ask you for the new credentials."
   },
   "pin": {
-    "device_name": "Device Name",
+    "device_name": "Optional: Device Name",
     "pair_failure": "Pairing Failed: Check if the PIN is typed correctly",
     "pair_success": "Success! Please check Moonlight to continue",
     "pin_pairing": "PIN Pairing",
