@@ -46,6 +46,7 @@
   #include "network.h"
   #include "src/entry_handler.h"
   #include "version.h"
+  #include "misc.h"
 
 using namespace std::literals;
 
@@ -222,8 +223,12 @@ namespace system_tray {
   #else  // Windows, Linux
     // create tray in separate thread
 
+  #ifdef _WIN32
+    std::string tmp_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
+    static const std::string title_str = convertUtf8ToCurrentCodepage(tmp_str);
+  #else
     static const std::string title_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
-
+  #endif
     tray.menu[0].text = title_str.c_str();
 
     std::thread tray_thread(system_tray);
@@ -244,6 +249,8 @@ namespace system_tray {
       return;
     }
 
+    printf("Tray playing: %s\n", app_name.c_str());
+
     tray.notification_title = NULL;
     tray.notification_text = NULL;
     tray.notification_cb = NULL;
@@ -254,12 +261,16 @@ namespace system_tray {
     tray.icon = TRAY_ICON_PLAYING;
     tray.notification_title = "Stream Started";
     char msg[256];
+    static char force_close_msg[256];
     snprintf(msg, std::size(msg), "Streaming started for %s", app_name.c_str());
+    snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
+  #ifdef _WIN32
+    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+    strcpy(force_close_msg, convertUtf8ToCurrentCodepage(force_close_msg).c_str());
+  #endif
     tray.notification_text = msg;
     tray.tooltip = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
-    static char force_close_msg[256];
-    snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
     tray.menu[1].text = force_close_msg;
     tray_update(&tray);
   }
@@ -278,6 +289,9 @@ namespace system_tray {
     tray_update(&tray);
     char msg[256];
     snprintf(msg, std::size(msg), "Streaming paused for %s", app_name.c_str());
+  #ifdef _WIN32
+    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+  #endif
     tray.icon = TRAY_ICON_PAUSING;
     tray.notification_title = "Stream Paused";
     tray.notification_text = msg;
@@ -299,7 +313,10 @@ namespace system_tray {
     tray.icon = TRAY_ICON;
     tray_update(&tray);
     char msg[256];
-    snprintf(msg, std::size(msg), "Application %s successfully stopped", app_name.c_str());
+    snprintf(msg, std::size(msg), "Streaming paused for %s", app_name.c_str());
+  #ifdef _WIN32
+    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+  #endif
     tray.icon = TRAY_ICON;
     tray.notification_icon = TRAY_ICON;
     tray.notification_title = "Application Stopped";
