@@ -33,10 +33,15 @@ namespace rtsp_stream {
     std::string surround_params;
     bool enable_hdr;
     bool enable_sops;
+    bool virtual_display;
 
     std::optional<crypto::cipher::gcm_t> rtsp_cipher;
     std::string rtsp_url_scheme;
     uint32_t rtsp_iv_counter;
+
+  #ifdef _WIN32
+    GUID display_guid{};
+  #endif
   };
 
   void

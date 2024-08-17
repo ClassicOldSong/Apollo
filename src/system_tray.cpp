@@ -9,6 +9,7 @@
     #define WIN32_LEAN_AND_MEAN
     #include <accctrl.h>
     #include <aclapi.h>
+    #include "platform/windows/utils.h"
     #define TRAY_ICON WEB_DIR "images/apollo.ico"
     #define TRAY_ICON_PLAYING WEB_DIR "images/apollo-playing.ico"
     #define TRAY_ICON_PAUSING WEB_DIR "images/apollo-pausing.ico"
@@ -46,7 +47,6 @@
   #include "network.h"
   #include "src/entry_handler.h"
   #include "version.h"
-  #include "misc.h"
 
 using namespace std::literals;
 

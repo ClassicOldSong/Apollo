@@ -31,6 +31,7 @@
 #ifdef _WIN32
   // from_utf8() string conversion function
   #include "platform/windows/misc.h"
+  #include "platform/windows/virtual_display.h"
 
   // _SH constants for _wfsopen()
   #include <share.h>
@@ -44,6 +45,10 @@ namespace proc {
 
   proc_t proc;
 
+#ifdef _WIN32
+  bool vdisplayDriverInitialized = false;
+#endif
+
   class deinit_t: public platf::deinit_t {
   public:
     ~deinit_t() {
@@ -53,6 +58,9 @@ namespace proc {
 
   std::unique_ptr<platf::deinit_t>
   init() {
+  #ifdef _WIN32
+    vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
+  #endif
     return std::make_unique<deinit_t>();
   }
 
@@ -199,6 +207,32 @@ namespace proc {
       terminate();
     });
 
+    _launch_session = launch_session;
+
+#ifdef _WIN32
+    if (launch_session->virtual_display) {
+      if (!vdisplayDriverInitialized) {
+        // Try init driver again
+        vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
+      }
+
+      if (vdisplayDriverInitialized) {
+        std::wstring vdisplay_name = VDISPLAY::createVirtualDisplay(
+          launch_session->unique_id.c_str(),
+          launch_session->device_name.c_str(),
+          _app.name.c_str(),
+          launch_session->width,
+          launch_session->height,
+          launch_session->fps,
+          launch_session->display_guid
+        );
+
+        VDISPLAY::changeDisplaySettings(vdisplay_name.c_str(), launch_session->width, launch_session->height, launch_session->fps);
+        VDISPLAY::setPrimaryDisplay(vdisplay_name.c_str());
+      }
+    }
+#endif
+
     for (; _app_prep_it != std::end(_app.prep_cmds); ++_app_prep_it) {
       auto &cmd = *_app_prep_it;
 
@@ -332,6 +366,13 @@ namespace proc {
     }
 
     _pipe.reset();
+
+#ifdef _WIN32
+    if (vdisplayDriverInitialized && _launch_session && _launch_session->virtual_display) {
+      VDISPLAY::removeVirtualDisplay(_launch_session->display_guid);
+    }
+#endif
+
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
     bool has_run = _app_id > 0;
 
@@ -344,6 +385,7 @@ namespace proc {
 
     _app_id = -1;
     display_name.clear();
+    _launch_session.reset();
   }
 
   const std::vector<ctx_t> &

@@ -21,6 +21,10 @@
 namespace proc {
   using file_t = util::safe_ptr_v2<FILE, int, fclose>;
 
+#ifdef _WIN32
+  extern bool vdisplayDriverInitialized;
+#endif
+
   typedef config::prep_cmd_t cmd_t;
   /**
    * pre_cmds -- guaranteed to be executed unless any of the commands fail.
@@ -100,6 +104,8 @@ namespace proc {
 
   private:
     int _app_id;
+
+    std::shared_ptr<rtsp_stream::launch_session_t> _launch_session;
 
     boost::process::environment _env;
     std::vector<ctx_t> _apps;
