@@ -64,6 +64,7 @@ namespace proc {
     bool elevated;
     bool auto_detach;
     bool wait_all;
+    bool virtual_display;
     std::chrono::seconds exit_timeout;
   };
 

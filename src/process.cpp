@@ -58,9 +58,6 @@ namespace proc {
 
   std::unique_ptr<platf::deinit_t>
   init() {
-  #ifdef _WIN32
-    vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
-  #endif
     return std::make_unique<deinit_t>();
   }
 
@@ -210,7 +207,9 @@ namespace proc {
     _launch_session = launch_session;
 
 #ifdef _WIN32
-    if (launch_session->virtual_display) {
+    if (launch_session->virtual_display || _app.virtual_display) {
+      // Mark as no vdisplay by default
+      launch_session->virtual_display = false;
       if (!vdisplayDriverInitialized) {
         // Try init driver again
         vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
@@ -226,6 +225,8 @@ namespace proc {
           launch_session->fps,
           launch_session->display_guid
         );
+        // Set virtual_display to true when everything went fine
+        launch_session->virtual_display = true;
 
         VDISPLAY::changeDisplaySettings(vdisplay_name.c_str(), launch_session->width, launch_session->height, launch_session->fps);
         VDISPLAY::setPrimaryDisplay(vdisplay_name.c_str());
@@ -633,6 +634,32 @@ namespace proc {
       std::set<std::string> ids;
       std::vector<proc::ctx_t> apps;
       int i = 0;
+
+      if (vdisplayDriverInitialized) {
+        proc::ctx_t ctx;
+        ctx.name = "Virtual Display";
+        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+        ctx.virtual_display = true;
+
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = true;
+        ctx.exit_timeout = 5s;
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          // Avoid using index to generate id if possible
+          ctx.id = std::get<0>(possible_ids);
+        }
+        else {
+          // Fallback to include index on collision
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        apps.emplace_back(std::move(ctx));
+      }
+
       for (auto &[_, app_node] : apps_node) {
         proc::ctx_t ctx;
 
@@ -648,6 +675,7 @@ namespace proc {
         auto auto_detach = app_node.get_optional<bool>("auto-detach"s);
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
+        auto virtual_display = app_node.get_optional<bool>("virtual-display");
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -715,6 +743,7 @@ namespace proc {
         ctx.auto_detach = auto_detach.value_or(true);
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds { exit_timeout.value_or(5) };
+        ctx.virtual_display = virtual_display.value_or(false);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {
@@ -747,6 +776,12 @@ namespace proc {
 
   void
   refresh(const std::string &file_name) {
+  #ifdef _WIN32
+    if (!vdisplayDriverInitialized) {
+      vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
+    }
+  #endif
+
     auto proc_opt = proc::parse(file_name);
 
     if (proc_opt) {

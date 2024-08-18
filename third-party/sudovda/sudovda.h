@@ -79,7 +79,7 @@ static const bool AddVirtualDisplay(HANDLE hDevice, UINT Width, UINT Height, UIN
 	);
 
 	if (!success) {
-		std::cerr << "AddVirtualDisplay failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] AddVirtualDisplay failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
@@ -100,7 +100,7 @@ static const bool RemoveVirtualDisplay(HANDLE hDevice, const GUID& MonitorGuid) 
 	);
 
 	if (!success) {
-		std::cerr << "RemoveVirtualDisplay failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] RemoveVirtualDisplay failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
@@ -121,7 +121,7 @@ static const bool SetRenderAdapter(HANDLE hDevice, const LUID& AdapterLuid) {
 	);
 
 	if (!success) {
-		std::cerr << "SetRenderAdapter failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] SetRenderAdapter failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
@@ -141,7 +141,7 @@ static const bool GetWatchdogTimeout(HANDLE hDevice, VIRTUAL_DISPLAY_GET_WATCHDO
 	);
 
 	if (!success) {
-		std::cerr << "DeviceIoControl failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] GetWatchdogTimeout failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
@@ -161,7 +161,7 @@ static const bool GetProtocolVersion(HANDLE hDevice, VIRTUAL_DISPLAY_GET_PROTOCO
 	);
 
 	if (!success) {
-		std::cerr << "DeviceIoControl failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] GetProtocolVersion failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
@@ -206,7 +206,7 @@ static const bool PingDriver(HANDLE hDevice) {
 	);
 
 	if (!success) {
-		std::cerr << "DeviceIoControl failed: " << GetLastError() << std::endl;
+		std::cerr << "[SUVDA] PingDriver failed: " << GetLastError() << std::endl;
 	}
 
 	return success;
