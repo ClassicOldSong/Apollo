@@ -53,6 +53,7 @@
         v-if="currentTab === 'av'"
         :config="config"
         :platform="platform"
+        :vdisplay="vdisplayStatus"
       >
       </audio-video>
 
@@ -131,6 +132,7 @@
         restarted: false,
         config: null,
         currentTab: "general",
+        vdisplayStatus: false,
         global_prep_cmd: [],
         tabs: [ // TODO: Move the options to each Component instead, encapsulate.
           {
@@ -308,6 +310,9 @@
           delete this.config.platform;
           delete this.config.status;
           delete this.config.version;
+
+          this.vdisplayStatus = this.config.vdisplayStatus === 'true';
+          delete this.config.vdisplayStatus;
 
           // TODO: let each tab's Component handle it's own data instead of doing it here
 

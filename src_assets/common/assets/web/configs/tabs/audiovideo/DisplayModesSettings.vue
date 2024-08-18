@@ -6,6 +6,7 @@ import PlatformLayout from '../../../PlatformLayout.vue'
 const props = defineProps([
   'platform',
   'config',
+  'vdisplay',
   'min_fps_factor',
 ])
 
@@ -24,6 +25,9 @@ const fpsIn = ref("")
       <div class="form-text">{{ $t('config.min_fps_factor_desc') }}</div>
     </div>
 
+    <div class="alert" :class="[vdisplay ? 'alert-success' : 'alert-warning']">
+      <label><i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{vdisplay && "Ready" || "Not Ready"}}</label>
+    </div>
   </div>
 </template>
 

@@ -84,22 +84,6 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 	return true;
 }
 
-bool openVDisplayDevice() {
-	SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
-	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
-		return false;
-	}
-
-	if (!CheckProtocolCompatible(SUDOVDA_DRIVER_HANDLE)) {
-		printf("[SUDOVDA] SUDOVDA protocol not compatible with driver!\n");
-		CloseHandle(SUDOVDA_DRIVER_HANDLE);
-		SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
-		return false;
-	}
-
-	return true;
-}
-
 bool startPingThread() {
 	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
 		return false;
@@ -127,6 +111,22 @@ bool startPingThread() {
 	}
 
 	return true;
+}
+
+bool openVDisplayDevice() {
+	SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
+	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+
+	if (!CheckProtocolCompatible(SUDOVDA_DRIVER_HANDLE)) {
+		printf("[SUDOVDA] SUDOVDA protocol not compatible with driver!\n");
+		CloseHandle(SUDOVDA_DRIVER_HANDLE);
+		SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
+		return false;
+	}
+
+	return startPingThread();
 }
 
 std::wstring createVirtualDisplay(

@@ -547,7 +547,7 @@ namespace confighttp {
     outputTree.put("platform", SUNSHINE_PLATFORM);
     outputTree.put("version", PROJECT_VER);
   #ifdef _WIN32
-    outputTree.put("vdisplaySupported", proc::vdisplayDriverInitialized ? "true" : "false");
+    outputTree.put("vdisplayStatus", proc::vdisplayDriverInitialized ? "true" : "false");
   #endif
 
     auto vars = config::parse_config(file_handler::read_file(config::sunshine.config_file.c_str()));

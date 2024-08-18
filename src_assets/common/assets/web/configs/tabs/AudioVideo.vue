@@ -11,6 +11,7 @@ import DisplayModesSettings from "./audiovideo/DisplayModesSettings.vue";
 const props = defineProps([
   'platform',
   'config',
+  'vdisplay',
   'min_fps_factor',
 ])
 
@@ -95,6 +96,7 @@ const config = ref(props.config)
     <DisplayModesSettings
         :platform="platform"
         :config="config"
+        :vdisplay="vdisplay"
         :min_fps_factor="min_fps_factor"
     />
 

@@ -15,8 +15,8 @@ namespace VDISPLAY {
 	LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate);
 	bool setPrimaryDisplay(const wchar_t* primaryDeviceName);
 
-	bool openVDisplayDevice();
 	bool startPingThread();
+	bool openVDisplayDevice();
 	std::wstring createVirtualDisplay(
 		const char* s_client_uid,
 		const char* s_client_name,
