@@ -6,6 +6,7 @@
 
 #include "network.h"
 #include "thread_safe.h"
+#include "uuid.h"
 
 namespace http {
 
@@ -30,6 +31,7 @@ namespace http {
   url_get_host(const std::string &url);
 
   extern std::string unique_id;
+  extern uuid_util::uuid_t uuid;
   extern net::net_e origin_web_ui_allowed;
 
 }  // namespace http

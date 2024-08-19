@@ -238,9 +238,11 @@ namespace nvhttp {
     auto unique_id_p = tree.get_optional<std::string>("root.uniqueid");
     if (!unique_id_p) {
       // This file doesn't contain moonlight credentials
-      http::unique_id = uuid_util::uuid_t::generate().string();
+      http::uuid = uuid_util::uuid_t::generate();
+      http::unique_id = http::uuid.string();
       return;
     }
+    http::uuid = uuid_util::uuid_t::parse(*unique_id_p);
     http::unique_id = std::move(*unique_id_p);
 
     auto root = tree.get_child("root");
@@ -335,6 +337,7 @@ namespace nvhttp {
     launch_session->gcmap = util::from_view(get_arg(args, "gcmap", "0"));
     launch_session->enable_hdr = util::from_view(get_arg(args, "hdrMode", "0"));
     launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0"));
+    launch_session->scale_factor = util::from_view(get_arg(args, "scale_factor", "100"));
 
     // Encrypted RTSP is enabled with client reported corever >= 1
     auto corever = util::from_view(get_arg(args, "corever", "0"));

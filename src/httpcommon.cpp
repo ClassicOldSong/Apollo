@@ -30,7 +30,6 @@
 #include "platform/common.h"
 #include "rtsp.h"
 #include "utility.h"
-#include "uuid.h"
 
 namespace http {
   using namespace std::literals;
@@ -43,6 +42,7 @@ namespace http {
   user_creds_exist(const std::string &file);
 
   std::string unique_id;
+  uuid_util::uuid_t uuid;
   net::net_e origin_web_ui_allowed;
 
   int
@@ -51,7 +51,8 @@ namespace http {
     origin_web_ui_allowed = net::from_enum_string(config::nvhttp.origin_web_ui_allowed);
 
     if (clean_slate) {
-      unique_id = uuid_util::uuid_t::generate().string();
+      uuid = uuid_util::uuid_t::generate();
+      unique_id = uuid.string();
       auto dir = std::filesystem::temp_directory_path() / "Sunshine"sv;
       config::nvhttp.cert = (dir / ("cert-"s + unique_id)).string();
       config::nvhttp.pkey = (dir / ("pkey-"s + unique_id)).string();

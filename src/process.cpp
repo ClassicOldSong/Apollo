@@ -25,6 +25,7 @@
 #include "crypto.h"
 #include "logging.h"
 #include "platform/common.h"
+#include "httpcommon.h"
 #include "system_tray.h"
 #include "utility.h"
 
@@ -157,13 +158,29 @@ namespace proc {
     _app_prep_begin = std::begin(_app.prep_cmds);
     _app_prep_it = _app_prep_begin;
 
+    uint32_t client_width = launch_session->width;
+    uint32_t client_height = launch_session->height;
+
+    uint32_t render_width = client_width;
+    uint32_t render_height = client_height;
+
+    if (launch_session->scale_factor != 100) {
+      // Chop the last bit to ensure the scaled resolution is even numbered
+      // Most odd resolution won't work well
+      render_width *= 100 / launch_session->scale_factor & ~1;
+      render_height *= 100 / launch_session->scale_factor & ~1;
+    }
+
     // Add Stream-specific environment variables
     _env["SUNSHINE_APP_ID"] = std::to_string(_app_id);
     _env["SUNSHINE_APP_NAME"] = _app.name;
     _env["SUNSHINE_CLIENT_UID"] = launch_session->unique_id;
     _env["SUNSHINE_CLIENT_NAME"] = launch_session->device_name;
-    _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(launch_session->width);
-    _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(launch_session->height);
+    _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(render_width);
+    _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(render_height);
+    _env["SUNSHINE_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
+    _env["SUNSHINE_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
+    _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(launch_session->scale_factor);
     _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
     _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
     _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
@@ -216,12 +233,14 @@ namespace proc {
       if (vdisplayDriverInitialized) {
         std::wstring prevPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
 
+        launch_session->display_guid = *(GUID*)(void*)&http::uuid;
+
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           launch_session->unique_id.c_str(),
           launch_session->device_name.c_str(),
           _app.name.c_str(),
-          launch_session->width,
-          launch_session->height,
+          render_width,
+          render_height,
           launch_session->fps,
           launch_session->display_guid
         );

@@ -175,7 +175,6 @@ std::wstring createVirtualDisplay(
 		}
 		memcpy((void*)&guid, (void*)s_client_uid, len);
 	} else {
-		guid = DEFAULT_DISPLAY_GUID;
 		s_client_uid = "unknown";
 	}
 
