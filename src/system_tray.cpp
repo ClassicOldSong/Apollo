@@ -249,8 +249,6 @@ namespace system_tray {
       return;
     }
 
-    printf("Tray playing: %s\n", app_name.c_str());
-
     tray.notification_title = NULL;
     tray.notification_text = NULL;
     tray.notification_cb = NULL;

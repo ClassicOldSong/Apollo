@@ -65,6 +65,7 @@ namespace proc {
     bool auto_detach;
     bool wait_all;
     bool virtual_display;
+    bool virtual_display_primary;
     std::chrono::seconds exit_timeout;
   };
 
@@ -73,6 +74,7 @@ namespace proc {
     KITTY_DEFAULT_CONSTR_MOVE_THROW(proc_t)
 
     std::string display_name;
+    bool virtual_display;
 
     proc_t(
       boost::process::environment &&env,

@@ -208,15 +208,15 @@ namespace proc {
 
 #ifdef _WIN32
     if (launch_session->virtual_display || _app.virtual_display) {
-      // Mark as no vdisplay by default
-      launch_session->virtual_display = false;
       if (!vdisplayDriverInitialized) {
         // Try init driver again
         vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
       }
 
       if (vdisplayDriverInitialized) {
-        std::wstring vdisplay_name = VDISPLAY::createVirtualDisplay(
+        std::wstring prevPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
+
+        std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           launch_session->unique_id.c_str(),
           launch_session->device_name.c_str(),
           _app.name.c_str(),
@@ -225,11 +225,33 @@ namespace proc {
           launch_session->fps,
           launch_session->display_guid
         );
-        // Set virtual_display to true when everything went fine
-        launch_session->virtual_display = true;
 
-        VDISPLAY::changeDisplaySettings(vdisplay_name.c_str(), launch_session->width, launch_session->height, launch_session->fps);
-        VDISPLAY::setPrimaryDisplay(vdisplay_name.c_str());
+        std::wstring currentPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
+
+        // Apply display settings
+        VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), launch_session->width, launch_session->height, launch_session->fps);
+
+        // Determine if we need to set the virtual display as primary
+        bool shouldSetPrimary = false;
+
+        if (launch_session->virtual_display || _app.virtual_display_primary) {
+            shouldSetPrimary = (currentPrimaryDisplayName != vdisplayName);
+        } else {
+            shouldSetPrimary = (currentPrimaryDisplayName != prevPrimaryDisplayName);
+        }
+
+        // Set primary display if needed
+        if (shouldSetPrimary) {
+            VDISPLAY::setPrimaryDisplay(
+              (launch_session->virtual_display || _app.virtual_display_primary)
+              ? vdisplayName.c_str()
+              : prevPrimaryDisplayName.c_str()
+            );
+        }
+
+        // Set virtual_display to true when everything went fine
+        this->virtual_display = true;
+        this->display_name = platf::to_utf8(vdisplayName);
       }
     }
 #endif
@@ -369,7 +391,7 @@ namespace proc {
     _pipe.reset();
 
 #ifdef _WIN32
-    if (vdisplayDriverInitialized && _launch_session && _launch_session->virtual_display) {
+    if (vdisplayDriverInitialized && _launch_session && this->virtual_display) {
       VDISPLAY::removeVirtualDisplay(_launch_session->display_guid);
     }
 #endif
@@ -387,6 +409,7 @@ namespace proc {
     _app_id = -1;
     display_name.clear();
     _launch_session.reset();
+    virtual_display = false;
   }
 
   const std::vector<ctx_t> &
@@ -640,6 +663,7 @@ namespace proc {
         ctx.name = "Virtual Display";
         ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
         ctx.virtual_display = true;
+        ctx.virtual_display_primary = true;
 
         ctx.elevated = false;
         ctx.auto_detach = true;
@@ -676,6 +700,7 @@ namespace proc {
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
         auto virtual_display = app_node.get_optional<bool>("virtual-display");
+        auto virtual_display_primary = app_node.get_optional<bool>("virtual-display-primary");
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -744,6 +769,7 @@ namespace proc {
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds { exit_timeout.value_or(5) };
         ctx.virtual_display = virtual_display.value_or(false);
+        ctx.virtual_display_primary = virtual_display_primary.value_or(true);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {

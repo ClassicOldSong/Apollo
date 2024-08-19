@@ -229,11 +229,18 @@
           <div class="form-text">{{ $t('apps.wait_all_desc') }}</div>
         </div>
         <!-- use virtual display -->
-        <div class="mb-3 form-check">
+        <div class="mb-3 form-check" v-if="platform === 'windows'">
           <label for="virtualDisplay" class="form-check-label">{{ $t('apps.virtual_display') }}</label>
           <input type="checkbox" class="form-check-input" id="virtualDisplay" v-model="editForm['virtual-display']"
             true-value="true" false-value="false" />
           <div class="form-text">{{ $t('apps.virtual_display_desc') }}</div>
+        </div>
+        <!-- set virtual display to primary -->
+        <div class="mb-3 form-check" v-if="platform === 'windows' && editForm['virtual-display'] == 'true'">
+          <label for="virtualDisplayPrimary" class="form-check-label">{{ $t('apps.virtual_display_primary') }}</label>
+          <input type="checkbox" class="form-check-input" id="virtualDisplayPrimary" v-model="editForm['virtual-display-primary']"
+            true-value="true" false-value="false" />
+          <div class="form-text">{{ $t('apps.virtual_display_primary_desc') }}</div>
         </div>
         <!-- exit timeout -->
         <div class="mb-3">
@@ -373,11 +380,13 @@
   import { createApp } from 'vue'
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
+  import PlatformLayout from './PlatformLayout.vue'
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
   const app = createApp({
     components: {
-      Navbar
+      Navbar,
+      PlatformLayout
     },
     data() {
       return {
@@ -417,7 +426,8 @@
           "exit-timeout": 5,
           "prep-cmd": [],
           detached: [],
-          "image-path": ""
+          "image-path": "",
+          "virtual-display-primary": true
         };
         this.editForm.index = -1;
         this.showEditForm = true;
@@ -442,6 +452,9 @@
         }
         if (this.editForm["exit-timeout"] === undefined) {
           this.editForm["exit-timeout"] = 5;
+        }
+        if (typeof this.editForm["virtual-display-primary"] === "undefined") {
+          this.editForm["virtual-display-primary"] = true;
         }
         this.showEditForm = true;
       },

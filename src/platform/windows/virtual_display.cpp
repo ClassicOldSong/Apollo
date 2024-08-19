@@ -36,6 +36,24 @@ LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int
 	return 0;
 }
 
+std::wstring getPrimaryDisplay() {
+	DISPLAY_DEVICEW displayDevice;
+	displayDevice.cb = sizeof(DISPLAY_DEVICE);
+
+	std::wstring primaryDeviceName;
+
+	int deviceIndex = 0;
+	while (EnumDisplayDevicesW(NULL, deviceIndex, &displayDevice, 0)) {
+		if (displayDevice.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) {
+			primaryDeviceName = displayDevice.DeviceName;
+			break;
+		}
+		deviceIndex++;
+	}
+
+	return primaryDeviceName;
+}
+
 bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 	DEVMODEW primaryDevMode{};
 	if (!getDeviceSettings(primaryDeviceName, primaryDevMode)) {
@@ -178,7 +196,7 @@ std::wstring createVirtualDisplay(
 		retryInterval *= 2;
 	}
 
-	wprintf(L"[SUDOVDA] Virtual display added successfully: %ws\n", deviceName);
+	wprintf(L"[SUDOVDA] Virtual display added successfully: %ls\n", deviceName);
 	printf("[SUDOVDA] Configuration: W: %d, H: %d, FPS: %d\n", width, height, fps);
 
 	return std::wstring(deviceName);

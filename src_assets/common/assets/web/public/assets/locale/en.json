@@ -81,7 +81,9 @@
     "working_dir": "Working Directory",
     "working_dir_desc": "The working directory that should be passed to the process. For example, some applications use the working directory to search for configuration files. If not set, Apollo will default to the parent directory of the command",
     "virtual_display": "Use Virtual Display",
-    "virtual_display_desc": "Always use Virtual Display on this app, overriding client request."
+    "virtual_display_desc": "Always use Virtual Display on this app, overriding client request. Please make sure the SudoVDA driver is installed and enabled.",
+    "virtual_display_primary": "Set Virtual Display as Primary Display",
+    "virtual_display_primary_desc": "Automatically set the Virtual Display as Primary Display when the app starts. (Recommended to keep on)"
   },
   "config": {
     "adapter_name": "Adapter Name",
