@@ -70,6 +70,7 @@ namespace proc {
     bool wait_all;
     bool virtual_display;
     bool virtual_display_primary;
+    int  scale_factor;
     std::chrono::seconds exit_timeout;
   };
 

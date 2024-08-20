@@ -178,12 +178,17 @@ namespace proc {
     uint32_t render_width = client_width;
     uint32_t render_height = client_height;
 
-    if (launch_session->scale_factor != 100) {
-      render_width *= ((float)launch_session->scale_factor / 100);
-      render_height *= ((float)launch_session->scale_factor / 100);
+    int scale_factor = launch_session->scale_factor;
+    if (_app.scale_factor != 100) {
+      scale_factor = _app.scale_factor;
+    }
+
+    if (scale_factor != 100) {
+      render_width *= ((float)scale_factor / 100);
+      render_height *= ((float)scale_factor / 100);
 
       // Chop the last bit to ensure the scaled resolution is even numbered
-      // Most odd resolution won't work well
+      // Most odd resolutions won't work well
       render_width &= ~1;
       render_height &= ~1;
     }
@@ -197,7 +202,7 @@ namespace proc {
     _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(render_height);
     _env["SUNSHINE_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
     _env["SUNSHINE_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
-    _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(launch_session->scale_factor);
+    _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(scale_factor);
     _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
     _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
     _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
@@ -699,6 +704,7 @@ namespace proc {
       std::vector<proc::ctx_t> apps;
       int i = 0;
 
+    #ifdef _WIN32
       if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         proc::ctx_t ctx;
         ctx.name = "Virtual Display";
@@ -724,6 +730,7 @@ namespace proc {
 
         apps.emplace_back(std::move(ctx));
       }
+    #endif
 
       for (auto &[_, app_node] : apps_node) {
         proc::ctx_t ctx;
@@ -740,8 +747,9 @@ namespace proc {
         auto auto_detach = app_node.get_optional<bool>("auto-detach"s);
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
-        auto virtual_display = app_node.get_optional<bool>("virtual-display");
-        auto virtual_display_primary = app_node.get_optional<bool>("virtual-display-primary");
+        auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
+        auto virtual_display_primary = app_node.get_optional<bool>("virtual-display-primary"s);
+        auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -811,6 +819,7 @@ namespace proc {
         ctx.exit_timeout = std::chrono::seconds { exit_timeout.value_or(5) };
         ctx.virtual_display = virtual_display.value_or(false);
         ctx.virtual_display_primary = virtual_display_primary.value_or(true);
+        ctx.scale_factor = resolution_scale_factor.value_or(100);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {

@@ -80,10 +80,12 @@
     "wait_all_desc": "This will continue streaming until all processes started by the app have terminated. When unchecked, streaming will stop when the initial app process exits, even if other app processes are still running.",
     "working_dir": "Working Directory",
     "working_dir_desc": "The working directory that should be passed to the process. For example, some applications use the working directory to search for configuration files. If not set, Apollo will default to the parent directory of the command",
-    "virtual_display": "Use Virtual Display",
-    "virtual_display_desc": "Always use Virtual Display on this app, overriding client request. Please make sure the SudoVDA driver is installed and enabled.",
-    "virtual_display_primary": "Set Virtual Display as Primary Display",
-    "virtual_display_primary_desc": "Automatically set the Virtual Display as Primary Display when the app starts. (Recommended to keep on)"
+    "virtual_display": "Always use Virtual Display",
+    "virtual_display_desc": "Always use virtual display on this app, overriding client request. Please make sure the SudoVDA driver is installed and enabled.",
+    "virtual_display_primary": "Set virtual display as primary display",
+    "virtual_display_primary_desc": "Automatically set the virtual display as primary display when the app starts. Virtual display will always be set to primary when client requests to use virtual display. (Recommended to keep on)",
+    "resolution_scale_factor": "Resolution Scale Factor",
+    "resolution_scale_factor_desc": "Scale the client requested resolution based on this factor. e.g. 2000x1000 with a factor of 120% will become 2400x1200. Overrides client requested factor when the number isn't 100%. This option won't affect client requested streaming resolution."
   },
   "config": {
     "adapter_name": "Adapter Name",

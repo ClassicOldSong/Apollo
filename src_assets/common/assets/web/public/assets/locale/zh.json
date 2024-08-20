@@ -77,7 +77,13 @@
     "wait_all": "继续串流直到所有应用进程终止",
     "wait_all_desc": "这将继续串流直到应用程序启动的所有进程终止。 当未选中时，串流将在初始应用进程终止时停止，即使其他应用进程仍在运行。",
     "working_dir": "工作目录",
-    "working_dir_desc": "应传递给进程的工作目录。例如，某些应用程序使用工作目录搜索配置文件。如果不设置，Apollo 将默认使用命令的父目录"
+    "working_dir_desc": "应传递给进程的工作目录。例如，某些应用程序使用工作目录搜索配置文件。如果不设置，Apollo 将默认使用命令的父目录",
+    "virtual_display": "总是使用虚拟显示器",
+    "virtual_display_desc": "在使用这个App的时候总是使用虚拟显示器，覆盖客户端请求。请确保 SudoVDA 虚拟显示器驱动已安装并启用。",
+    "virtual_display_primary": "设置虚拟显示器为主显示器",
+    "virtual_display_primary_desc": "在App启动时自动将虚拟显示器设为主显示器。当客户端请求使用虚拟显示器时将无条件设为主显示器。（推荐保持开启）",
+    "resolution_scale_factor": "分辨率缩放比例",
+    "resolution_scale_factor_desc": "基于此比例缩放客户端请求的分辨率。例如 2000x1000 缩放 120% 将变成 2400x1200。当此项为非 100% 时覆盖客户端请求的缩放比例。此选项不会影响客户端请求的串流分辨率。"
   },
   "config": {
     "adapter_name": "适配器名称",
