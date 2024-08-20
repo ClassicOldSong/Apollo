@@ -852,6 +852,7 @@ namespace proc {
 
   void
   refresh(const std::string &file_name) {
+    proc.terminate();
   #ifdef _WIN32
     if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
       initVDisplayDriver();
