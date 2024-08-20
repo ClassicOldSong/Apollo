@@ -18,11 +18,15 @@
 #include "rtsp.h"
 #include "utility.h"
 
+#ifdef _WIN32
+  #include "platform/windows/virtual_display.h"
+#endif
+
 namespace proc {
   using file_t = util::safe_ptr_v2<FILE, int, fclose>;
 
 #ifdef _WIN32
-  extern bool vdisplayDriverInitialized;
+  extern VDISPLAY::DRIVER_STATUS vDisplayDriverStatus;
 #endif
 
   typedef config::prep_cmd_t cmd_t;

@@ -32,7 +32,6 @@
 #ifdef _WIN32
   // from_utf8() string conversion function
   #include "platform/windows/misc.h"
-  #include "platform/windows/virtual_display.h"
 
   // _SH constants for _wfsopen()
   #include <share.h>
@@ -47,7 +46,21 @@ namespace proc {
   proc_t proc;
 
 #ifdef _WIN32
-  bool vdisplayDriverInitialized = false;
+  VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
+
+  void onVDisplayWatchdogFailed() {
+    vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::WATCHDOG_FAILED;
+    VDISPLAY::closeVDisplayDevice();
+  }
+
+  void initVDisplayDriver() {
+    vDisplayDriverStatus = VDISPLAY::openVDisplayDevice();
+    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+      if (!VDISPLAY::startPingThread(onVDisplayWatchdogFailed)) {
+        onVDisplayWatchdogFailed();
+      }
+    }
+  }
 #endif
 
   class deinit_t: public platf::deinit_t {
@@ -225,15 +238,15 @@ namespace proc {
 
 #ifdef _WIN32
     if (launch_session->virtual_display || _app.virtual_display) {
-      if (!vdisplayDriverInitialized) {
+      if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
-        vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
+        initVDisplayDriver();
       }
 
-      if (vdisplayDriverInitialized) {
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         std::wstring prevPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
 
-        launch_session->display_guid = *(GUID*)(void*)&http::uuid;
+        memcpy(&launch_session->display_guid, &http::uuid, sizeof(GUID));
 
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           launch_session->unique_id.c_str(),
@@ -410,7 +423,7 @@ namespace proc {
     _pipe.reset();
 
 #ifdef _WIN32
-    if (vdisplayDriverInitialized && _launch_session && this->virtual_display) {
+    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display) {
       VDISPLAY::removeVirtualDisplay(_launch_session->display_guid);
     }
 #endif
@@ -677,7 +690,7 @@ namespace proc {
       std::vector<proc::ctx_t> apps;
       int i = 0;
 
-      if (vdisplayDriverInitialized) {
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         proc::ctx_t ctx;
         ctx.name = "Virtual Display";
         ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
@@ -822,8 +835,8 @@ namespace proc {
   void
   refresh(const std::string &file_name) {
   #ifdef _WIN32
-    if (!vdisplayDriverInitialized) {
-      vdisplayDriverInitialized = VDISPLAY::openVDisplayDevice();
+    if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
+      initVDisplayDriver();
     }
   #endif
 

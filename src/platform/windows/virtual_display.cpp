@@ -102,7 +102,32 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 	return true;
 }
 
-bool startPingThread() {
+void closeVDisplayDevice() {
+	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
+		return;
+	}
+
+	CloseHandle(SUDOVDA_DRIVER_HANDLE);
+
+	SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
+}
+
+DRIVER_STATUS openVDisplayDevice() {
+	SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
+	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
+		return DRIVER_STATUS::FAILED;
+	}
+
+	if (!CheckProtocolCompatible(SUDOVDA_DRIVER_HANDLE)) {
+		printf("[SUDOVDA] SUDOVDA protocol not compatible with driver!\n");
+		closeVDisplayDevice();
+		return DRIVER_STATUS::VERSION_INCOMPATIBLE;
+	}
+
+	return DRIVER_STATUS::OK;
+}
+
+bool startPingThread(std::function<void()> failCb) {
 	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
 		return false;
 	}
@@ -117,10 +142,17 @@ bool startPingThread() {
 
 	if (watchdogOut.Timeout) {
 		auto sleepInterval = watchdogOut.Timeout * 1000 / 2;
-		std::thread ping_thread([sleepInterval]{
+		std::thread ping_thread([sleepInterval, failCb = std::move(failCb)]{
+			uint8_t fail_count = 0;
 			for (;;) {
 				if (!sleepInterval) return;
-				if (!PingDriver(SUDOVDA_DRIVER_HANDLE)) return;
+				if (!PingDriver(SUDOVDA_DRIVER_HANDLE)) {
+					fail_count += 1;
+					if (fail_count > 3) {
+						failCb();
+						return;
+					}
+				};
 				Sleep(sleepInterval);
 			}
 		});
@@ -129,22 +161,6 @@ bool startPingThread() {
 	}
 
 	return true;
-}
-
-bool openVDisplayDevice() {
-	SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
-	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
-		return false;
-	}
-
-	if (!CheckProtocolCompatible(SUDOVDA_DRIVER_HANDLE)) {
-		printf("[SUDOVDA] SUDOVDA protocol not compatible with driver!\n");
-		CloseHandle(SUDOVDA_DRIVER_HANDLE);
-		SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
-		return false;
-	}
-
-	return startPingThread();
 }
 
 std::wstring createVirtualDisplay(

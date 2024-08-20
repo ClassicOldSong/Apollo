@@ -1,5 +1,7 @@
 #pragma once
 
+#include <functional>
+
 #ifndef FILE_DEVICE_UNKNOWN
 #define FILE_DEVICE_UNKNOWN 0x00000022
 #endif
@@ -9,6 +11,14 @@
 #include <sudovda/sudovda.h>
 
 namespace VDISPLAY {
+	enum class DRIVER_STATUS {
+		UNKNOWN              = 1,
+		OK                   = 0,
+		FAILED               = -1,
+		VERSION_INCOMPATIBLE = -2,
+		WATCHDOG_FAILED      = -3
+	};
+
 	extern HANDLE SUDOVDA_DRIVER_HANDLE;
 
 	LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode);
@@ -16,8 +26,9 @@ namespace VDISPLAY {
 	std::wstring getPrimaryDisplay();
 	bool setPrimaryDisplay(const wchar_t* primaryDeviceName);
 
-	bool startPingThread();
-	bool openVDisplayDevice();
+	void closeVDisplayDevice();
+	DRIVER_STATUS openVDisplayDevice();
+	bool startPingThread(std::function<void()> failCb);
 	std::wstring createVirtualDisplay(
 		const char* s_client_uid,
 		const char* s_client_name,

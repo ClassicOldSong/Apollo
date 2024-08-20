@@ -36,6 +36,10 @@
 #include "uuid.h"
 #include "video.h"
 
+#ifdef _WIN32
+  #include "platform/windows/virtual_display.h"
+#endif
+
 using namespace std::literals;
 namespace nvhttp {
 
@@ -708,7 +712,7 @@ namespace nvhttp {
 
   #ifdef _WIN32
     tree.put("root.VirtualDisplayCapable", true);
-    tree.put("root.VirtualDisplayDriverReady", proc::vdisplayDriverInitialized);
+    tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
   #endif
 
     // Only include the MAC address for requests sent from paired clients over HTTPS.
