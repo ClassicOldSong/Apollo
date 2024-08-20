@@ -5,6 +5,10 @@
 #include <initguid.h>
 #include <combaseapi.h>
 #include <thread>
+
+#include <wrl/client.h>
+#include <dxgi.h>
+
 #include "virtual_display.h"
 
 using namespace SUDOVDA;
@@ -161,6 +165,38 @@ bool startPingThread(std::function<void()> failCb) {
 	}
 
 	return true;
+}
+
+bool setRenderAdapterByName(const std::wstring& adapterName) {
+	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
+		return false;
+	}
+
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (!SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+	DXGI_ADAPTER_DESC desc;
+	int i = 0;
+    while (SUCCEEDED(factory->EnumAdapters(i, &adapter))) {
+    	i += 1;
+
+        if (!SUCCEEDED(adapter->GetDesc(&desc))) {
+            continue;
+        }
+
+        if (std::wstring_view(desc.Description) != adapterName) {
+        	continue;
+        }
+
+        if (SetRenderAdapter(SUDOVDA_DRIVER_HANDLE, desc.AdapterLuid)) {
+        	return true;
+        }
+    }
+
+	return false;
 }
 
 std::wstring createVirtualDisplay(

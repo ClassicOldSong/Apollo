@@ -58,6 +58,7 @@ namespace proc {
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       if (!VDISPLAY::startPingThread(onVDisplayWatchdogFailed)) {
         onVDisplayWatchdogFailed();
+        return;
       }
     }
   }
@@ -248,6 +249,11 @@ namespace proc {
 
       if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         std::wstring prevPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
+
+        // Try set the render adapter matching the capture adapter if user has specified one
+        if (!config::video.adapter_name.empty()) {
+          VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
+        }
 
         memcpy(&launch_session->display_guid, &http::uuid, sizeof(GUID));
 

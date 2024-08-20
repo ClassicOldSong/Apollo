@@ -16,7 +16,7 @@ BEGIN
     BEGIN
         BLOCK "040904E4"
         BEGIN
-            VALUE "CompanyName",      "YukiWorkshop\0"
+            VALUE "CompanyName",      "SudoMaker\0"
             VALUE "FileDescription",  "Apollo\0"
             VALUE "FileVersion",      "@PROJECT_VERSION@\0"
             VALUE "InternalName",     "Apollo\0"

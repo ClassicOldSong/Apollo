@@ -29,6 +29,7 @@ namespace VDISPLAY {
 	void closeVDisplayDevice();
 	DRIVER_STATUS openVDisplayDevice();
 	bool startPingThread(std::function<void()> failCb);
+	bool setRenderAdapterByName(const std::wstring& adapterName);
 	std::wstring createVirtualDisplay(
 		const char* s_client_uid,
 		const char* s_client_name,

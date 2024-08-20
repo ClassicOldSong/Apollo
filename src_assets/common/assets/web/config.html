@@ -132,7 +132,7 @@
         restarted: false,
         config: null,
         currentTab: "general",
-        vdisplayStatus: false,
+        vdisplayStatus: "1",
         global_prep_cmd: [],
         tabs: [ // TODO: Move the options to each Component instead, encapsulate.
           {
@@ -311,7 +311,7 @@
           delete this.config.status;
           delete this.config.version;
 
-          this.vdisplayStatus = this.config.vdisplayStatus === 'true';
+          this.vdisplayStatus = this.config.vdisplayStatus;
           delete this.config.vdisplayStatus;
 
           // TODO: let each tab's Component handle it's own data instead of doing it here
