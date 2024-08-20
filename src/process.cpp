@@ -178,10 +178,13 @@ namespace proc {
     uint32_t render_height = client_height;
 
     if (launch_session->scale_factor != 100) {
+      render_width *= ((float)launch_session->scale_factor / 100);
+      render_height *= ((float)launch_session->scale_factor / 100);
+
       // Chop the last bit to ensure the scaled resolution is even numbered
       // Most odd resolution won't work well
-      render_width *= 100 / launch_session->scale_factor & ~1;
-      render_height *= 100 / launch_session->scale_factor & ~1;
+      render_width &= ~1;
+      render_height &= ~1;
     }
 
     // Add Stream-specific environment variables
@@ -261,7 +264,7 @@ namespace proc {
         std::wstring currentPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
 
         // Apply display settings
-        VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), launch_session->width, launch_session->height, launch_session->fps);
+        VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
 
         // Determine if we need to set the virtual display as primary
         bool shouldSetPrimary = false;
