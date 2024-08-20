@@ -711,6 +711,7 @@ namespace proc {
         ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
         ctx.virtual_display = true;
         ctx.virtual_display_primary = true;
+        ctx.scale_factor = 100;
 
         ctx.elevated = false;
         ctx.auto_detach = true;
