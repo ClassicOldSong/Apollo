@@ -155,7 +155,7 @@ namespace proc {
   }
 
   int
-  proc_t::execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
+  proc_t::execute(int app_id, const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     // Ensure starting from a clean slate
     terminate();
 
@@ -164,6 +164,7 @@ namespace proc {
       terminate();
     });
 
+    _app = app;
     _app_id = app_id;
     _launch_session = launch_session;
 

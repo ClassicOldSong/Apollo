@@ -311,7 +311,7 @@ namespace system_tray {
     tray.icon = TRAY_ICON;
     tray_update(&tray);
     char msg[256];
-    snprintf(msg, std::size(msg), "Streaming paused for %s", app_name.c_str());
+    snprintf(msg, std::size(msg), "Streaming stopped for %s", app_name.c_str());
   #ifdef _WIN32
     strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
   #endif
