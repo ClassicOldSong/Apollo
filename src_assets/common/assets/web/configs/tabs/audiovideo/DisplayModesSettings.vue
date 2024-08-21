@@ -35,8 +35,15 @@ const fpsIn = ref("")
       <div class="form-text">{{ $t('config.min_fps_factor_desc') }}</div>
     </div>
 
+    <!--headless_mode-->
+    <div class="mb-3">
+      <input type="checkbox" min="1" max="3" class="form-check-input" id="headless_mode" placeholder="1" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
+      <label for="qp" class="form-check-label">{{ $t('config.headless_mode') }}</label>
+      <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
+    </div>
+
     <div class="alert" :class="[vdisplay === '0' ? 'alert-success' : 'alert-warning']">
-      <label><i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}</label>
+      <i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}
     </div>
     <div class="form-text" v-if="vdisplay !== '0'">Please ensure SudoVDA driver is installed to the latest version and enabled properly.</div>
   </div>

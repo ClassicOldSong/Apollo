@@ -280,7 +280,8 @@ main(int argc, char *argv[]) {
     BOOST_LOG(warning) << "No gamepad input is available"sv;
   }
 
-  if (video::probe_encoders()) {
+  // Do not probe encoders on startup if headless mode is enabled
+  if (!config::video.headless_mode && video::probe_encoders()) {
     BOOST_LOG(error) << "Video failed to find working encoder"sv;
   }
 

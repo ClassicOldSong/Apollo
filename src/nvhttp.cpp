@@ -859,8 +859,6 @@ namespace nvhttp {
       return;
     }
 
-    auto appid = util::from_view(get_arg(args, "appid"));
-
     auto current_appid = proc::proc.running();
     if (current_appid > 0) {
       tree.put("root.resume", 0);
@@ -868,20 +866,6 @@ namespace nvhttp {
       tree.put("root.<xmlattr>.status_message", "An app is already running on this host");
 
       return;
-    }
-
-    // Probe encoders again before streaming to ensure our chosen
-    // encoder matches the active GPU (which could have changed
-    // due to hotplugging, driver crash, primary monitor change,
-    // or any number of other factors).
-    if (rtsp_stream::session_count() == 0) {
-      if (video::probe_encoders()) {
-        tree.put("root.<xmlattr>.status_code", 503);
-        tree.put("root.<xmlattr>.status_message", "Failed to initialize video capture/encoding. Is a display connected and turned on?");
-        tree.put("root.gamesession", 0);
-
-        return;
-      }
     }
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
@@ -898,11 +882,31 @@ namespace nvhttp {
       return;
     }
 
+    auto appid = util::from_view(get_arg(args, "appid"));
+    auto appid_str = std::to_string(appid);
+
     if (appid > 0) {
-      auto err = proc::proc.execute(appid, launch_session);
+      const auto& apps = proc::proc.get_apps();
+      auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str](const auto _app) {
+        return _app.id == appid_str;
+      });
+
+      if (app_iter == apps.end()) {
+        BOOST_LOG(error) << "Couldn't find app with ID ["sv << appid_str << ']';
+        tree.put("root.<xmlattr>.status_code", 404);
+        tree.put("root.<xmlattr>.status_message", "Cannot find requested application");
+        tree.put("root.gamesession", 0);
+        return;
+      }
+
+      auto err = proc::proc.execute(appid, *app_iter, launch_session);
       if (err) {
         tree.put("root.<xmlattr>.status_code", err);
-        tree.put("root.<xmlattr>.status_message", "Failed to start the specified application");
+        tree.put(
+          "root.<xmlattr>.status_message",
+          err == 503
+          ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
+          : "Failed to start the specified application");
         tree.put("root.gamesession", 0);
 
         return;

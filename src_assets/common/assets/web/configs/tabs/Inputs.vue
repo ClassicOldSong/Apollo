@@ -149,7 +149,7 @@ const config = ref(props.config)
 
     <!-- Mapping Key AltRight to Key Windows -->
     <div class="mb-3" v-if="config.keyboard === 'enabled'">
-      <label for="key_rightalt_to_key_win" class="form-label">{{ $t('config.key_rightalt_to_key_win') }}</label>
+      <label for="key_rightalt_to_key_win" class="form-label">{{ $t('config.key_rightalt_to_key_windows') }}</label>
       <select id="key_rightalt_to_key_win" class="form-select" v-model="config.key_rightalt_to_key_win">
         <option value="disabled">{{ $t('_common.disabled') }}</option>
         <option value="enabled">{{ $t('_common.enabled_def') }}</option>

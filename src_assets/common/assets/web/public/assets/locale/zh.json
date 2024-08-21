@@ -182,6 +182,8 @@
     "gamepad_xone": "Xone (Xbox O1)",
     "global_prep_cmd": "命令准备工作",
     "global_prep_cmd_desc": "任何应用运行前/后要运行的命令列表。如果任何前置命令失败，应用的启动过程将被中止。",
+    "headless_mode": "无头模式",
+    "headless_mode_desc": "启用后Apollo将支持无显示器模式，所有App都将在虚拟显示器中启动。",
     "hevc_mode": "HEVC 支持",
     "hevc_mode_0": "Apollo 将根据编码器能力通告对 HEVC 的支持（推荐）",
     "hevc_mode_1": "Apollo 将不会通告对 HEVC 的支持",

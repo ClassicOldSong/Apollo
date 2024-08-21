@@ -89,7 +89,7 @@ namespace proc {
         _apps(std::move(apps)) {}
 
     int
-    execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
+    execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
 
     /**
      * @return `_app_id` if a process is running, otherwise returns `0`

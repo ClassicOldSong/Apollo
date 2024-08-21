@@ -326,6 +326,7 @@ namespace config {
   }  // namespace sw
 
   video_t video {
+    false, // headless_mode
     28,  // qp
 
     0,  // hevc_mode
@@ -947,6 +948,7 @@ namespace config {
       std::cout << "["sv << name << "] -- ["sv << val << ']' << std::endl;
     }
 
+    bool_f(vars, "headless_mode", video.headless_mode);
     int_f(vars, "qp", video.qp);
     int_f(vars, "min_threads", video.min_threads);
     int_between_f(vars, "hevc_mode", video.hevc_mode, { 0, 3 });

@@ -28,6 +28,7 @@
 #include "httpcommon.h"
 #include "system_tray.h"
 #include "utility.h"
+#include "video.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -154,23 +155,17 @@ namespace proc {
   }
 
   int
-  proc_t::execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
+  proc_t::execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     // Ensure starting from a clean slate
     terminate();
 
-    auto iter = std::find_if(_apps.begin(), _apps.end(), [&app_id](const auto app) {
-      return app.id == std::to_string(app_id);
+    // Executed when returning from function
+    auto fg = util::fail_guard([&]() {
+      terminate();
     });
 
-    if (iter == _apps.end()) {
-      BOOST_LOG(error) << "Couldn't find app with ID ["sv << app_id << ']';
-      return 404;
-    }
-
     _app_id = app_id;
-    _app = *iter;
-    _app_prep_begin = std::begin(_app.prep_cmds);
-    _app_prep_it = _app_prep_begin;
+    _launch_session = launch_session;
 
     uint32_t client_width = launch_session->width;
     uint32_t client_height = launch_session->height;
@@ -193,60 +188,8 @@ namespace proc {
       render_height &= ~1;
     }
 
-    // Add Stream-specific environment variables
-    _env["SUNSHINE_APP_ID"] = std::to_string(_app_id);
-    _env["SUNSHINE_APP_NAME"] = _app.name;
-    _env["SUNSHINE_CLIENT_UID"] = launch_session->unique_id;
-    _env["SUNSHINE_CLIENT_NAME"] = launch_session->device_name;
-    _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(render_width);
-    _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(render_height);
-    _env["SUNSHINE_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
-    _env["SUNSHINE_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
-    _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(scale_factor);
-    _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
-    _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
-    _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
-    _env["SUNSHINE_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
-    _env["SUNSHINE_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
-    int channelCount = launch_session->surround_info & (65535);
-    switch (channelCount) {
-      case 2:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "2.0";
-        break;
-      case 6:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "5.1";
-        break;
-      case 8:
-        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "7.1";
-        break;
-    }
-    _env["SUNSHINE_CLIENT_AUDIO_SURROUND_PARAMS"] = launch_session->surround_params;
-
-    if (!_app.output.empty() && _app.output != "null"sv) {
 #ifdef _WIN32
-      // fopen() interprets the filename as an ANSI string on Windows, so we must convert it
-      // to UTF-16 and use the wchar_t variants for proper Unicode log file path support.
-      auto woutput = platf::from_utf8(_app.output);
-
-      // Use _SH_DENYNO to allow us to open this log file again for writing even if it is
-      // still open from a previous execution. This is required to handle the case of a
-      // detached process executing again while the previous process is still running.
-      _pipe.reset(_wfsopen(woutput.c_str(), L"a", _SH_DENYNO));
-#else
-      _pipe.reset(fopen(_app.output.c_str(), "a"));
-#endif
-    }
-
-    std::error_code ec;
-    // Executed when returning from function
-    auto fg = util::fail_guard([&]() {
-      terminate();
-    });
-
-    _launch_session = launch_session;
-
-#ifdef _WIN32
-    if (launch_session->virtual_display || _app.virtual_display) {
+    if (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
         initVDisplayDriver();
@@ -301,6 +244,62 @@ namespace proc {
       }
     }
 #endif
+
+    // Add Stream-specific environment variables
+    _env["SUNSHINE_APP_ID"] = _app.id;
+    _env["SUNSHINE_APP_NAME"] = _app.name;
+    _env["SUNSHINE_CLIENT_UID"] = launch_session->unique_id;
+    _env["SUNSHINE_CLIENT_NAME"] = launch_session->device_name;
+    _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(render_width);
+    _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(render_height);
+    _env["SUNSHINE_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
+    _env["SUNSHINE_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
+    _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(scale_factor);
+    _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
+    _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
+    _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
+    _env["SUNSHINE_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
+    _env["SUNSHINE_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
+    int channelCount = launch_session->surround_info & (65535);
+    switch (channelCount) {
+      case 2:
+        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "2.0";
+        break;
+      case 6:
+        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "5.1";
+        break;
+      case 8:
+        _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "7.1";
+        break;
+    }
+    _env["SUNSHINE_CLIENT_AUDIO_SURROUND_PARAMS"] = launch_session->surround_params;
+
+    if (!_app.output.empty() && _app.output != "null"sv) {
+#ifdef _WIN32
+      // fopen() interprets the filename as an ANSI string on Windows, so we must convert it
+      // to UTF-16 and use the wchar_t variants for proper Unicode log file path support.
+      auto woutput = platf::from_utf8(_app.output);
+
+      // Use _SH_DENYNO to allow us to open this log file again for writing even if it is
+      // still open from a previous execution. This is required to handle the case of a
+      // detached process executing again while the previous process is still running.
+      _pipe.reset(_wfsopen(woutput.c_str(), L"a", _SH_DENYNO));
+#else
+      _pipe.reset(fopen(_app.output.c_str(), "a"));
+#endif
+    }
+
+    // Probe encoders again before streaming to ensure our chosen
+    // encoder matches the active GPU (which could have changed
+    // due to hotplugging, driver crash, primary monitor change,
+    // or any number of other factors).
+    if (video::probe_encoders()) {
+      return 503;
+    }
+
+    std::error_code ec;
+    _app_prep_begin = std::begin(_app.prep_cmds);
+    _app_prep_it = _app_prep_begin;
 
     for (; _app_prep_it != std::end(_app.prep_cmds); ++_app_prep_it) {
       auto &cmd = *_app_prep_it;
