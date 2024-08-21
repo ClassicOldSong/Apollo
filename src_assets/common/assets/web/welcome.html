@@ -74,6 +74,10 @@
     },
     methods: {
       save() {
+        if (this.passwordData.newPassword !== this.passwordData.confirmNewPassword) {
+          this.error = "Password mismatch";
+          return;
+        };
         this.error = null;
         this.loading = true;
         fetch("/api/password", {
