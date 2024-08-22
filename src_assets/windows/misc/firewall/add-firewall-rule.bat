@@ -3,7 +3,7 @@
 rem Get sunshine root directory
 for %%I in ("%~dp0\..") do set "ROOT_DIR=%%~fI"
 
-set RULE_NAME=Sunshine
+set RULE_NAME=Apollo
 set PROGRAM_BIN="%ROOT_DIR%\sunshine.exe"
 
 rem Add the rule

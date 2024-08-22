@@ -4,6 +4,6 @@ rem Stop and delete the legacy SunshineSvc service
 net stop sunshinesvc
 sc delete sunshinesvc
 
-rem Stop and delete the new SunshineService service
-net stop SunshineService
-sc delete SunshineService
+rem Stop and delete the new ApolloService service
+net stop ApolloService
+sc delete ApolloService

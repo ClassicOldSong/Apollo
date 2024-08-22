@@ -14,6 +14,11 @@ install(TARGETS audio-info RUNTIME DESTINATION "tools" COMPONENT audio)
 install(TARGETS ddprobe RUNTIME DESTINATION "tools" COMPONENT application)
 install(TARGETS sunshinesvc RUNTIME DESTINATION "tools" COMPONENT application)
 
+# Drivers
+install(DIRECTORY "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/drivers/sudovda"
+        DESTINATION "drivers"
+        COMPONENT sudovda)
+
 # Mandatory scripts
 install(DIRECTORY "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/service/"
         DESTINATION "scripts"
@@ -62,8 +67,9 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "${CPACK_PACKAGE_NAME}")
 SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
         IfSilent +2 0
-        ExecShell 'open' 'https://sunshinestream.readthedocs.io/'
+        # ExecShell 'open' 'https://sunshinestream.readthedocs.io/'
         nsExec::ExecToLog 'icacls \\\"$INSTDIR\\\" /reset'
+        nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\install.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\migrate-config.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\add-firewall-rule.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\install-gamepad.bat\\\"'
@@ -80,10 +86,15 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\uninstall-service.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\sunshine.exe\\\" --restore-nvprefs-undo'
         MessageBox MB_YESNO|MB_ICONQUESTION \
-            'Do you want to remove Virtual Gamepad)?' \
+            'Do you want to remove Virtual Gamepad?' \
             /SD IDNO IDNO NoGamepad
             nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\uninstall-gamepad.bat\\\"'; skipped if no
         NoGamepad:
+        MessageBox MB_YESNO|MB_ICONQUESTION \
+            'Do you want to remove SudoVDA Virtual Display Driver?' \
+            /SD IDNO IDNO NoSudoVDA
+            nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\uninstall.bat\\\"'; skipped if no
+        NoSudoVDA:
         MessageBox MB_YESNO|MB_ICONQUESTION \
             'Do you want to remove $INSTDIR (this includes the configuration, cover images, and settings)?' \
             /SD IDNO IDNO NoDelete
@@ -95,11 +106,11 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
 set(CPACK_NSIS_MODIFY_PATH "OFF")
 set(CPACK_NSIS_EXECUTABLES_DIRECTORY ".")
 # This will be shown on the installed apps Windows settings
-set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_PROJECT_NAME}.exe")
+set(CPACK_NSIS_INSTALLED_ICON_NAME "sunshine.exe")
 set(CPACK_NSIS_CREATE_ICONS_EXTRA
         "${CPACK_NSIS_CREATE_ICONS_EXTRA}
         CreateShortCut '\$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\${CMAKE_PROJECT_NAME}.lnk' \
-            '\$INSTDIR\\\\${CMAKE_PROJECT_NAME}.exe' '--shortcut'
+            '\$INSTDIR\\\\sunshine.exe' '--shortcut'
         ")
 set(CPACK_NSIS_DELETE_ICONS_EXTRA
         "${CPACK_NSIS_DELETE_ICONS_EXTRA}
@@ -109,14 +120,14 @@ set(CPACK_NSIS_DELETE_ICONS_EXTRA
 # Checking for previous installed versions
 set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON")
 
-set(CPACK_NSIS_HELP_LINK "https://sunshinestream.readthedocs.io/en/latest/about/installation.html")
-set(CPACK_NSIS_URL_INFO_ABOUT "${CMAKE_PROJECT_HOMEPAGE_URL}")
-set(CPACK_NSIS_CONTACT "${CMAKE_PROJECT_HOMEPAGE_URL}/support")
+# set(CPACK_NSIS_HELP_LINK "https://sunshinestream.readthedocs.io/en/latest/about/installation.html")
+# set(CPACK_NSIS_URL_INFO_ABOUT "${CMAKE_PROJECT_HOMEPAGE_URL}")
+# set(CPACK_NSIS_CONTACT "${CMAKE_PROJECT_HOMEPAGE_URL}/support")
 
-set(CPACK_NSIS_MENU_LINKS
-        "https://sunshinestream.readthedocs.io" "Sunshine documentation"
-        "https://app.lizardbyte.dev" "LizardByte Web Site"
-        "https://app.lizardbyte.dev/support" "LizardByte Support")
+# set(CPACK_NSIS_MENU_LINKS
+#         "https://sunshinestream.readthedocs.io" "Sunshine documentation"
+#         "https://app.lizardbyte.dev" "LizardByte Web Site"
+#         "https://app.lizardbyte.dev/support" "LizardByte Support")
 set(CPACK_NSIS_MANIFEST_DPI_AWARE true)
 
 # Setting components groups and dependencies
@@ -131,7 +142,7 @@ set(CPACK_COMPONENT_APPLICATION_DEPENDS assets)
 
 # service auto-start script
 set(CPACK_COMPONENT_AUTOSTART_DISPLAY_NAME "Launch on Startup")
-set(CPACK_COMPONENT_AUTOSTART_DESCRIPTION "If enabled, launches Sunshine automatically on system startup.")
+set(CPACK_COMPONENT_AUTOSTART_DESCRIPTION "If enabled, launches Apollo automatically on system startup.")
 set(CPACK_COMPONENT_AUTOSTART_GROUP "Core")
 
 # assets
@@ -139,6 +150,12 @@ set(CPACK_COMPONENT_ASSETS_DISPLAY_NAME "Required Assets")
 set(CPACK_COMPONENT_ASSETS_DESCRIPTION "Shaders, default box art, and web UI.")
 set(CPACK_COMPONENT_ASSETS_GROUP "Core")
 set(CPACK_COMPONENT_ASSETS_REQUIRED true)
+
+# drivers
+set(CPACK_COMPONENT_SUDOVDA_DISPLAY_NAME "SudoVDA")
+set(CPACK_COMPONENT_SUDOVDA_DESCRIPTION "Driver required for Virtual Display to function.")
+set(CPACK_COMPONENT_SUDOVDA_GROUP "Drivers")
+set(CPACK_COMPONENT_SUDOVDA_REQUIRED true)
 
 # audio tool
 set(CPACK_COMPONENT_AUDIO_DISPLAY_NAME "audio-info")

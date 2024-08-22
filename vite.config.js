@@ -43,6 +43,7 @@ export default defineConfig({
     root: resolve(assetsSrcPath),
     build: {
         outDir: resolve(assetsDstPath),
+        emptyOutDir: true,
         rollupOptions: {
             input: {
                 apps: resolve(assetsSrcPath, 'apps.html'),
