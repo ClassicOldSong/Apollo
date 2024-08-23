@@ -439,6 +439,7 @@ namespace config {
   };
 
   sunshine_t sunshine {
+    false, // hide_tray_controls
     "en",  // locale
     2,  // min_log_level
     0,  // flags
@@ -1102,6 +1103,7 @@ namespace config {
     bool_f(vars, "high_resolution_scrolling", input.high_resolution_scrolling);
     bool_f(vars, "native_pen_touch", input.native_pen_touch);
 
+    bool_f(vars, "hide_tray_controls", sunshine.hide_tray_controls);
     bool_f(vars, "notify_pre_releases", sunshine.notify_pre_releases);
 
     int port = sunshine.port;

@@ -129,6 +129,13 @@ function removeCmd(index) {
       </button>
     </div>
 
+    <!--hide_tray_controls-->
+    <div class="mb-3 form-check">
+      <input type="checkbox" class="form-check-input" id="hide_tray_controls" v-model="config.hide_tray_controls" true-value="enabled" false-value="disabled"/>
+      <label for="qp" class="form-check-label">{{ $t('config.hide_tray_controls') }}</label>
+      <div class="form-text">{{ $t('config.hide_tray_controls_desc') }}</div>
+    </div>
+
     <!-- Notify Pre-Releases -->
     <div class="mb-3">
         <label for="notify_pre_releases" class="form-label">{{ $t('config.notify_pre_releases') }}</label>

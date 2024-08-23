@@ -97,6 +97,7 @@ namespace system_tray {
       (struct tray_menu[]) {
         // todo - use boost/locale to translate menu strings
         { .text = "Open Apollo", .cb = tray_open_ui_cb },
+        { .text = "-" },
         // { .text = "-" },
         // { .text = "Donate",
         //   .submenu =
@@ -231,6 +232,10 @@ namespace system_tray {
   #endif
     tray.menu[0].text = title_str.c_str();
 
+    if (config::sunshine.hide_tray_controls) {
+      tray.menu[1].text = nullptr;
+    }
+
     std::thread tray_thread(system_tray);
     tray_thread.detach();
   #endif
@@ -269,7 +274,7 @@ namespace system_tray {
     tray.notification_text = msg;
     tray.tooltip = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
-    tray.menu[1].text = force_close_msg;
+    tray.menu[2].text = force_close_msg;
     tray_update(&tray);
   }
 
@@ -320,7 +325,7 @@ namespace system_tray {
     tray.notification_title = "Application Stopped";
     tray.notification_text = msg;
     tray.tooltip = PROJECT_NAME;
-    tray.menu[1].text = TRAY_MSG_NO_APP_RUNNING;
+    tray.menu[2].text = TRAY_MSG_NO_APP_RUNNING;
     tray_update(&tray);
   }
 

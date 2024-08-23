@@ -36,8 +36,8 @@ const fpsIn = ref("")
     </div>
 
     <!--headless_mode-->
-    <div class="mb-3">
-      <input type="checkbox" min="1" max="3" class="form-check-input" id="headless_mode" placeholder="1" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
+    <div class="mb-3 form-check">
+      <input type="checkbox" class="form-check-input" id="headless_mode" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
       <label for="qp" class="form-check-label">{{ $t('config.headless_mode') }}</label>
       <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
     </div>

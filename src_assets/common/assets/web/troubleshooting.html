@@ -65,12 +65,31 @@
         <h2 id="restart">{{ $t('troubleshooting.restart_apollo') }}</h2>
         <br>
         <p>{{ $t('troubleshooting.restart_apollo_desc') }}</p>
-        <div class="alert alert-success" v-if="restartPressed === true">
+        <div class="alert alert-success" v-if="serverRestarting">
           {{ $t('troubleshooting.restart_apollo_success') }}
         </div>
         <div>
-          <button class="btn btn-warning" :disabled="restartPressed" @click="restart">
+          <button class="btn btn-warning" :disabled="serverQuitting || serverRestarting" @click="restart">
             {{ $t('troubleshooting.restart_apollo') }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Quit Apollo -->
+    <div class="card p-2 my-4">
+      <div class="card-body">
+        <h2 id="quit">{{ $t('troubleshooting.quit_apollo') }}</h2>
+        <br>
+        <p>{{ $t('troubleshooting.quit_apollo_desc') }}</p>
+        <div class="alert alert-success" v-if="serverQuit">
+          {{ $t('troubleshooting.quit_apollo_success') }}
+        </div>
+        <div class="alert alert-success" v-if="serverQuitting">
+          {{ $t('troubleshooting.quit_apollo_success_ongoing') }}
+        </div>
+        <div>
+          <button class="btn btn-warning" :disabled="serverQuitting || serverRestarting" @click="quit">
+            {{ $t('troubleshooting.quit_apollo') }}
           </button>
         </div>
       </div>
@@ -107,7 +126,7 @@
       <ul v-else class="list-group list-group-flush list-group-item-light">
         <div class="list-group-item p-3 text-center"><em>{{ $t('troubleshooting.unpair_single_no_devices') }}</em></div>
       </ul>
-      
+
     </div>
     <!-- Logs -->
     <div class="card p-2 my-4">
@@ -144,7 +163,9 @@
           logs: 'Loading...',
           logFilter: null,
           logInterval: null,
-          restartPressed: false,
+          serterRestarting: false,
+          serverQuitting: false,
+          serverQuit: false,
           showApplyMessage: false,
           unpairAllPressed: false,
           unpairAllStatus: null,
@@ -228,14 +249,48 @@
           navigator.clipboard.writeText(this.actualLogs);
         },
         restart() {
-          this.restartPressed = true;
+          this.serverRestarting = true;
           setTimeout(() => {
-            this.restartPressed = false;
+            this.serverRestarting = false;
           }, 5000);
           fetch("/api/restart", {
             method: "POST",
           });
         },
+        quit() {
+          if (window.confirm("Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.")) {
+            this.serverQuitting = true;
+            const timeoutID = setTimeout(() => {
+              this.serverQuitting = false;
+            }, 5000);
+            fetch("/api/quit", {
+              method: "POST",
+            })
+            .then(() => {
+              clearTimeout(timeoutID);
+              return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                  fetch("/", {
+                    signal: AbortSignal.timeout(1000)
+                  }).then(() => {
+                    reject();
+                  }).catch(() => {
+                    resolve();
+                  })
+                }, 1000);
+              });
+            })
+            .then(() => {
+              this.serverQuitting = false;
+              this.serverQuit = true;
+            })
+            .catch(() => {
+              this.serverQuitting = false;
+              this.serverQuit = false;
+              alert("Exit failed!");
+            });
+          }
+        }
       },
     });
 

@@ -622,6 +622,32 @@ namespace confighttp {
   }
 
   void
+  quit(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    // We do want to return here
+    std::thread quit_thread([]{
+      sleep(1000);
+    #ifdef _WIN32
+      // If we're running in a service, return a special status to
+      // tell it to terminate too, otherwise it will just respawn us.
+      if (GetConsoleWindow() == NULL) {
+        lifetime::exit_sunshine(ERROR_SHUTDOWN_IN_PROGRESS, true);
+        return;
+      }
+    #endif
+
+      lifetime::exit_sunshine(0, true);
+    });
+
+    quit_thread.detach();
+
+    response->write();
+  }
+
+  void
   savePassword(resp_https_t response, req_https_t request) {
     if (!config::sunshine.username.empty() && !authenticate(response, request)) return;
 
@@ -825,6 +851,7 @@ namespace confighttp {
     server.resource["^/api/config$"]["POST"] = saveConfig;
     server.resource["^/api/configLocale$"]["GET"] = getLocale;
     server.resource["^/api/restart$"]["POST"] = restart;
+    server.resource["^/api/quit$"]["POST"] = quit;
     server.resource["^/api/password$"]["POST"] = savePassword;
     server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
     server.resource["^/api/clients/unpair-all$"]["POST"] = unpairAll;

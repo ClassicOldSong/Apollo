@@ -163,6 +163,7 @@ namespace config {
     bool elevated;
   };
   struct sunshine_t {
+    bool hide_tray_controls;
     std::string locale;
     int min_log_level;
     std::bitset<flag::FLAG_SIZE> flags;
