@@ -1,6 +1,6 @@
 # Apollo
 
-Apollo is a self-hosted desktop stream host for Artemis(Moonlight Noir). Offering low latency, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. You can connect to Apollo from any Artemis(Moonlight Noir) client on a variety of devices. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
+Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
 
 ## Usage
 
@@ -54,7 +54,9 @@ Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestr
 
 ## Integrations
 
-TBD
+SudoVDA: Virtual Display Adapter Driver used in Apollo
+
+[Artemis](https://github.com/ClassicOldSong/moonlight-android): Integrated Virtual Display options control from client side
 
 ## Support
 
@@ -62,7 +64,7 @@ Currently support is only provided via GitHub Issues.
 
 ## Downloads
 
-TBD
+[Releases](./releases)
 
 ## Disclaimer
 
