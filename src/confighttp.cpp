@@ -627,24 +627,27 @@ namespace confighttp {
 
     print_req(request);
 
-    // We do want to return here
-    std::thread quit_thread([]{
-      sleep(1000);
-    #ifdef _WIN32
-      // If we're running in a service, return a special status to
-      // tell it to terminate too, otherwise it will just respawn us.
-      if (GetConsoleWindow() == NULL) {
-        lifetime::exit_sunshine(ERROR_SHUTDOWN_IN_PROGRESS, true);
-        return;
-      }
-    #endif
+    BOOST_LOG(warning) << "Requested quit from config page!"sv;
 
+  #ifdef _WIN32
+    // If we're running in a service, return a special status to
+    // tell it to terminate too, otherwise it will just respawn us.
+    if (GetConsoleWindow() == NULL) {
+      lifetime::exit_sunshine(ERROR_SHUTDOWN_IN_PROGRESS, true);
+    } else
+  #endif
+    {
       lifetime::exit_sunshine(0, true);
+    }
+
+    // We do want to return here
+    // If user get a return, then the exit has failed.
+    // This might not be thread safe but we're exiting anyways
+    std::thread write_resp([response]{
+      sleep(5000);
+      response->write();
     });
-
-    quit_thread.detach();
-
-    response->write();
+    write_resp.detach();
   }
 
   void

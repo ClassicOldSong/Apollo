@@ -129,21 +129,18 @@ function removeCmd(index) {
       </button>
     </div>
 
-    <!--hide_tray_controls-->
+    <!-- Hide Tray Controls -->
     <div class="mb-3 form-check">
       <input type="checkbox" class="form-check-input" id="hide_tray_controls" v-model="config.hide_tray_controls" true-value="enabled" false-value="disabled"/>
-      <label for="qp" class="form-check-label">{{ $t('config.hide_tray_controls') }}</label>
+      <label for="hide_tray_controls" class="form-check-label">{{ $t('config.hide_tray_controls') }}</label>
       <div class="form-text">{{ $t('config.hide_tray_controls_desc') }}</div>
     </div>
 
     <!-- Notify Pre-Releases -->
-    <div class="mb-3">
-        <label for="notify_pre_releases" class="form-label">{{ $t('config.notify_pre_releases') }}</label>
-        <select id="notify_pre_releases" class="form-select" v-model="config.notify_pre_releases">
-            <option value="disabled">{{ $t('_common.disabled') }}</option>
-            <option value="enabled">{{ $t('_common.enabled') }}</option>
-        </select>
-        <div class="form-text">{{ $t('config.notify_pre_releases_desc') }}</div>
+    <div class="mb-3 form-check">
+      <input type="checkbox" class="form-check-input" id="notify_pre_releases" v-model="config.notify_pre_releases" true-value="enabled" false-value="disabled"/>
+      <label for="notify_pre_releases" class="form-check-label">{{ $t('config.notify_pre_releases') }}</label>
+      <div class="form-text">{{ $t('config.notify_pre_releases_desc') }}</div>
     </div>
   </div>
 </template>

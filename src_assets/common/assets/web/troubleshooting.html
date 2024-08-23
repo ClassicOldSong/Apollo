@@ -260,34 +260,17 @@
         quit() {
           if (window.confirm("Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.")) {
             this.serverQuitting = true;
-            const timeoutID = setTimeout(() => {
-              this.serverQuitting = false;
-            }, 5000);
             fetch("/api/quit", {
               method: "POST",
             })
             .then(() => {
-              clearTimeout(timeoutID);
-              return new Promise((resolve, reject) => {
-                setTimeout(() => {
-                  fetch("/", {
-                    signal: AbortSignal.timeout(1000)
-                  }).then(() => {
-                    reject();
-                  }).catch(() => {
-                    resolve();
-                  })
-                }, 1000);
-              });
-            })
-            .then(() => {
-              this.serverQuitting = false;
-              this.serverQuit = true;
-            })
-            .catch(() => {
               this.serverQuitting = false;
               this.serverQuit = false;
               alert("Exit failed!");
+            })
+            .catch(() => {
+              this.serverQuitting = false;
+              this.serverQuit = true;
             });
           }
         }
