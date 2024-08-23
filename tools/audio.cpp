@@ -323,5 +323,7 @@ main(int argc, char *argv[]) {
     audio::print_device(device);
   }
 
+  system("pause");
+
   return 0;
 }
