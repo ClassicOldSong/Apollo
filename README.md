@@ -64,7 +64,7 @@ Currently support is only provided via GitHub Issues.
 
 ## Downloads
 
-[Releases](./releases)
+[Releases](https://github.com/ClassicOldSong/Apollo/releases)
 
 ## Disclaimer
 
