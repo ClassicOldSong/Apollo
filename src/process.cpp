@@ -246,6 +246,14 @@ namespace proc {
     }
 #endif
 
+    // Probe encoders again before streaming to ensure our chosen
+    // encoder matches the active GPU (which could have changed
+    // due to hotplugging, driver crash, primary monitor change,
+    // or any number of other factors).
+    if (video::probe_encoders()) {
+      return 503;
+    }
+
     // Add Stream-specific environment variables
     _env["SUNSHINE_APP_ID"] = _app.id;
     _env["SUNSHINE_APP_NAME"] = _app.name;
@@ -288,14 +296,6 @@ namespace proc {
 #else
       _pipe.reset(fopen(_app.output.c_str(), "a"));
 #endif
-    }
-
-    // Probe encoders again before streaming to ensure our chosen
-    // encoder matches the active GPU (which could have changed
-    // due to hotplugging, driver crash, primary monitor change,
-    // or any number of other factors).
-    if (video::probe_encoders()) {
-      return 503;
     }
 
     std::error_code ec;

@@ -1018,10 +1018,10 @@ namespace video {
    */
   void
   refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index, std::string &preferred_display_name) {
-    std::string current_display_name;
+    std::string current_display_name = preferred_display_name;
 
     // If we have a current display index, let's start with that
-    if (current_display_index >= 0 && current_display_index < display_names.size()) {
+    if (current_display_name.empty() && current_display_index >= 0 && current_display_index < display_names.size()) {
       current_display_name = display_names.at(current_display_index);
     }
 
@@ -1042,6 +1042,10 @@ namespace video {
     // We now have a new display name list, so reset the index back to 0
     current_display_index = 0;
 
+    if (current_display_name.empty()) {
+      current_display_name = config::video.output_name;
+    }
+
     // If we had a name previously, let's try to find it in the new list
     if (!current_display_name.empty()) {
       for (int x = 0; x < display_names.size(); ++x) {
@@ -1052,19 +1056,7 @@ namespace video {
       }
 
       // The old display was removed, so we'll start back at the first display again
-      BOOST_LOG(warning) << "Previous active display ["sv << current_display_name << "] is no longer present"sv;
-    }
-    else {
-      current_display_name = preferred_display_name;
-      if (current_display_name.empty()) {
-        current_display_name = config::video.output_name;
-      }
-      for (int x = 0; x < display_names.size(); ++x) {
-        if (display_names[x] == current_display_name) {
-          current_display_index = x;
-          return;
-        }
-      }
+      BOOST_LOG(warning) << "Desired display ["sv << current_display_name << "] does not exist"sv;
     }
   }
 
@@ -1303,7 +1295,7 @@ namespace video {
             disp.reset();
 
             // Refresh display names since a display removal might have caused the reinitialization
-            refresh_displays(encoder.platform_formats->dev_type, display_names, display_p);
+            refresh_displays(encoder.platform_formats->dev_type, display_names, display_p, proc::proc.display_name);
 
             // Process any pending display switch with the new list of displays
             if (switch_display_event->peek()) {
