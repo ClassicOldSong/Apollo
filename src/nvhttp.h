@@ -7,12 +7,15 @@
 
 // standard includes
 #include <string>
+#include <chrono>
 
 // lib includes
 #include <boost/property_tree/ptree.hpp>
 
 // local includes
 #include "thread_safe.h"
+
+using namespace std::chrono_literals;
 
 /**
  * @brief Contains all the functions and variables related to the nvhttp (GameStream) server.
@@ -41,6 +44,8 @@ namespace nvhttp {
    */
   constexpr auto PORT_HTTPS = -5;
 
+  constexpr auto OTP_EXPIRE_DURATION = 60s;
+
   /**
    * @brief Start the nvhttp server.
    * @examples
@@ -61,6 +66,8 @@ namespace nvhttp {
    */
   bool
   pin(std::string pin, std::string name);
+
+  std::string request_otp(const std::string& passphrase);
 
   /**
    * @brief Remove single client.

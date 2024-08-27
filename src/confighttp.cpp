@@ -741,6 +741,43 @@ namespace confighttp {
   }
 
   void
+  getOTP(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    pt::ptree outputTree;
+
+    auto g = util::fail_guard([&]() {
+      std::ostringstream data;
+      pt::write_json(data, outputTree);
+      response->write(data.str());
+    });
+
+    try {
+      auto args = request->parse_query_string();
+      auto it = args.find("passphrase");
+      if (it == std::end(args)) {
+        throw std::runtime_error("Passphrase not provided!");
+      }
+
+      if (it->second.size() < 4) {
+        throw std::runtime_error("Passphrase too short!");
+      }
+
+      outputTree.put("otp", nvhttp::request_otp(it->second));
+      outputTree.put("statue", true);
+      outputTree.put("message", "OTP created, effective within 1 minute.")
+    }
+    catch (std::exception &e) {
+      BOOST_LOG(warning) << "OTP creation failed: "sv << e.what();
+      outputTree.put("status", false);
+      outputTree.put("message", e.what());
+      return;
+    }
+  }
+
+  void
   unpairAll(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
 
@@ -847,6 +884,7 @@ namespace confighttp {
     server.resource["^/welcome/?$"]["GET"] = getWelcomePage;
     server.resource["^/troubleshooting/?$"]["GET"] = getTroubleshootingPage;
     server.resource["^/api/pin$"]["POST"] = savePin;
+    server.resource["^/api/otp$"]["GET"] = getOTP;
     server.resource["^/api/apps$"]["GET"] = getApps;
     server.resource["^/api/logs$"]["GET"] = getLogs;
     server.resource["^/api/apps$"]["POST"] = saveApp;
