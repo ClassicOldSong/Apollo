@@ -767,7 +767,7 @@ namespace confighttp {
 
       outputTree.put("otp", nvhttp::request_otp(it->second));
       outputTree.put("statue", true);
-      outputTree.put("message", "OTP created, effective within 1 minute.")
+      outputTree.put("message", "OTP created, effective within 1 minute.");
     }
     catch (std::exception &e) {
       BOOST_LOG(warning) << "OTP creation failed: "sv << e.what();
