@@ -44,7 +44,7 @@ namespace nvhttp {
    */
   constexpr auto PORT_HTTPS = -5;
 
-  constexpr auto OTP_EXPIRE_DURATION = 60s;
+  constexpr auto OTP_EXPIRE_DURATION = 180s;
 
   /**
    * @brief Start the nvhttp server.

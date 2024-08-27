@@ -373,7 +373,14 @@
     "pair_success": "Success! Please check Moonlight to continue",
     "pin_pairing": "PIN Pairing",
     "send": "Send",
-    "warning_msg": "Make sure you have access to the client you are pairing with. This software can give total control to your computer, so be careful!"
+    "warning_msg": "Make sure you have access to the client you are pairing with. This software can give total control to your computer, so be careful!",
+    "otp_pairing": "OTP Pairing",
+    "generate_pin": "Generate PIN",
+    "otp_passphrase": "One Time Passphrase",
+    "otp_expired": "EXPIRED",
+    "otp_expired_msg": "OTP expired. Please request a new one.",
+    "otp_success": "PIN request success, the PIN is available within 3 minutes.",
+    "otp_msg": "OTP pairing is only available for Artemis clients. Please use legacy pairing method for other clients."
   },
   "resource_card": {
     "github_discussions": "GitHub Discussions",

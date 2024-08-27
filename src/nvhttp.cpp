@@ -619,10 +619,10 @@ namespace nvhttp {
             tree.put("root.<xmlattr>.status_code", 503);
             tree.put("root.<xmlattr>.status_message", "OTP auth not available.");
           } else {
-            auto hash = util::hex(crypto::hash(one_time_pin + ptr->second.async_insert_pin.salt + otp_passphrase));
+            auto hash = util::hex(crypto::hash(one_time_pin + ptr->second.async_insert_pin.salt + otp_passphrase), true);
 
             if (hash.to_string_view() == it->second) {
-              getservercert(ptr->second, tree, one_time_pin);
+              pin(one_time_pin, deviceName);
               one_time_pin.clear();
               otp_passphrase.clear();
               return;

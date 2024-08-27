@@ -374,7 +374,14 @@
     "pair_success": "成功！请检查 Moonlight 以继续",
     "pin_pairing": "PIN 码配对",
     "send": "发送",
-    "warning_msg": "请确保您可以掌控您正在配对的客户端。该软件可以完全控制您的计算机，请务必小心！"
+    "warning_msg": "请确保您可以掌控您正在配对的客户端。该软件可以完全控制您的计算机，请务必小心！",
+    "otp_pairing": "OTP 配对",
+    "generate_pin": "生成 PIN",
+    "otp_passphrase": "一次性口令",
+    "otp_expired": "已过期",
+    "otp_expired_msg": "口令已过期，请重新请求。",
+    "otp_success": "一次性 PIN 请求成功，3分钟内有效。",
+    "otp_msg": "一次性口令目前仅支持 Artemis 客户端使用。其他客户端请使用传统配对方式。"
   },
   "resource_card": {
     "github_discussions": "Github 讨论区",

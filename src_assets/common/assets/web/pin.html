@@ -3,23 +3,49 @@
 
 <head>
   <%- header %>
+
+  <style scoped type="text/css">
+    .content-container {
+      padding-top: 2em;
+    }
+
+    .pin-tab-bar {
+      margin-bottom: 2em !important;
+    }
+  </style>
 </head>
 
 <body id="app" v-cloak>
   <Navbar></Navbar>
-  <div id="content" class="container">
-    <h1 class="my-4 text-center">{{ $t('pin.pin_pairing') }}</h1>
-    <form class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
+  <div id="content" class="container content-container">
+    <ul class="nav nav-pills nav-fill pin-tab-bar">
+      <li class="nav-item">
+        <a class="nav-link" :class="{active: currentTab === 'OTP'}" @click="currentTab = 'OTP'">{{ $t('pin.otp_pairing') }}</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{active: currentTab === 'PIN'}" @click="currentTab = 'PIN'">{{ $t('pin.pin_pairing') }}</a>
+      </li>
+    </ul>
+    <form v-if="currentTab === 'OTP'" class="form d-flex flex-column align-items-center" @submit.prevent="requestOTP">
+      <div class="card flex-column d-flex p-4 mb-4">
+        <h1 class="my-4 text-center">{{ otp && otp || '????' }}</h1>
+        <input type="text" pattern="[0-9a-zA-Z]{4,}" :placeholder="`${$t('pin.otp_passphrase')}`" v-model="passphrase" required autofocus class="form-control my-4" />
+        <button class="btn btn-primary">{{ $t('pin.generate_pin') }}</button>
+      </div>
+      <div v-if="otpMessage" class="alert" :class="['alert-' + otpStatus]">{{ otpMessage }}</div>
+      <div class="alert alert-info">{{ $t('pin.otp_msg') }}</div>
+    </form>
+    <form v-if="currentTab === 'PIN'" class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
       <div class="card flex-column d-flex p-4 mb-4">
         <input type="text" pattern="\d*" :placeholder="`${$t('navbar.pin')}`" autofocus id="pin-input" class="form-control mt-2" required />
         <input type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control my-4" />
         <button class="btn btn-primary">{{ $t('pin.send') }}</button>
       </div>
-      <div class="alert alert-warning">
-        <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
-      </div>
       <div id="status"></div>
     </form>
+    <div class="alert alert-warning">
+      <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
+    </div>
   </div>
 </body>
 
@@ -28,11 +54,22 @@
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
 
+  let resetOTPTimeout = null;
+
   let app = createApp({
     components: {
       Navbar
     },
     inject: ['i18n'],
+    data() {
+      return {
+        currentTab: 'OTP',
+        otp: '',
+        passphrase: '',
+        otpMessage: '',
+        otpStatus: 'warning'
+      }
+    },
     methods: {
       registerDevice(e) {
         let pin = document.querySelector("#pin-input").value;
@@ -54,6 +91,29 @@
               ).innerHTML = `<div class="alert alert-danger" role="alert">${this.i18n.t('pin.pair_failure')}</div>`;
             }
           });
+      },
+      requestOTP() {
+        fetch(`/api/otp?passphrase=${this.passphrase}`)
+        .then(resp => resp.json())
+        .then(resp => {
+          if (resp.status !== 'true') {
+            this.otpMessage = resp.message
+            this.otpStatus = 'danger'
+            return
+          }
+
+          this.otp = resp.otp
+          this.otpStatus = 'success'
+          this.otpMessage = this.i18n.t('pin.otp_success')
+
+          if (resetOTPTimeout !== null) clearTimeout(resetOTPTimeout)
+          resetOTPTimeout = setTimeout(() => {
+            this.otp = this.i18n.t('pin.otp_expired')
+            this.otpMessage = this.i18n.t('pin.otp_expired_msg')
+            this.otpStatus = 'warning'
+            resetOTPTimeout = null
+          }, 3 * 60 * 1000)
+        })
       }
     }
   });
