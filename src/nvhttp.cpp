@@ -622,6 +622,8 @@ namespace nvhttp {
             auto hash = util::hex(crypto::hash(one_time_pin + ptr->second.async_insert_pin.salt + otp_passphrase), true);
 
             if (hash.to_string_view() == it->second) {
+              ptr->second.async_insert_pin.response = std::move(response);
+              fg.disable();
               pin(one_time_pin, deviceName);
               one_time_pin.clear();
               otp_passphrase.clear();
