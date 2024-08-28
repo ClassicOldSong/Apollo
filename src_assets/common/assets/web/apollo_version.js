@@ -28,7 +28,20 @@ class ApolloVersion {
     if (v.indexOf("v") === 0) {
       v = v.substring(1);
     }
-    return v.split('.').map(i => parseInt(i, 10));
+
+    const [mainVer, incrementalVer] = v.split('-');
+    const versionParts = mainVer.split('.').map(i => parseInt(i, 10));
+    if (incrementalVer) {
+      const [prefix, verStr] = incrementalVer.split('.');
+      let incremental = parseInt(verStr, 10);
+      if (prefix === 'beta') {
+        // we couldn't have 2^16 alpha versions?
+        incremental <<= 16;
+      }
+      versionParts.push(incremental);
+    }
+
+    return versionParts;
   }
 
   isGreater(otherVersion, checkIncremental) {
@@ -47,6 +60,8 @@ class ApolloVersion {
     for (let i = 0; i < Math.min(checkIncremental && 4 || 3, this.versionParts.length, otherVersionParts.length); i++) {
       if (this.versionParts[i] > otherVersionParts[i]) {
         return true;
+      } else if (this.versionParts[i] < otherVersionParts[i]) {
+        return false;
       }
     }
     return false;
