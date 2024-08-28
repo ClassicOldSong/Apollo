@@ -105,8 +105,47 @@
         <!-- Application Name -->
         <div class="mb-3">
           <label for="appName" class="form-label">{{ $t('apps.app_name') }}</label>
-          <input type="text" class="form-control" id="appName" aria-describedby="appNameHelp" v-model="editForm.name" />
+          <div class="input-group dropup">
+            <input type="text" class="form-control" id="appName" aria-describedby="appNameHelp" v-model="editForm.name" />
+            <button class="btn btn-secondary dropdown-toggle" type="button" id="findCoverToggle"
+              aria-expanded="false" @click="showCoverFinder" ref="coverFinderDropdown">
+              {{ $t('apps.find_cover') }} Online
+            </button>
+            <div class="dropdown-menu dropdown-menu-end w-50 cover-finder overflow-hidden"
+              aria-labelledby="findCoverToggle">
+              <div class="modal-header px-2">
+                <h4 class="modal-title">{{ $t('apps.covers_found') }}</h4>
+                <button type="button" class="btn-close mr-2" aria-label="Close" @click="closeCoverFinder"></button>
+              </div>
+              <div class="modal-body cover-results px-3 pt-3" :class="{ busy: coverFinderBusy }">
+                <div class="row">
+                  <div v-if="coverSearching" class="col-12 col-sm-6 col-lg-4 mb-3">
+                    <div class="cover-container">
+                      <div class="spinner-border" role="status">
+                        <span class="visually-hidden">{{ $t('apps.loading') }}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-for="(cover,i) in coverCandidates" :key="'i'" class="col-12 col-sm-6 col-lg-4 mb-3"
+                    @click="useCover(cover)">
+                    <div class="cover-container result">
+                      <img class="rounded" :src="cover.url" />
+                    </div>
+                    <label class="d-block text-nowrap text-center text-truncate">
+                      {{cover.name}}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div id="appNameHelp" class="form-text">{{ $t('apps.app_name_desc') }}</div>
+        </div>
+        <div class="mb-3">
+          <label for="appImagePath" class="form-label">{{ $t('apps.image') }}</label>
+          <input type="text" class="form-control monospace" id="appImagePath" aria-describedby="appImagePathHelp"
+            v-model="editForm['image-path']" />
+          <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
         </div>
         <!-- output -->
         <div class="mb-3">
@@ -254,45 +293,6 @@
           <input type="text" class="form-control monospace" id="exitTimeout" aria-describedby="exitTimeoutHelp"
             v-model="editForm['exit-timeout']" />
           <div id="exitTimeoutHelp" class="form-text">{{ $t('apps.exit_timeout_desc') }}</div>
-        </div>
-        <div class="mb-3">
-          <label for="appImagePath" class="form-label">{{ $t('apps.image') }}</label>
-          <div class="input-group dropup">
-            <input type="text" class="form-control monospace" id="appImagePath" aria-describedby="appImagePathHelp"
-              v-model="editForm['image-path']" />
-            <button class="btn btn-secondary dropdown-toggle" type="button" id="findCoverToggle"
-              aria-expanded="false" @click="showCoverFinder" ref="coverFinderDropdown">
-              {{ $t('apps.find_cover') }}
-            </button>
-            <div class="dropdown-menu dropdown-menu-end w-50 cover-finder overflow-hidden"
-              aria-labelledby="findCoverToggle">
-              <div class="modal-header px-2">
-                <h4 class="modal-title">{{ $t('apps.covers_found') }}</h4>
-                <button type="button" class="btn-close mr-2" aria-label="Close" @click="closeCoverFinder"></button>
-              </div>
-              <div class="modal-body cover-results px-3 pt-3" :class="{ busy: coverFinderBusy }">
-                <div class="row">
-                  <div v-if="coverSearching" class="col-12 col-sm-6 col-lg-4 mb-3">
-                    <div class="cover-container">
-                      <div class="spinner-border" role="status">
-                        <span class="visually-hidden">{{ $t('apps.loading') }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div v-for="(cover,i) in coverCandidates" :key="'i'" class="col-12 col-sm-6 col-lg-4 mb-3"
-                    @click="useCover(cover)">
-                    <div class="cover-container result">
-                      <img class="rounded" :src="cover.url" />
-                    </div>
-                    <label class="d-block text-nowrap text-center text-truncate">
-                      {{cover.name}}
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
         </div>
         <div class="env-hint alert alert-info">
           <div class="form-text">
