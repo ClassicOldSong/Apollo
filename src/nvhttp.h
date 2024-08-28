@@ -67,7 +67,7 @@ namespace nvhttp {
   bool
   pin(std::string pin, std::string name);
 
-  std::string request_otp(const std::string& passphrase);
+  std::string request_otp(const std::string& passphrase, const std::string& deviceName);
 
   /**
    * @brief Remove single client.

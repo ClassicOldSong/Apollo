@@ -49,6 +49,7 @@ namespace nvhttp {
   crypto::cert_chain_t cert_chain;
   static std::string one_time_pin;
   static std::string otp_passphrase;
+  static std::string otp_device_name;
   static std::chrono::time_point<std::chrono::steady_clock> otp_creation_time;
 
   class SunshineHTTPS: public SimpleWeb::HTTPS {
@@ -500,6 +501,13 @@ namespace nvhttp {
 
       auto it = map_id_sess.find(client.uniqueID);
 
+      // set up named cert
+      named_cert_t named_cert;
+      named_cert.name = client.deviceName;
+      named_cert.cert = client.cert;
+      named_cert.uuid = uuid_util::uuid_t::generate().string();
+      client_root.named_devices.emplace_back(named_cert);
+
       update_id_client(client.uniqueID, std::move(client.cert), op_e::ADD);
       map_id_sess.erase(it);
     }
@@ -616,17 +624,22 @@ namespace nvhttp {
           if (one_time_pin.empty() || (std::chrono::steady_clock::now() - otp_creation_time > OTP_EXPIRE_DURATION)) {
             one_time_pin.clear();
             otp_passphrase.clear();
+            otp_device_name.clear();
             tree.put("root.<xmlattr>.status_code", 503);
             tree.put("root.<xmlattr>.status_message", "OTP auth not available.");
           } else {
             auto hash = util::hex(crypto::hash(one_time_pin + ptr->second.async_insert_pin.salt + otp_passphrase), true);
 
             if (hash.to_string_view() == it->second) {
-              ptr->second.async_insert_pin.response = std::move(response);
-              fg.disable();
-              pin(one_time_pin, deviceName);
+              if (!otp_device_name.empty()) {
+                ptr->second.client.deviceName = std::move(otp_device_name);
+              }
+
+              getservercert(ptr->second, tree, one_time_pin);
+
               one_time_pin.clear();
               otp_passphrase.clear();
+              otp_device_name.clear();
               return;
             }
           }
@@ -701,13 +714,9 @@ namespace nvhttp {
     auto &sess = std::begin(map_id_sess)->second;
     getservercert(sess, tree, pin);
 
-    // set up named cert
-    client_t &client = client_root;
-    named_cert_t named_cert;
-    named_cert.name = name.empty() ? sess.client.deviceName : name;
-    named_cert.cert = sess.client.cert;
-    named_cert.uuid = uuid_util::uuid_t::generate().string();
-    client.named_devices.emplace_back(named_cert);
+    if (!name.empty()) {
+      sess.client.deviceName = name;
+    }
 
     // response to the request for pin
     std::ostringstream data;
@@ -1232,13 +1241,14 @@ namespace nvhttp {
     tcp.join();
   }
 
-  std::string request_otp(const std::string& passphrase) {
+  std::string request_otp(const std::string& passphrase, const std::string& deviceName) {
     if (passphrase.size() < 4) {
       return "";
     }
 
-    otp_passphrase = passphrase;
     one_time_pin = crypto::rand_alphabet(4, "0123456789"sv);
+    otp_passphrase = passphrase;
+    otp_device_name = deviceName;
     otp_creation_time = std::chrono::steady_clock::now();
 
     return one_time_pin;

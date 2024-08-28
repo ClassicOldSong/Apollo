@@ -29,7 +29,8 @@
     <form v-if="currentTab === 'OTP'" class="form d-flex flex-column align-items-center" @submit.prevent="requestOTP">
       <div class="card flex-column d-flex p-4 mb-4">
         <h1 class="my-4 text-center">{{ otp && otp || '????' }}</h1>
-        <input type="text" pattern="[0-9a-zA-Z]{4,}" :placeholder="`${$t('pin.otp_passphrase')}`" v-model="passphrase" required autofocus class="form-control my-4" />
+        <input type="text" pattern="[0-9a-zA-Z]{4,}" :placeholder="`${$t('pin.otp_passphrase')}`" v-model="passphrase" required autofocus class="form-control mt-2" />
+        <input type="text" :placeholder="`${$t('pin.device_name')}`" v-model="deviceName" class="form-control my-4" />
         <button class="btn btn-primary">{{ $t('pin.generate_pin') }}</button>
       </div>
       <div v-if="otpMessage" class="alert" :class="['alert-' + otpStatus]">{{ otpMessage }}</div>
@@ -67,7 +68,8 @@
         otp: '',
         passphrase: '',
         otpMessage: '',
-        otpStatus: 'warning'
+        otpStatus: 'warning',
+        deviceName: ''
       }
     },
     methods: {
@@ -93,7 +95,7 @@
           });
       },
       requestOTP() {
-        fetch(`/api/otp?passphrase=${this.passphrase}`)
+        fetch(`/api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`)
         .then(resp => resp.json())
         .then(resp => {
           if (resp.status !== 'true') {

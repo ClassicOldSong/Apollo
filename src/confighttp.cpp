@@ -765,7 +765,15 @@ namespace confighttp {
         throw std::runtime_error("Passphrase too short!");
       }
 
-      outputTree.put("otp", nvhttp::request_otp(it->second));
+      std::string passphrase = it->second;
+      std::string deviceName;
+
+      it = args.find("deviceName");
+      if (it != std::end(args)) {
+        deviceName = it->second;
+      }
+
+      outputTree.put("otp", nvhttp::request_otp(passphrase, deviceName));
       outputTree.put("status", true);
       outputTree.put("message", "OTP created, effective within 3 minutes.");
     }
