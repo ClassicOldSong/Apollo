@@ -145,7 +145,7 @@ bool startPingThread(std::function<void()> failCb) {
 	}
 
 	if (watchdogOut.Timeout) {
-		auto sleepInterval = watchdogOut.Timeout * 1000 / 2;
+		auto sleepInterval = watchdogOut.Timeout * 1000 / 3;
 		std::thread ping_thread([sleepInterval, failCb = std::move(failCb)]{
 			uint8_t fail_count = 0;
 			for (;;) {
