@@ -78,7 +78,11 @@
         let name = document.querySelector("#name-input").value;
         document.querySelector("#status").innerHTML = "";
         let b = JSON.stringify({pin: pin, name: name});
-        fetch("/api/pin", {method: "POST", body: b})
+        fetch("/api/pin", {
+          credentials: 'include',
+          method: "POST",
+          body: b
+        })
           .then((response) => response.json())
           .then((response) => {
             if (response.status.toString().toLowerCase() === "true") {
@@ -95,7 +99,9 @@
           });
       },
       requestOTP() {
-        fetch(`/api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`)
+        fetch(`/api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`, {
+          credentials: 'include'
+        })
         .then(resp => resp.json())
         .then(resp => {
           if (resp.status !== 'true') {

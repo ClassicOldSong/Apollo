@@ -283,7 +283,9 @@
        }
     },
     created() {
-      fetch("/api/config")
+      fetch("/api/config", {
+        credentials: 'include'
+      })
         .then((r) => r.json())
         .then((r) => {
           this.config = r;
@@ -372,6 +374,7 @@
         });
 
         return fetch("/api/config", {
+          credentials: 'include',
           method: "POST",
           body: JSON.stringify(config),
         }).then((r) => {

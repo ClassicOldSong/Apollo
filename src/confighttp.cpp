@@ -53,6 +53,8 @@ namespace confighttp {
   using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Response>;
   using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Request>;
 
+  std::string sessionCookie;
+
   enum class op_e {
     ADD,  ///< Add client
     REMOVE  ///< Remove client
@@ -80,10 +82,7 @@ namespace confighttp {
   send_unauthorized(resp_https_t response, req_https_t request) {
     auto address = net::addr_to_normalized_string(request->remote_endpoint().address());
     BOOST_LOG(info) << "Web UI: ["sv << address << "] -- not authorized"sv;
-    const SimpleWeb::CaseInsensitiveMultimap headers {
-      { "WWW-Authenticate", R"(Basic realm="Sunshine Gamestream Host", charset="UTF-8")" }
-    };
-    response->write(SimpleWeb::StatusCode::client_error_unauthorized, headers);
+    response->write(SimpleWeb::StatusCode::client_error_unauthorized);
   }
 
   void
@@ -96,14 +95,41 @@ namespace confighttp {
     response->write(SimpleWeb::StatusCode::redirection_temporary_redirect, headers);
   }
 
+  std::string getCookieValue(const std::string& cookieString, const std::string& key) {
+    std::string keyWithEqual = key + "=";
+    std::size_t startPos = cookieString.find(keyWithEqual);
+
+    if (startPos == std::string::npos) {
+      return "";
+    }
+
+    startPos += keyWithEqual.length();
+    std::size_t endPos = cookieString.find(";", startPos);
+
+    if (endPos == std::string::npos) {
+      return cookieString.substr(startPos);
+    }
+
+    return cookieString.substr(startPos, endPos - startPos);
+  }
+
   bool
-  authenticate(resp_https_t response, req_https_t request) {
+  checkIPOrigin(resp_https_t response, req_https_t request) {
     auto address = net::addr_to_normalized_string(request->remote_endpoint().address());
     auto ip_type = net::from_address(address);
 
     if (ip_type > http::origin_web_ui_allowed) {
       BOOST_LOG(info) << "Web UI: ["sv << address << "] -- denied"sv;
       response->write(SimpleWeb::StatusCode::client_error_forbidden);
+      return false;
+    }
+
+    return true;
+  }
+
+  bool
+  authenticate(resp_https_t response, req_https_t request, bool needsRedirect = false) {
+    if (!checkIPOrigin(response, request)) {
       return false;
     }
 
@@ -114,27 +140,24 @@ namespace confighttp {
     }
 
     auto fg = util::fail_guard([&]() {
-      send_unauthorized(response, request);
+      if (needsRedirect) {
+        send_redirect(response, request, "/login");
+      } else {
+        send_unauthorized(response, request);
+      }
     });
 
-    auto auth = request->header.find("authorization");
-    if (auth == request->header.end()) {
+    if (sessionCookie.empty()) {
       return false;
     }
 
-    auto &rawAuth = auth->second;
-    auto authData = SimpleWeb::Crypto::Base64::decode(rawAuth.substr("Basic "sv.length()));
-
-    int index = authData.find(':');
-    if (index >= authData.size() - 1) {
+    auto cookies = request->header.find("cookie");
+    if (cookies == request->header.end()) {
       return false;
     }
 
-    auto username = authData.substr(0, index);
-    auto password = authData.substr(index + 1);
-    auto hash = util::hex(crypto::hash(password + config::sunshine.salt)).to_string();
-
-    if (!boost::iequals(username, config::sunshine.username) || hash != config::sunshine.password) {
+    auto authCookie = getCookieValue(cookies->second, "auth");
+    if (authCookie.empty() || authCookie != sessionCookie) {
       return false;
     }
 
@@ -156,105 +179,73 @@ namespace confighttp {
               << data.str();
   }
 
-  /**
-   * @todo combine these functions into a single function that accepts the page, i.e "index", "pin", "apps"
-   */
   void
-  getIndexPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
+  fetchStaticPage(resp_https_t response, req_https_t request, const std::string& page, bool needsAuthenticate) {
+    if (needsAuthenticate) {
+      if (!authenticate(response, request, true)) return;
+    }
 
     print_req(request);
 
-    std::string content = file_handler::read_file(WEB_DIR "index.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
+    std::string content = file_handler::read_file((WEB_DIR + page).c_str());
+    const SimpleWeb::CaseInsensitiveMultimap headers {
+      { "Content-Type", "text/html; charset=utf-8" },
+      { "Access-Control-Allow-Origin", "https://images.igdb.com/"}
+    };
     response->write(content, headers);
+  };
+
+  void
+  getIndexPage(resp_https_t response, req_https_t request) {
+    fetchStaticPage(response, request, "index.html", true);
   }
 
   void
   getPinPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "pin.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+    fetchStaticPage(response, request, "pin.html", true);
   }
 
   void
   getAppsPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "apps.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    headers.emplace("Access-Control-Allow-Origin", "https://images.igdb.com/");
-    response->write(content, headers);
-  }
-
-  void
-  getClientsPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "clients.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+    fetchStaticPage(response, request, "apps.html", true);
   }
 
   void
   getConfigPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "config.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+    fetchStaticPage(response, request, "config.html", true);
   }
 
   void
   getPasswordPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "password.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+    fetchStaticPage(response, request, "password.html", true);
   }
 
   void
   getWelcomePage(resp_https_t response, req_https_t request) {
-    print_req(request);
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
     if (!config::sunshine.username.empty()) {
       send_redirect(response, request, "/");
       return;
     }
-    std::string content = file_handler::read_file(WEB_DIR "welcome.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+
+    fetchStaticPage(response, request, "welcome.html", false);
+  }
+
+  void
+  getLoginPage(resp_https_t response, req_https_t request) {
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
+    fetchStaticPage(response, request, "login.html", false);
   }
 
   void
   getTroubleshootingPage(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    std::string content = file_handler::read_file(WEB_DIR "troubleshooting.html");
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/html; charset=utf-8");
-    response->write(content, headers);
+    fetchStaticPage(response, request, "troubleshooting.html", true);
   }
 
   /**
@@ -263,11 +254,16 @@ namespace confighttp {
    */
   void
   getFaviconImage(resp_https_t response, req_https_t request) {
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
     print_req(request);
 
     std::ifstream in(WEB_DIR "images/apollo.ico", std::ios::binary);
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "image/x-icon");
+    const SimpleWeb::CaseInsensitiveMultimap headers {
+      { "Content-Type", "image/x-icon" }
+    };
     response->write(SimpleWeb::StatusCode::success_ok, in, headers);
   }
 
@@ -277,11 +273,16 @@ namespace confighttp {
    */
   void
   getSunshineLogoImage(resp_https_t response, req_https_t request) {
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
     print_req(request);
 
     std::ifstream in(WEB_DIR "images/logo-apollo-45.png", std::ios::binary);
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "image/png");
+    const SimpleWeb::CaseInsensitiveMultimap headers {
+      { "Content-Type", "image/png" }
+    };
     response->write(SimpleWeb::StatusCode::success_ok, in, headers);
   }
 
@@ -293,6 +294,10 @@ namespace confighttp {
 
   void
   getNodeModules(resp_https_t response, req_https_t request) {
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
     print_req(request);
     fs::path webDirPath(WEB_DIR);
     fs::path nodeModulesPath(webDirPath / "assets");
@@ -332,8 +337,9 @@ namespace confighttp {
     print_req(request);
 
     std::string content = file_handler::read_file(config::stream.file_apps.c_str());
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "application/json");
+    const SimpleWeb::CaseInsensitiveMultimap headers {
+      { "Content-Type", "application/json" }
+    };
     response->write(content, headers);
   }
 
@@ -344,8 +350,9 @@ namespace confighttp {
     print_req(request);
 
     std::string content = file_handler::read_file(config::sunshine.log_file.c_str());
-    SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/plain");
+    const SimpleWeb::CaseInsensitiveMultimap headers {
+      { "Content-Type", "text/plain" }
+    };
     response->write(SimpleWeb::StatusCode::success_ok, content, headers);
   }
 
@@ -691,6 +698,10 @@ namespace confighttp {
           else {
             http::save_user_creds(config::sunshine.credentials_file, newUsername, newPassword);
             http::reload_user_creds(config::sunshine.credentials_file);
+
+            // Force user to re-login
+            sessionCookie.clear();
+
             outputTree.put("status", true);
           }
         }
@@ -704,6 +715,48 @@ namespace confighttp {
       BOOST_LOG(warning) << "SavePassword: "sv << e.what();
       outputTree.put("status", false);
       outputTree.put("error", e.what());
+      return;
+    }
+  }
+
+  void
+  login(resp_https_t response, req_https_t request) {
+    if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
+    auto fg = util::fail_guard([&]{
+      response->write(SimpleWeb::StatusCode::client_error_unauthorized);
+    });
+
+    std::stringstream ss;
+    ss << request->content.rdbuf();
+
+    pt::ptree inputTree;
+
+    try {
+      pt::read_json(ss, inputTree);
+      std::string username = inputTree.get<std::string>("username");
+      std::string password = inputTree.get<std::string>("password");
+      std::string hash = util::hex(crypto::hash(password + config::sunshine.salt)).to_string();
+
+      if (!boost::iequals(username, config::sunshine.username) || hash != config::sunshine.password) {
+        return;
+      }
+
+      sessionCookie = crypto::rand_alphabet(64);
+
+      const SimpleWeb::CaseInsensitiveMultimap headers {
+        { "Set-Cookie", "auth=" + sessionCookie + "; Secure; Max-Age=2592000; Path=/" }
+      };
+
+      response->write(headers);
+
+      fg.disable();
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "Web UI Login failed: ["sv << net::addr_to_normalized_string(request->remote_endpoint().address()) << "]: "sv << e.what();
+      response->write(SimpleWeb::StatusCode::server_error_internal_server_error);
+      fg.disable();
       return;
     }
   }
@@ -886,11 +939,12 @@ namespace confighttp {
     server.resource["^/$"]["GET"] = getIndexPage;
     server.resource["^/pin/?$"]["GET"] = getPinPage;
     server.resource["^/apps/?$"]["GET"] = getAppsPage;
-    server.resource["^/clients/?$"]["GET"] = getClientsPage;
     server.resource["^/config/?$"]["GET"] = getConfigPage;
     server.resource["^/password/?$"]["GET"] = getPasswordPage;
     server.resource["^/welcome/?$"]["GET"] = getWelcomePage;
+    server.resource["^/login/?$"]["GET"] = getLoginPage;
     server.resource["^/troubleshooting/?$"]["GET"] = getTroubleshootingPage;
+    server.resource["^/api/login"]["POST"] = login;
     server.resource["^/api/pin$"]["POST"] = savePin;
     server.resource["^/api/otp$"]["GET"] = getOTP;
     server.resource["^/api/apps$"]["GET"] = getApps;

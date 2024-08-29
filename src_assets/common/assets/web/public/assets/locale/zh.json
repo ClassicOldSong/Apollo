@@ -424,6 +424,7 @@
     "create_creds_alert": "需要下面的账户信息才能访问 Apollo 的 Web UI 。请妥善保存，因为你再也不会见到它们！",
     "greeting": "欢迎使用 Apollo！",
     "login": "登录",
-    "welcome_success": "此页面将很快重新加载，您的浏览器将询问您新的账户信息"
+    "welcome_success": "此页面将很快重新加载，您的浏览器将询问您新的账户信息",
+    "login_success": "此页面将重新加载。"
   }
 }

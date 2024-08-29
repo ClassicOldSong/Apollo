@@ -163,7 +163,7 @@
           logs: 'Loading...',
           logFilter: null,
           logInterval: null,
-          serterRestarting: false,
+          serverRestarting: false,
           serverQuitting: false,
           serverQuit: false,
           showApplyMessage: false,
@@ -191,7 +191,7 @@
       },
       methods: {
         refreshLogs() {
-          fetch("/api/logs",)
+          fetch("/api/logs", { credentials: 'include' })
             .then((r) => r.text())
             .then((r) => {
               this.logs = r;
@@ -199,7 +199,10 @@
         },
         closeApp() {
           this.closeAppPressed = true;
-          fetch("/api/apps/close", { method: "POST" })
+          fetch("/api/apps/close", {
+            credentials: 'include',
+            method: "POST"
+          })
             .then((r) => r.json())
             .then((r) => {
               this.closeAppPressed = false;
@@ -211,7 +214,10 @@
         },
         unpairAll() {
           this.unpairAllPressed = true;
-          fetch("/api/clients/unpair-all", { method: "POST" })
+          fetch("/api/clients/unpair-all", {
+            credentials: 'include',
+            method: "POST"
+          })
             .then((r) => r.json())
             .then((r) => {
               this.unpairAllPressed = false;
@@ -223,13 +229,16 @@
             });
         },
         unpairSingle(uuid) {
-          fetch("/api/clients/unpair", { method: "POST", body: JSON.stringify({ uuid }) }).then(() => {
+          fetch("/api/clients/unpair", { credentials: 'include',
+            method: "POST",
+            body: JSON.stringify({ uuid })
+          }).then(() => {
             this.showApplyMessage = true;
             this.refreshClients();
           });
         },
         refreshClients() {
-          fetch("/api/clients/list")
+          fetch("/api/clients/list", { credentials: 'include' })
             .then((response) => response.json())
             .then((response) => {
               const clientList = document.querySelector("#client-list");
@@ -254,13 +263,26 @@
             this.serverRestarting = false;
           }, 5000);
           fetch("/api/restart", {
+            credentials: 'include',
             method: "POST",
+          })
+          .then((resp) => {
+            if (resp.status !== 200) {
+              location.href = './login'
+              return
+            }
+          })
+          .catch((e) => {
+            this.serverRestarting = false;
+            console.error(e);
+            alert("Restart error!");
           });
         },
         quit() {
           if (window.confirm("Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.")) {
             this.serverQuitting = true;
             fetch("/api/quit", {
+              credentials: 'include',
               method: "POST",
             })
             .then(() => {

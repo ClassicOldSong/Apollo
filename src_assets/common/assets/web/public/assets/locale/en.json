@@ -423,6 +423,7 @@
     "create_creds_alert": "The credentials below are needed to access Apollo's Web UI. Keep them safe, since you will never see them again!",
     "greeting": "Welcome to Apollo!",
     "login": "Login",
-    "welcome_success": "This page will reload soon, your browser will ask you for the new credentials"
+    "welcome_success": "This page will reload soon, your browser will ask you for the new credentials",
+    "login_success": "This page will reload soon."
   }
 }

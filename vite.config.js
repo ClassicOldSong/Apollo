@@ -53,6 +53,7 @@ export default defineConfig({
                 pin: resolve(assetsSrcPath, 'pin.html'),
                 troubleshooting: resolve(assetsSrcPath, 'troubleshooting.html'),
                 welcome: resolve(assetsSrcPath, 'welcome.html'),
+                login: resolve(assetsSrcPath, 'login.html')
             },
         },
     },
