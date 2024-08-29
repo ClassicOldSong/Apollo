@@ -6,6 +6,8 @@ Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https:
 
 Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestream.readthedocs.io/) for now.
 
+Currently Virtual Display support is Windows only, Linux support is planned and will implement in the future.
+
 ## About Virtual Display
 
 > [!WARNING]
@@ -33,7 +35,7 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 - **Primary display changed to the virtual display after connection. I don't want that.**
   - Go to Apps and add one entry without any commands. Tick `Always use Virtual Display`, then untick `Set Virtual Display as Default`.
 - **Resolution can't match client side anymore**
-  - ***NEVER*** set screen rotation on virtual displays! Widecar can handle vertical display normally, there's no need to manually set screen rotatition if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Widecar.
+  - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotatition if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
   - If you happen messed up with your monitor config:
     1. Disconnect ALL Artemis/Moonlight sessions
     2. Quit Apollo
