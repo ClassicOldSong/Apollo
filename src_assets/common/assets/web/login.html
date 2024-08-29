@@ -69,7 +69,11 @@
             this.success = true;
             location.href = './';
           } else {
-            throw new Error(`Server returned ${res.status}`);
+            if (res.status === 401) {
+              throw new Error('Please check your username and password')
+            } else {
+              throw new Error(`Server returned ${res.status}`);
+            }
           }
         }).catch((e) => {
           this.error = `Login failed: ${e.message}`;
