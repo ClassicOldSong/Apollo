@@ -5,14 +5,18 @@
 #pragma once
 
 #include <functional>
+#include <chrono>
 #include <string>
 
 #include "thread_safe.h"
 
 #define WEB_DIR SUNSHINE_ASSETS_DIR "/web/"
 
+using namespace std::chrono_literals;
+
 namespace confighttp {
   constexpr auto PORT_HTTPS = 1;
+  constexpr auto SESSION_EXPIRE_DURATION = 24h * 15;
   void
   start();
 }  // namespace confighttp

@@ -54,6 +54,7 @@ namespace confighttp {
   using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTPS>::Request>;
 
   std::string sessionCookie;
+  static std::chrono::time_point<std::chrono::steady_clock> cookie_creation_time;
 
   enum class op_e {
     ADD,  ///< Add client
@@ -148,6 +149,12 @@ namespace confighttp {
     });
 
     if (sessionCookie.empty()) {
+      return false;
+    }
+
+    // Cookie has expired
+    if (std::chrono::steady_clock::now() - cookie_creation_time > SESSION_EXPIRE_DURATION) {
+      sessionCookie.clear();
       return false;
     }
 
@@ -745,6 +752,7 @@ namespace confighttp {
       }
 
       sessionCookie = crypto::rand_alphabet(64);
+      cookie_creation_time = std::chrono::steady_clock::now();
 
       const SimpleWeb::CaseInsensitiveMultimap headers {
         { "Set-Cookie", "auth=" + sessionCookie + "; Secure; Max-Age=2592000; Path=/" }
