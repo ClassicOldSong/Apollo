@@ -380,7 +380,8 @@
     "otp_expired": "EXPIRED",
     "otp_expired_msg": "OTP expired. Please request a new one.",
     "otp_success": "PIN request success, the PIN is available within 3 minutes.",
-    "otp_msg": "OTP pairing is only available for Artemis clients. Please use legacy pairing method for other clients."
+    "otp_msg": "OTP pairing is only available for Artemis clients. Please use legacy pairing method for other clients.",
+    "otp_pair_now": "PIN generated successfully, do you want to pair now?"
   },
   "resource_card": {
     "github_discussions": "GitHub Discussions",
@@ -407,6 +408,7 @@
     "quit_apollo_desc": "Exit Apollo. This will terminate any running sessions.",
     "quit_apollo_success": "Apollo has exited.",
     "quit_apollo_success_ongoing": "Apollo is quitting...",
+    "quit_apollo_confirm": "Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.",
     "troubleshooting": "Troubleshooting",
     "unpair_all": "Unpair All",
     "unpair_all_error": "Error while unpairing",

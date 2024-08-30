@@ -155,6 +155,7 @@
       components: {
         Navbar
       },
+      inject: ['i18n'],
       data() {
         return {
           clients: [],
@@ -279,7 +280,7 @@
           });
         },
         quit() {
-          if (window.confirm("Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.")) {
+          if (window.confirm(this.i18n.t('troubleshooting.quit_apollo_confirm'))) {
             this.serverQuitting = true;
             fetch("/api/quit", {
               credentials: 'include',

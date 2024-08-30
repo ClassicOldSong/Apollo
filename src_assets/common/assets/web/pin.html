@@ -121,6 +121,14 @@
             this.otpStatus = 'warning'
             resetOTPTimeout = null
           }, 3 * 60 * 1000)
+
+          if (['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) < 0) {
+            setTimeout(() => {
+              if (window.confirm(this.i18n.t('pin.otp_pair_now'))) {
+                window.open(`art://${location.hostname}:${parseInt(location.port, 10) - 1}?pin=${this.otp}&passphrase=${this.passphrase}`);
+              }
+            }, 0)
+          }
         })
       }
     }

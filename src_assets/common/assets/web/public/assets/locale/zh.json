@@ -381,7 +381,8 @@
     "otp_expired": "已过期",
     "otp_expired_msg": "口令已过期，请重新请求。",
     "otp_success": "一次性 PIN 请求成功，3分钟内有效。",
-    "otp_msg": "一次性口令目前仅支持 Artemis 客户端使用。其他客户端请使用传统配对方式。"
+    "otp_msg": "一次性口令目前仅支持 Artemis 客户端使用。其他客户端请使用传统配对方式。",
+    "otp_pair_now": "PIN 请求成功，是否一键配对？"
   },
   "resource_card": {
     "github_discussions": "Github 讨论区",
@@ -406,8 +407,9 @@
     "restart_apollo_success": "Apollo 正在重启",
     "quit_apollo": "退出 Apollo",
     "quit_apollo_desc": "停止运行 Apollo。这将会终止任何正在进行的会话。",
-    "quit_apollo_success": "Apollo has exited.",
-    "quit_apollo_success_ongoing": "Apollo is quitting...",
+    "quit_apollo_success": "Apollo 已成功退出。",
+    "quit_apollo_success_ongoing": "Apollo 正在退出...",
+    "quit_apollo_confirm": "确定要退出 Apollo 吗？如果没有其他操作方式，你将无法再次启动 Apollo。",
     "troubleshooting": "故障排除",
     "unpair_all": "全部取消配对",
     "unpair_all_error": "取消配对时出错",

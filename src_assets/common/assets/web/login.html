@@ -19,11 +19,11 @@
           <div class="mb-2">
             <label for="usernameInput" class="form-label">{{ $t('_common.username') }}</label>
             <input type="text" class="form-control" id="usernameInput" autocomplete="username"
-              v-model="passwordData.username" />
+              v-model="passwordData.username" required autofocus/>
           </div>
           <div class="mb-4">
             <label for="passwordInput" class="form-label">{{ $t('_common.password') }}</label>
-            <input type="password" class="form-control" id="passwordInput" autocomplete="new-password"
+            <input type="password" class="form-control" id="passwordInput" autocomplete="password"
               v-model="passwordData.password" required />
           </div>
           <button type="submit" class="btn btn-primary w-100 mb-2" v-bind:disabled="loading">
@@ -34,7 +34,6 @@
             <b>{{ $t('_common.success') }}</b> {{ $t('welcome.login_success') }}
           </div>
         </form>
-      </div>
       </div>
     </div>
   </main>
