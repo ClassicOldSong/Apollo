@@ -190,6 +190,62 @@ namespace platf {
     return "00:00:00:00:00:00"s;
   }
 
+  std::string
+  get_local_ip_for_gateway() {
+    PIP_ADAPTER_INFO pAdapterInfo;
+    PIP_ADAPTER_INFO pAdapter = nullptr;
+    DWORD dwRetVal = 0;
+    ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+
+    pAdapterInfo = (IP_ADAPTER_INFO *)malloc(sizeof(IP_ADAPTER_INFO));
+    if (pAdapterInfo == nullptr) {
+      BOOST_LOG(warning) << "Error allocating memory needed to call GetAdaptersInfo";
+      return "";
+    }
+
+    // Make an initial call to GetAdaptersInfo to get the necessary size into the ulOutBufLen variable
+    if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
+      free(pAdapterInfo);
+      pAdapterInfo = (IP_ADAPTER_INFO *)malloc(ulOutBufLen);
+      if (pAdapterInfo == nullptr) {
+        BOOST_LOG(warning) << "Error allocating memory needed to call GetAdaptersInfo";
+        return "";
+      }
+    }
+
+    if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) != NO_ERROR) {
+      if (pAdapterInfo) {
+        free(pAdapterInfo);
+      }
+      BOOST_LOG(warning) << "GetAdaptersInfo failed with error: " + std::to_string(dwRetVal);
+      return "";
+    }
+
+    pAdapter = pAdapterInfo;
+    std::string local_ip;
+
+    // Iterate through the list of adapters
+    while (pAdapter) {
+      IP_ADDR_STRING* pGateway = &pAdapter->GatewayList;
+      if (pGateway && pGateway->IpAddress.String[0] != '\0') {
+        // This adapter has a default gateway, use its IP address
+        local_ip = pAdapter->IpAddressList.IpAddress.String;
+        break;
+      }
+      pAdapter = pAdapter->Next;
+    }
+
+    if (pAdapterInfo) {
+      free(pAdapterInfo);
+    }
+
+    if (local_ip.empty()) {
+      BOOST_LOG(warning) << "No associated IP address found for the default gateway";
+    }
+
+    return local_ip;
+  }
+
   HDESK
   syncThreadDesktop() {
     auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);

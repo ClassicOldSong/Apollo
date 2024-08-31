@@ -381,7 +381,7 @@
     "otp_expired": "已过期",
     "otp_expired_msg": "口令已过期，请重新请求。",
     "otp_success": "一次性 PIN 请求成功，3分钟内有效。",
-    "otp_msg": "一次性口令目前仅支持 Artemis 客户端使用。其他客户端请使用传统配对方式。",
+    "otp_msg": "一次性口令目前仅支持最新的 Artemis 客户端使用。其他客户端请使用传统配对方式。",
     "otp_pair_now": "PIN 请求成功，是否一键配对？"
   },
   "resource_card": {

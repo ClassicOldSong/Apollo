@@ -4,6 +4,7 @@
 <head>
   <%- header %>
 
+  <script type="text/javascript" src="/assets/js/qrcode.min.js"></script>
   <style scoped type="text/css">
     .content-container {
       padding-top: 2em;
@@ -18,20 +19,29 @@
 <body id="app" v-cloak>
   <Navbar></Navbar>
   <div id="content" class="container content-container">
-    <ul class="nav nav-pills nav-fill pin-tab-bar">
+    <ul class="nav nav-pills pin-tab-bar justify-content-center">
       <li class="nav-item">
-        <a class="nav-link" :class="{active: currentTab === 'OTP'}" @click="currentTab = 'OTP'">{{ $t('pin.otp_pairing') }}</a>
+        <a class="nav-link" :class="{active: currentTab === 'OTP'}" href="#" @click.prevent="switchTab('OTP')">{{ $t('pin.otp_pairing') }}</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{active: currentTab === 'PIN'}" @click="currentTab = 'PIN'">{{ $t('pin.pin_pairing') }}</a>
+        <a class="nav-link" :class="{active: currentTab === 'PIN'}" href="#" @click.prevent="switchTab('PIN')">{{ $t('pin.pin_pairing') }}</a>
       </li>
     </ul>
     <form v-if="currentTab === 'OTP'" class="form d-flex flex-column align-items-center" @submit.prevent="requestOTP">
       <div class="card flex-column d-flex p-4 mb-4">
-        <h1 class="my-4 text-center">{{ otp && otp || '????' }}</h1>
-        <input type="text" pattern="[0-9a-zA-Z]{4,}" :placeholder="`${$t('pin.otp_passphrase')}`" v-model="passphrase" required autofocus class="form-control mt-2" />
-        <input type="text" :placeholder="`${$t('pin.device_name')}`" v-model="deviceName" class="form-control my-4" />
-        <button class="btn btn-primary">{{ $t('pin.generate_pin') }}</button>
+        <div v-show="editingHost || (otp && hostAddr)" id="qrRef"></div>
+        <p v-if="editingHost || (otp && hostAddr)" class="text-center text-secondary"><a class="text-secondary" :href="deepLink">art://{{ hostAddr }}:{{ hostPort }}</a> <i class="fas fa-fw fa-pen-to-square" @click="editHost"></i></p>
+        <h1 class="mb-4 text-center">{{ otp && otp || '????' }}</h1>
+        <div v-if="editingHost" class="d-flex flex-column align-items-stretch">
+          <input type="text" placeholder="HOST" v-model="hostAddr" autofocus class="form-control mt-2" />
+          <input type="text" placeholder="PORT" v-model="hostPort" class="form-control my-4" />
+          <button class="btn btn-primary" :disabled="!this.canSaveHost" @click.prevent="saveHost">{{ $t('_common.save') }}</button>
+        </div>
+        <div v-else class="d-flex flex-column align-items-stretch">
+          <input type="text" pattern="[0-9a-zA-Z]{4,}" :placeholder="`${$t('pin.otp_passphrase')}`" v-model="passphrase" required autofocus class="form-control mt-2" />
+          <input type="text" :placeholder="`${$t('pin.device_name')}`" v-model="deviceName" class="form-control my-4" />
+          <button class="btn btn-primary">{{ $t('pin.generate_pin') }}</button>
+        </div>
       </div>
       <div v-if="otpMessage" class="alert" :class="['alert-' + otpStatus]">{{ otpMessage }}</div>
       <div class="alert alert-info">{{ $t('pin.otp_msg') }}</div>
@@ -56,23 +66,76 @@
   import Navbar from './Navbar.vue'
 
   let resetOTPTimeout = null;
+  const qrContainer = document.createElement('div');
+  qrContainer.className = "mb-2 p-2 bg-white"
+  const qrCode = new QRCode(qrContainer);
+
+  const updateQR = (url) => {
+    qrCode.clear()
+    qrCode.makeCode(url)
+
+    const refContainer = document.querySelector('#qrRef');
+    if (refContainer) refContainer.appendChild(qrContainer);
+  }
+
+  let hostInfoCache = JSON.parse(sessionStorage.getItem('hostInfo'));
+  let hostManuallySet = false;
+
+  if (hostInfoCache) hostManuallySet = true;
+
+  const saveHostCache = ({hostAddr, hostPort}, manual) => {
+    hostInfoCache = {hostAddr, hostPort}
+    if (manual) {
+      sessionStorage.setItem('hostInfo', JSON.stringify(hostInfoCache))
+      hostManuallySet = true;
+    }
+  }
+
+  const data = () => {
+    return {
+      editingHost: false,
+      currentTab: 'OTP',
+      otp: '',
+      passphrase: '',
+      otpMessage: '',
+      otpStatus: 'warning',
+      deviceName: '',
+      hostAddr: '',
+      hostPort: '',
+      hostName: ''
+    }
+  }
 
   let app = createApp({
     components: {
       Navbar
     },
     inject: ['i18n'],
-    data() {
-      return {
-        currentTab: 'OTP',
-        otp: '',
-        passphrase: '',
-        otpMessage: '',
-        otpStatus: 'warning',
-        deviceName: ''
+    data,
+    computed: {
+      deepLink() {
+        return encodeURI(`art://${this.hostAddr}:${this.hostPort}?pin=${this.otp}&passphrase=${this.passphrase}&name=${this.hostName}`);
+      },
+      canSaveHost() {
+        return !!(this.hostAddr && this.hostPort);
       }
     },
     methods: {
+      switchTab(currentTab) {
+        Object.assign(this, data(), {currentTab});
+        hostInfoCache = null;
+        clearTimeout(resetOTPTimeout);
+      },
+      editHost() {
+        this.editingHost = !this.editingHost;
+        Object.assign(this, hostInfoCache);
+      },
+      saveHost() {
+        if (!this.canSaveHost) return;
+        updateQR(this.deepLink);
+        this.editingHost = false;
+        saveHostCache(this, true);
+      },
       registerDevice(e) {
         let pin = document.querySelector("#pin-input").value;
         let name = document.querySelector("#name-input").value;
@@ -99,6 +162,8 @@
           });
       },
       requestOTP() {
+        if (this.editingHost) return;
+
         fetch(`/api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`, {
           credentials: 'include'
         })
@@ -111,23 +176,44 @@
           }
 
           this.otp = resp.otp
+          this.hostName = resp.name
           this.otpStatus = 'success'
           this.otpMessage = this.i18n.t('pin.otp_success')
 
-          if (resetOTPTimeout !== null) clearTimeout(resetOTPTimeout)
-          resetOTPTimeout = setTimeout(() => {
-            this.otp = this.i18n.t('pin.otp_expired')
-            this.otpMessage = this.i18n.t('pin.otp_expired_msg')
-            this.otpStatus = 'warning'
-            resetOTPTimeout = null
-          }, 3 * 60 * 1000)
+          const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) < 0
 
-          if (['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) < 0) {
-            setTimeout(() => {
-              if (window.confirm(this.i18n.t('pin.otp_pair_now'))) {
-                window.open(`art://${location.hostname}:${parseInt(location.port, 10) - 1}?pin=${this.otp}&passphrase=${this.passphrase}`);
-              }
-            }, 0)
+          if (hostManuallySet) {
+            Object.assign(this, hostInfoCache);
+          } else {
+            this.hostAddr = resp.ip
+            this.hostPort = parseInt(location.port, 10) - 1
+
+            if (isLocalHost) {
+              this.hostAddr = location.hostname
+            }
+
+            saveHostCache(this);
+          }
+
+          if (this.hostAddr) {
+            updateQR(this.deepLink);
+
+            if (resetOTPTimeout !== null) clearTimeout(resetOTPTimeout)
+            resetOTPTimeout = setTimeout(() => {
+              Object.assign(this, data(), {
+                otp: this.i18n.t('pin.otp_expired'),
+                otpMessage: this.i18n.t('pin.otp_expired_msg')
+              })
+              resetOTPTimeout = null
+            }, 3 * 60 * 1000)
+
+            if (isLocalHost) {
+              setTimeout(() => {
+                if (window.confirm(this.i18n.t('pin.otp_pair_now'))) {
+                  window.open(this.deepLink);
+                }
+              }, 0)
+            }
           }
         })
       }

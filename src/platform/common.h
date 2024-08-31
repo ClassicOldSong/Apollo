@@ -568,6 +568,9 @@ namespace platf {
   get_mac_address(const std::string_view &address);
 
   std::string
+  get_local_ip_for_gateway();
+
+  std::string
   from_sockaddr(const sockaddr *const);
   std::pair<std::uint16_t, std::string>
   from_sockaddr_ex(const sockaddr *const);

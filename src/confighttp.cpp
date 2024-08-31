@@ -835,6 +835,8 @@ namespace confighttp {
       }
 
       outputTree.put("otp", nvhttp::request_otp(passphrase, deviceName));
+      outputTree.put("ip", platf::get_local_ip_for_gateway());
+      outputTree.put("name", config::nvhttp.sunshine_name);
       outputTree.put("status", true);
       outputTree.put("message", "OTP created, effective within 3 minutes.");
     }
