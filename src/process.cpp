@@ -216,6 +216,8 @@ namespace proc {
           launch_session->display_guid
         );
 
+        BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
+
         std::wstring currentPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
 
         // Apply display settings
@@ -384,17 +386,22 @@ namespace proc {
       // The app is still running only if the initial process launched is still running
       return _app_id;
     }
-    else if (_app.auto_detach && _process.native_exit_code() == 0 &&
-             std::chrono::steady_clock::now() - _app_launch_time < 5s) {
-      BOOST_LOG(info) << "App exited gracefully within 5 seconds of launch. Treating the app as a detached command."sv;
+    else if (_app.auto_detach && std::chrono::steady_clock::now() - _app_launch_time < 5s) {
+      BOOST_LOG(info) << "App exited with code ["sv << _process.native_exit_code() << "] within 5 seconds of launch. Treating the app as a detached command."sv;
       BOOST_LOG(info) << "Adjust this behavior in the Applications tab or apps.json if this is not what you want."sv;
       placebo = true;
+
+    #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+      if (_process.native_exit_code() != 0) {
+        system_tray::update_tray_launch_error(proc::proc.get_last_run_app_name(), _process.native_exit_code());
+      }
+    #endif
+
       return _app_id;
     }
 
     // Perform cleanup actions now if needed
     if (_process) {
-      BOOST_LOG(info) << "App exited with code ["sv << _process.native_exit_code() << ']';
       terminate();
     }
 
@@ -438,7 +445,11 @@ namespace proc {
 
 #ifdef _WIN32
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display) {
-      VDISPLAY::removeVirtualDisplay(_launch_session->display_guid);
+      if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
+        BOOST_LOG(info) << "Virtual Display removed successfully";
+      } else {
+        BOOST_LOG(info) << "Virtual Display remove failed";
+      }
     }
 #endif
 

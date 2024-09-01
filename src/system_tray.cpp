@@ -272,8 +272,8 @@ namespace system_tray {
     strcpy(force_close_msg, convertUtf8ToCurrentCodepage(force_close_msg).c_str());
   #endif
     tray.notification_text = msg;
-    tray.tooltip = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
+    tray.tooltip = msg;
     tray.menu[2].text = force_close_msg;
     tray_update(&tray);
   }
@@ -298,8 +298,8 @@ namespace system_tray {
     tray.icon = TRAY_ICON_PAUSING;
     tray.notification_title = "Stream Paused";
     tray.notification_text = msg;
-    tray.tooltip = msg;
     tray.notification_icon = TRAY_ICON_PAUSING;
+    tray.tooltip = msg;
     tray_update(&tray);
   }
 
@@ -326,6 +326,35 @@ namespace system_tray {
     tray.notification_text = msg;
     tray.tooltip = PROJECT_NAME;
     tray.menu[2].text = TRAY_MSG_NO_APP_RUNNING;
+    tray_update(&tray);
+  }
+
+  void
+  update_tray_launch_error(std::string app_name, int exit_code) {
+    if (!tray_initialized) {
+      return;
+    }
+
+    tray.notification_title = NULL;
+    tray.notification_text = NULL;
+    tray.notification_cb = NULL;
+    tray.notification_icon = NULL;
+    tray.icon = TRAY_ICON;
+    tray_update(&tray);
+    char msg[256];
+    snprintf(msg, std::size(msg), "Application %s exited too fast with code %d. Click here to terminate the stream.", app_name.c_str(), exit_code);
+  #ifdef _WIN32
+    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+  #endif
+    tray.icon = TRAY_ICON;
+    tray.notification_icon = TRAY_ICON;
+    tray.notification_title = "Launch Error";
+    tray.notification_text = msg;
+    tray.notification_cb = []() {
+      BOOST_LOG(info) << "Force stop from notification"sv;
+      proc::proc.terminate();
+    };
+    tray.tooltip = PROJECT_NAME;
     tray_update(&tray);
   }
 

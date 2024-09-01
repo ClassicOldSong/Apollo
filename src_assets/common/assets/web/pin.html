@@ -18,7 +18,7 @@
 
 <body id="app" v-cloak>
   <Navbar></Navbar>
-  <div id="content" class="container content-container">
+  <div id="content" class="container content-container d-flex flex-column align-items-center">
     <ul class="nav nav-pills pin-tab-bar justify-content-center">
       <li class="nav-item">
         <a class="nav-link" :class="{active: currentTab === 'OTP'}" href="#" @click.prevent="switchTab('OTP')">{{ $t('pin.otp_pairing') }}</a>
