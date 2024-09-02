@@ -274,9 +274,10 @@
             }
           })
           .catch((e) => {
-            this.serverRestarting = false;
-            console.error(e);
-            alert("Restart error!");
+            this.serverRestarting = false
+            location.href = './login'
+            console.error(e)
+            return
           });
         },
         quit() {
