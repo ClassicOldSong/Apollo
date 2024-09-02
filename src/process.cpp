@@ -234,11 +234,11 @@ namespace proc {
 
         // Set primary display if needed
         if (shouldSetPrimary) {
-            VDISPLAY::setPrimaryDisplay(
-              (launch_session->virtual_display || _app.virtual_display_primary)
-              ? vdisplayName.c_str()
-              : prevPrimaryDisplayName.c_str()
-            );
+          VDISPLAY::setPrimaryDisplay(
+            (launch_session->virtual_display || _app.virtual_display_primary)
+            ? vdisplayName.c_str()
+            : prevPrimaryDisplayName.c_str()
+          );
         }
 
         // Set virtual_display to true when everything went fine

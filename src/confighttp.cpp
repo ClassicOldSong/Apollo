@@ -658,7 +658,7 @@ namespace confighttp {
     // If user get a return, then the exit has failed.
     // This might not be thread safe but we're exiting anyways
     std::thread write_resp([response]{
-      sleep(5000);
+      std::this_thread::sleep_for(5s);
       response->write();
     });
     write_resp.detach();
