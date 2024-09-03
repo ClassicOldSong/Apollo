@@ -25,6 +25,7 @@ namespace VDISPLAY {
 	LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate);
 	std::wstring getPrimaryDisplay();
 	bool setPrimaryDisplay(const wchar_t* primaryDeviceName);
+	bool ensureDisplayHDR(const wchar_t* displayName);
 
 	void closeVDisplayDevice();
 	DRIVER_STATUS openVDisplayDevice();

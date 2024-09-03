@@ -368,6 +368,24 @@ namespace proc {
 
     _app_launch_time = std::chrono::steady_clock::now();
 
+  #ifdef _WIN32
+    auto resetHDRThread = std::thread([this]{
+      std::this_thread::sleep_for(200ms);
+      // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
+      // so we have tooggle HDR for the virtual display manually.
+      std::string currentDisplay = this->display_name;
+      if (!currentDisplay.empty()) {
+        if (VDISPLAY::ensureDisplayHDR(platf::from_utf8(currentDisplay).c_str())) {
+          BOOST_LOG(info) << "HDR rsestted for display " << currentDisplay;
+        } else {
+          BOOST_LOG(info) << "HDR not applied for display " << currentDisplay;
+        };
+      }
+    });
+
+    resetHDRThread.detach();
+  #endif
+
     fg.disable();
 
     return 0;

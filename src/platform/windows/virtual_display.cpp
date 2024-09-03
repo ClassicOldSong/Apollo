@@ -8,6 +8,8 @@
 
 #include <wrl/client.h>
 #include <dxgi.h>
+#include <highlevelmonitorconfigurationapi.h>
+#include <physicalmonitorenumerationapi.h>
 
 #include "virtual_display.h"
 
@@ -106,6 +108,83 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 	return true;
 }
 
+
+bool ensureDisplayHDR(const wchar_t* displayName) {
+	UINT32 pathCount = 0, modeCount = 0;
+
+	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount) != ERROR_SUCCESS) {
+		printf("Failed to query display configuration.\n");
+		return false;
+	}
+
+	std::vector<DISPLAYCONFIG_PATH_INFO> pathArray(pathCount);
+	std::vector<DISPLAYCONFIG_MODE_INFO> modeArray(modeCount);
+
+	if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, pathArray.data(), &modeCount, modeArray.data(), NULL) != ERROR_SUCCESS) {
+		printf("Failed to query display paths.\n");
+		return false;
+	}
+
+	for (const auto& path : pathArray) {
+		DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo = path.sourceInfo;
+
+		DISPLAYCONFIG_SOURCE_DEVICE_NAME deviceName = {};
+		deviceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+		deviceName.header.size = sizeof(deviceName);
+		deviceName.header.adapterId = sourceInfo.adapterId;
+		deviceName.header.id = sourceInfo.id;
+
+		if (DisplayConfigGetDeviceInfo(&deviceName.header) != ERROR_SUCCESS) {
+			continue;
+		}
+
+		if (std::wstring_view(displayName) == deviceName.viewGdiDeviceName) {
+			DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO hdrInfo = {};
+			hdrInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
+			hdrInfo.header.size = sizeof(hdrInfo);
+			hdrInfo.header.adapterId = path.targetInfo.adapterId;
+			hdrInfo.header.id = path.targetInfo.id;
+
+			if (DisplayConfigGetDeviceInfo(&hdrInfo.header) != ERROR_SUCCESS) {
+				wprintf(L"Failed to get HDR info for display: %ls\n", std::wstring(deviceName.viewGdiDeviceName));
+				return false;
+			}
+
+			if (hdrInfo.advancedColorSupported) {
+				if (hdrInfo.advancedColorEnabled) {
+					DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE setHdrInfo = {};
+					setHdrInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE;
+					setHdrInfo.header.size = sizeof(setHdrInfo);
+					setHdrInfo.header.adapterId = path.targetInfo.adapterId;
+					setHdrInfo.header.id = path.targetInfo.id;
+					setHdrInfo.enableAdvancedColor = FALSE;  // Disable HDR
+
+					if (DisplayConfigSetDeviceInfo(&setHdrInfo.header) == ERROR_SUCCESS) {
+						wprintf(L"HDR toggled off for display: %ls\n", displayName);
+					} else {
+						wprintf(L"Failed to toggle HDR off for display: %ls\n", std::wstring(deviceName.viewGdiDeviceName));
+					}
+
+					setHdrInfo.enableAdvancedColor = TRUE;  // Enable HDR back on
+
+					if (DisplayConfigSetDeviceInfo(&setHdrInfo.header) == ERROR_SUCCESS) {
+						wprintf(L"HDR toggled on for display: %ls\n", displayName);
+						return true;
+					} else {
+						wprintf(L"Failed to toggle HDR on for display: %ls\n", std::wstring(deviceName.viewGdiDeviceName));
+					}
+				} else {
+					wprintf(L"HDR is not enabled on display: %ls\n", displayName);
+				}
+			}
+			return false;
+		}
+	}
+
+	wprintf(L"Display not found or HDR not supported: %ls\n", displayName);
+	return false;
+}
+
 void closeVDisplayDevice() {
 	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
 		return;
@@ -172,29 +251,29 @@ bool setRenderAdapterByName(const std::wstring& adapterName) {
 		return false;
 	}
 
-    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
-    if (!SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
-        return false;
-    }
+	Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+	if (!SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) {
+		return false;
+	}
 
-    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+	Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
 	DXGI_ADAPTER_DESC desc;
 	int i = 0;
-    while (SUCCEEDED(factory->EnumAdapters(i, &adapter))) {
-    	i += 1;
+	while (SUCCEEDED(factory->EnumAdapters(i, &adapter))) {
+		i += 1;
 
-        if (!SUCCEEDED(adapter->GetDesc(&desc))) {
-            continue;
-        }
+		if (!SUCCEEDED(adapter->GetDesc(&desc))) {
+			continue;
+		}
 
-        if (std::wstring_view(desc.Description) != adapterName) {
-        	continue;
-        }
+		if (std::wstring_view(desc.Description) != adapterName) {
+			continue;
+		}
 
-        if (SetRenderAdapter(SUDOVDA_DRIVER_HANDLE, desc.AdapterLuid)) {
-        	return true;
-        }
-    }
+		if (SetRenderAdapter(SUDOVDA_DRIVER_HANDLE, desc.AdapterLuid)) {
+			return true;
+		}
+	}
 
 	return false;
 }
