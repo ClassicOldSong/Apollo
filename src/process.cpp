@@ -370,7 +370,7 @@ namespace proc {
 
   #ifdef _WIN32
     auto resetHDRThread = std::thread([this]{
-      std::this_thread::sleep_for(200ms);
+      std::this_thread::sleep_for(1s);
       // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
       // so we have tooggle HDR for the virtual display manually.
       std::string currentDisplay = this->display_name;
