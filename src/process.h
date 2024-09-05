@@ -79,7 +79,9 @@ namespace proc {
     KITTY_DEFAULT_CONSTR_MOVE_THROW(proc_t)
 
     std::string display_name;
+    std::string initial_display;
     bool virtual_display;
+    bool initial_hdr;
 
     proc_t(
       boost::process::environment &&env,

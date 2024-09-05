@@ -369,17 +369,28 @@ namespace proc {
     _app_launch_time = std::chrono::steady_clock::now();
 
   #ifdef _WIN32
-    auto resetHDRThread = std::thread([this]{
+    auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
       std::this_thread::sleep_for(1s);
       // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
       // so we have tooggle HDR for the virtual display manually.
+      // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
       if (!currentDisplay.empty()) {
-        if (VDISPLAY::ensureDisplayHDR(platf::from_utf8(currentDisplay).c_str())) {
-          BOOST_LOG(info) << "HDR rsestted for display " << currentDisplay;
-        } else {
-          BOOST_LOG(info) << "HDR not applied for display " << currentDisplay;
-        };
+        auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
+
+        this->initial_display = currentDisplay;
+        this->initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
+        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
+          return;
+        }
+
+        if (enable_hdr) {
+          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+            BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
+          } else {
+            BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
+          }
+        }
       }
     });
 
@@ -462,6 +473,14 @@ namespace proc {
     _pipe.reset();
 
 #ifdef _WIN32
+    if (!this->initial_display.empty()) {
+      if (VDISPLAY::setDisplayHDRByName(platf::from_utf8(this->initial_display).c_str(), this->initial_hdr)) {
+        BOOST_LOG(info) << "HDR restored successfully for display " << this->initial_display;
+      } else {
+        BOOST_LOG(info) << "HDR restore failed for display " << this->initial_display;
+      };
+    }
+
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display) {
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
         BOOST_LOG(info) << "Virtual Display removed successfully";

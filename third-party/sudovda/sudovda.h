@@ -228,6 +228,10 @@ static const bool GetAddedDisplayName(const VIRTUAL_DISPLAY_ADD_OUT& addedDispla
 		return _path.targetInfo.id == addedDisplay.TargetId;
 	});
 
+	if (path == paths.end()) {
+		return false;
+	}
+
 	DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
 	sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
 	sourceName.header.size = sizeof(DISPLAYCONFIG_SOURCE_DEVICE_NAME);
