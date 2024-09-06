@@ -147,13 +147,6 @@
             v-model="editForm['image-path']" />
           <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
         </div>
-        <!-- output -->
-        <div class="mb-3">
-          <label for="appOutput" class="form-label">{{ $t('apps.output_name') }}</label>
-          <input type="text" class="form-control monospace" id="appOutput" aria-describedby="appOutputHelp"
-            v-model="editForm.output" />
-          <div id="appOutputHelp" class="form-text">{{ $t('apps.output_desc') }}</div>
-        </div>
         <!-- prep-cmd -->
         <div class="mb-3">
           <label for="excludeGlobalPrep" class="form-label">{{ $t('apps.global_prep_name') }}</label>
@@ -245,6 +238,13 @@
           <input type="text" class="form-control monospace" id="appWorkingDir" aria-describedby="appWorkingDirHelp"
             v-model="editForm['working-dir']" />
           <div id="appWorkingDirHelp" class="form-text">{{ $t('apps.working_dir_desc') }}</div>
+        </div>
+        <!-- output -->
+        <div class="mb-3">
+          <label for="appOutput" class="form-label">{{ $t('apps.output_name') }}</label>
+          <input type="text" class="form-control monospace" id="appOutput" aria-describedby="appOutputHelp"
+            v-model="editForm.output" />
+          <div id="appOutputHelp" class="form-text">{{ $t('apps.output_desc') }}</div>
         </div>
         <!-- elevation -->
         <div class="mb-3 form-check" v-if="platform === 'windows'">
