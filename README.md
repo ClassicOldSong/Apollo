@@ -26,7 +26,13 @@ Apollo supports dual GPUs seamlessly.
 
 If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enable `Headless mode` in `Audio/Video` tab, save and restart your computer. No dummy plug is needed any more, the image will be rendered and encoded directly from your dGPU.
 
-## Troubleshooting
+## About HDR
+
+Enabling HDR is **not recommended** at this moment, probably in the long term. The issue with HDR is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy. Things are a little better if you're using Artemis as clients, since each client are remembered as a dedicated display with a fixed identity, Windows can auto select the calibration based on the device, but other Moonclients sharing one single identity are not that lucky.
+
+SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases. 
+
+## FAQ
 
 - **No virtual display added**
   - Ensure the SudoVDA driver is installed
@@ -34,6 +40,11 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
   - If you're using an external display for the first time, Windows might configure it as "Mirror mode" by default. Press <kbd>Meta + P</kbd> (or known as <kbd>Win + P</kbd>) and select "Extended", then **exit the app** (not only the stream) and start the app again. You only need to do this once.
 - **Primary display changed to the virtual display after connection. I don't want that.**
   - Go to Apps and add one entry without any commands. Tick `Always use Virtual Display`, then untick `Set Virtual Display as Default`.
+- **I want to turn off the physical monitor when streaming**
+  - The first time you stream with virtual display, go to Windows settings and disable the physical monitor. The next time you start streaming it will turn off automatically.
+- **HDR isn't enabled when using battery**
+  - Check out [To play HDR content when running on battery](https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6)
+  - [Archive](https://web.archive.org/web/20240828044038/https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6) to the above link in case M$ remove it unexpectedly someday
 - **Resolution can't match client side anymore**
   - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotatition if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
   - If you happen messed up with your monitor config:
@@ -105,7 +116,18 @@ SudoVDA: Virtual Display Adapter Driver used in Apollo
 
 ## Support
 
-Currently support is only provided via GitHub Issues.
+Currently support is only provided via GitHub Issues/Discussions.
+
+No real time chat support will ever be provided for Apollo and Artemis. Includig but not limited to:
+
+- Discord
+- Telegram
+- Whatsapp
+- QQ
+- WeChat 
+
+> When there's a chat, there're dramas.
+>                            ---- Confucius
 
 ## Downloads
 
@@ -124,6 +146,8 @@ Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Art
 The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ablilty but I got kicked out just for helping others. The funniest thing is, the repo starts updating after they got me banned!
 
 **PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
+
+**Update**: They have contacted me and apologized for this incident, but the fact it **happened** still motivated me to start my own fork.
 
 ## License
 
