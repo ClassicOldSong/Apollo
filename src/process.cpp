@@ -370,9 +370,9 @@ namespace proc {
 
   #ifdef _WIN32
     auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
-      std::this_thread::sleep_for(1s);
       // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
-      // so we have tooggle HDR for the virtual display manually.
+      // so we have tooggle HDR for the virtual display manually after a delay.
+      std::this_thread::sleep_for(1s);
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
       if (!currentDisplay.empty()) {
@@ -380,15 +380,24 @@ namespace proc {
 
         this->initial_display = currentDisplay;
         this->initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
-        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
-          return;
-        }
 
-        if (enable_hdr) {
-          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
-            BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
+        if (config::video.follow_client_hdr) {
+          if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
+            return;
+          }
+
+          if (enable_hdr) {
+            if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+              BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
+            } else {
+              BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
+            }
+          }
+        } else if (this->initial_hdr) {
+          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+            BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
           } else {
-            BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
+            BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
           }
         }
       }
@@ -473,7 +482,7 @@ namespace proc {
     _pipe.reset();
 
 #ifdef _WIN32
-    if (!this->initial_display.empty()) {
+    if (config::video.follow_client_hdr && !this->initial_display.empty()) {
       if (VDISPLAY::setDisplayHDRByName(platf::from_utf8(this->initial_display).c_str(), this->initial_hdr)) {
         BOOST_LOG(info) << "HDR restored successfully for display " << this->initial_display;
       } else {

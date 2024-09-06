@@ -1,5 +1,5 @@
 <script setup>
-import {ref} from 'vue'
+import {ref, computed} from 'vue'
 import {$tp} from '../../platform-i18n'
 import PlatformLayout from '../../PlatformLayout.vue'
 import AdapterNameSelector from './audiovideo/AdapterNameSelector.vue'
@@ -14,6 +14,16 @@ const props = defineProps([
   'vdisplay',
   'min_fps_factor',
 ])
+
+const sudovdaStatus = {
+  '1': 'Unknown',
+  '0': 'Ready',
+  '-1': 'Uninitialized',
+  '-2': 'Version Incompatible',
+  '-3': 'Watchdog Failed'
+}
+
+const currentDriverStatus = computed(() => sudovdaStatus[props.vdisplay])
 
 const config = ref(props.config)
 </script>
@@ -54,29 +64,22 @@ const config = ref(props.config)
           <div class="form-text pre-wrap">{{ $t('config.virtual_sink_desc') }}</div>
         </div>
         <!-- Install Steam Audio Drivers -->
-        <div class="mb-3">
-          <label for="install_steam_audio_drivers" class="form-label">{{ $t('config.install_steam_audio_drivers') }}</label>
-          <select id="install_steam_audio_drivers" class="form-select" v-model="config.install_steam_audio_drivers">
-            <option value="disabled">{{ $t('_common.disabled') }}</option>
-            <option value="enabled">{{ $t('_common.enabled_def') }}</option>
-          </select>
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="install_steam_audio_drivers" v-model="config.install_steam_audio_drivers" true-value="enabled" false-value="disabled"/>
+          <label for="install_steam_audio_drivers" class="form-check-label">{{ $t('config.install_steam_audio_drivers') }}</label>
           <div class="form-text pre-wrap">{{ $t('config.install_steam_audio_drivers_desc') }}</div>
         </div>
-        <div class="mb-3">
-          <label for="keep_sink_default" class="form-label">{{ 'Keep virtual sink as default' }}</label>
-          <select id="keep_sink_default" class="form-select" v-model="config.keep_sink_default">
-            <option value="disabled">{{ $t('_common.disabled') }}</option>
-            <option value="enabled">{{ $t('_common.enabled_def') }}</option>
-          </select>
-          <div class="form-text pre-wrap">{{ 'Whether to force selected virtual sink as default (effective when host audio output is disabled).' }}</div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="keep_sink_default" v-model="config.keep_sink_default" true-value="enabled" false-value="disabled"/>
+          <label for="keep_sink_default" class="form-check-label">{{ $t('config.keep_sink_default') }}</label>
+          <div class="form-text pre-wrap">{{ $t('config.keep_sink_default_desc') }}</div>
         </div>
-        <div class="mb-3">
-          <label for="auto_capture_sink" class="form-label">{{ 'Auto capture current sink' }}</label>
-          <select id="auto_capture_sink" class="form-select" v-model="config.auto_capture_sink">
-            <option value="disabled">{{ $t('_common.disabled') }}</option>
-            <option value="enabled">{{ $t('_common.enabled_def') }}</option>
-          </select>
-          <div class="form-text pre-wrap">{{ 'Auto capture current sink after default audio sink changed.' }}</div>
+
+        <div class="mb-3 form-check">
+          <input type="checkbox" class="form-check-input" id="auto_capture_sink" v-model="config.auto_capture_sink" true-value="enabled" false-value="disabled"/>
+          <label for="auto_capture_sink" class="form-check-label">{{ $t('config.auto_capture_sink') }}</label>
+          <div class="form-text pre-wrap">{{ $t('config.auto_capture_sink_desc') }}</div>
         </div>
       </template>
     </PlatformLayout>
@@ -96,9 +99,26 @@ const config = ref(props.config)
     <DisplayModesSettings
         :platform="platform"
         :config="config"
-        :vdisplay="vdisplay"
         :min_fps_factor="min_fps_factor"
     />
+
+    <div class="mb-3 form-check" v-if="platform === 'windows'">
+      <input type="checkbox" class="form-check-input" id="follow_client_hdr" v-model="config.follow_client_hdr" true-value="enabled" false-value="disabled"/>
+      <label for="follow_client_hdr" class="form-check-label">{{ $t('config.follow_client_hdr') }}</label>
+      <div class="form-text pre-wrap">{{ $t('config.follow_client_hdr_desc') }}</div>
+    </div>
+
+    <!--headless_mode-->
+    <div class="mb-3 form-check" v-if="platform === 'windows'">
+      <input type="checkbox" class="form-check-input" id="headless_mode" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
+      <label for="qp" class="form-check-label">{{ $t('config.headless_mode') }}</label>
+      <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
+    </div>
+
+    <div class="alert" :class="[vdisplay === '0' ? 'alert-success' : 'alert-warning']" v-if="platform === 'windows'">
+      <i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}
+    </div>
+    <div class="form-text" v-if="vdisplay !== '0'">Please ensure SudoVDA driver is installed to the latest version and enabled properly.</div>
 
   </div>
 </template>
