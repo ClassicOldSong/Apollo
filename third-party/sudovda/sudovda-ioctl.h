@@ -22,7 +22,7 @@ typedef struct _SUVDA_PROTOCAL_VERSION {
 } SUVDA_PROTOCAL_VERSION, * PSUVDA_PROTOCAL_VERSION;
 
 // Please update the version after ioctl changed
-static const SUVDA_PROTOCAL_VERSION VDAProtocolVersion = { 0, 2, 0, true };
+static const SUVDA_PROTOCAL_VERSION VDAProtocolVersion = { 0, 2, 1, true };
 
 static const char* SUVDA_HARDWARE_ID = "root\\sudomaker\\sudovda";
 
