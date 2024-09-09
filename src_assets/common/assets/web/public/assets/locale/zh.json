@@ -85,6 +85,11 @@
     "resolution_scale_factor": "分辨率缩放比例",
     "resolution_scale_factor_desc": "基于此比例缩放客户端请求的分辨率。例如 2000x1000 缩放 120% 将变成 2400x1200。当此项为非 100% 时覆盖客户端请求的缩放比例。此选项不会影响客户端请求的串流分辨率。"
   },
+  "client_card": {
+    "clients": "客户端",
+    "clients_desc": "为 Apollo 精心特调的客户端",
+    "generic_moonlight_clients_desc": "普通 Moonlight 客户端也可与 Apollo 共同使用。"
+  },
   "config": {
     "adapter_name": "适配器名称",
     "adapter_name_desc_linux_1": "手动指定用于捕获的 GPU。",
@@ -340,6 +345,9 @@
     "wan_encryption_mode_1": "为支持的客户端启用（默认）",
     "wan_encryption_mode_2": "强制所有客户端使用",
     "wan_encryption_mode_desc": "这决定了在公网串流时是否加密。加密会降低串流性能，尤其是在性能较弱的主机和客户端上。"
+  },
+  "login": {
+    "save_password": "记住密码"
   },
   "index": {
     "description": "Apollo 是供 Moonlight 使用的自建游戏串流服务。",

@@ -1,5 +1,5 @@
 <template>
-    <div class="card p-2">
+    <div class="card p-2 mt-4">
         <div class="card-body">
             <h2>{{ $t('resource_card.resources') }}</h2>
             <br>

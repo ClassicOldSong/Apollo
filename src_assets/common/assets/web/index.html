@@ -68,6 +68,7 @@
     </div>
     <!-- Resources -->
     <div class="my-4">
+      <Client-Card></Client-Card>
       <Resource-Card></Resource-Card>
     </div>
   </div>
@@ -77,6 +78,7 @@
   import { createApp } from 'vue'
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
+  import ClientCard from './ClientCard.vue'
   import ResourceCard from './ResourceCard.vue'
   import ApolloVersion from './apollo_version'
 
@@ -84,6 +86,7 @@
   let app = createApp({
     components: {
       Navbar,
+      ClientCard,
       ResourceCard
     },
     data() {

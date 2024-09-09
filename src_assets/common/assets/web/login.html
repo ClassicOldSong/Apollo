@@ -21,10 +21,14 @@
             <input type="text" class="form-control" id="usernameInput" autocomplete="username"
               v-model="passwordData.username" required autofocus/>
           </div>
-          <div class="mb-4">
+          <div class="mb-2">
             <label for="passwordInput" class="form-label">{{ $t('_common.password') }}</label>
             <input type="password" class="form-control" id="passwordInput" autocomplete="password"
               v-model="passwordData.password" required />
+          </div>
+          <div class="mb-3 form-check">
+            <label for="savePassword" class="form-check-label">{{ $t('login.save_password') }}</label>
+            <input type="checkbox" class="form-check-input" id="savePassword" v-model="savePassword"/>
           </div>
           <button type="submit" class="btn btn-primary w-100 mb-2" v-bind:disabled="loading">
             {{ $t('welcome.login') }}
@@ -44,16 +48,36 @@
   import { initApp } from './init'
 
   let app = createApp({
-    data() {
+    setup() {
+      const savedPasswordStr = localStorage.getItem('login')
+      if (savedPasswordStr) {
+        try {
+          const { username, password } = JSON.parse(savedPasswordStr);
+          return  {
+            error: null,
+            success: false,
+            loading: false,
+            savePassword: true,
+            passwordData: {
+              username,
+              password
+            }
+          }
+        } catch (e) {
+          console.error('Reading saved password failed!', e);
+        }
+      }
+
       return {
         error: null,
         success: false,
         loading: false,
+        savePassword: false,
         passwordData: {
           username: "",
           password: ""
         },
-      };
+      }
     },
     methods: {
       save() {
@@ -66,6 +90,7 @@
           this.loading = false;
           if (res.status === 200) {
             this.success = true;
+            localStorage.setItem('login', JSON.stringify(this.passwordData));
             location.href = './';
           } else {
             if (res.status === 401) {

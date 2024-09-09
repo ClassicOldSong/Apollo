@@ -87,6 +87,11 @@
     "resolution_scale_factor": "Resolution Scale Factor",
     "resolution_scale_factor_desc": "Scale the client requested resolution based on this factor. e.g. 2000x1000 with a factor of 120% will become 2400x1200. Overrides client requested factor when the number isn't 100%. This option won't affect client requested streaming resolution."
   },
+  "client_card": {
+    "clients": "Clients",
+    "clients_desc": "Clients that are specifically tuned to work the best with Apollo",
+    "generic_moonlight_clients_desc": "Gereric Moonlight clients are still usable with Apollo."
+  },
   "config": {
     "adapter_name": "Adapter Name",
     "adapter_name_desc_linux_1": "Manually specify a GPU to use for capture.",
@@ -340,6 +345,9 @@
     "wan_encryption_mode_1": "Enabled for supported clients (default)",
     "wan_encryption_mode_2": "Required for all clients",
     "wan_encryption_mode_desc": "This determines when encryption will be used when streaming over the Internet. Encryption can reduce streaming performance, particularly on less powerful hosts and clients."
+  },
+  "login": {
+    "save_password": "Remember Password"
   },
   "index": {
     "description": "Apollo is a self-hosted game stream host for Moonlight.",
