@@ -1,29 +1,22 @@
 #pragma once
 
 #include <string>
+
 #include <windows.h>
+#include <SetupApi.h>
+#include <wtsapi32.h>
 
-std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str) {
-	if (GetACP() == CP_UTF8) {
-		return std::string(utf8Str);
-	}
-	// Step 1: Convert UTF-8 to UTF-16
-	int utf16Len = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, NULL, 0);
-	if (utf16Len == 0) {
-			return std::string(utf8Str);
-	}
+#include "src/utility.h"
+#include "src/logging.h"
 
-	std::wstring utf16Str(utf16Len, L'\0');
-	MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &utf16Str[0], utf16Len);
+std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str);
 
-	// Step 2: Convert UTF-16 to the current Windows codepage
-	int codepageLen = WideCharToMultiByte(GetACP(), 0, utf16Str.c_str(), -1, NULL, 0, NULL, NULL);
-	if (codepageLen == 0) {
-			return std::string(utf8Str);
-	}
+std::string get_error_string(LONG error_code);
 
-	std::string codepageStr(codepageLen, '\0');
-	WideCharToMultiByte(GetACP(), 0, utf16Str.c_str(), -1, &codepageStr[0], codepageLen, NULL, NULL);
+bool query_display_config(std::vector<DISPLAYCONFIG_PATH_INFO>& paths, std::vector<DISPLAYCONFIG_MODE_INFO>& modes, bool active_only);
 
-	return codepageStr;
-}
+bool is_user_session_locked();
+
+bool test_no_access_to_ccd_api();
+
+bool is_changing_settings_going_to_fail();

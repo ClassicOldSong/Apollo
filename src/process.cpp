@@ -33,6 +33,7 @@
 #ifdef _WIN32
   // from_utf8() string conversion function
   #include "platform/windows/misc.h"
+  #include "platform/windows/utils.h"
 
   // _SH constants for _wfsopen()
   #include <share.h>
@@ -372,7 +373,15 @@ namespace proc {
     auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
       // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
       // so we have tooggle HDR for the virtual display manually after a delay.
-      std::this_thread::sleep_for(1s);
+      auto retryInterval = 200ms;
+      while (is_changing_settings_going_to_fail()) {
+        if (retryInterval > 2s) {
+          BOOST_LOG(warning) << "Restoring HDR settings failed due to retry timeout!";
+          return;
+        }
+        std::this_thread::sleep_for(retryInterval);
+        retryInterval *= 2;
+      }
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
       if (!currentDisplay.empty()) {
