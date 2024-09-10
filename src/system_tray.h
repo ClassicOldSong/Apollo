@@ -84,4 +84,7 @@ namespace system_tray {
    */
   void
   update_tray_require_pin();
+
+  void
+  update_tray_otp_pair(std::string device_name);
 }  // namespace system_tray

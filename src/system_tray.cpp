@@ -381,5 +381,30 @@ namespace system_tray {
     tray_update(&tray);
   }
 
+  void
+  update_tray_otp_pair(std::string device_name) {
+    if (!tray_initialized) {
+      return;
+    }
+
+    tray.notification_title = NULL;
+    tray.notification_text = NULL;
+    tray.notification_cb = NULL;
+    tray.notification_icon = NULL;
+    tray.icon = TRAY_ICON;
+    tray_update(&tray);
+    char msg[256];
+    snprintf(msg, std::size(msg), "OTP Pairing started for device \"%s\". Please make sure you have access to the device initiating the pairing request.", device_name.c_str());
+  #ifdef _WIN32
+    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+  #endif
+    tray.icon = TRAY_ICON;
+    tray.notification_title = "Incoming OTP Pairing Request";
+    tray.notification_text = msg;
+    tray.notification_icon = TRAY_ICON_LOCKED;
+    tray.tooltip = PROJECT_NAME;
+    tray_update(&tray);
+  }
+
 }  // namespace system_tray
 #endif

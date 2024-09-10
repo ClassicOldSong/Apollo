@@ -613,6 +613,11 @@ namespace nvhttp {
             auto hash = util::hex(crypto::hash(one_time_pin + ptr->second.async_insert_pin.salt + otp_passphrase), true);
 
             if (hash.to_string_view() == it->second) {
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+              system_tray::update_tray_otp_pair(ptr->second.client.name);
+#endif
+
               if (!otp_device_name.empty()) {
                 ptr->second.client.name = std::move(otp_device_name);
               }
