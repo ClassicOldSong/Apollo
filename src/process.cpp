@@ -520,6 +520,8 @@ namespace proc {
 
     _app_id = -1;
     display_name.clear();
+    initial_hdr = false;
+    initial_display.clear();
     _launch_session.reset();
     virtual_display = false;
   }
