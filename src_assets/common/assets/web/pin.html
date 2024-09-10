@@ -21,13 +21,21 @@
   <div id="content" class="container content-container d-flex flex-column align-items-center">
     <ul class="nav nav-pills pin-tab-bar justify-content-center">
       <li class="nav-item">
-        <a class="nav-link" :class="{active: currentTab === 'OTP'}" href="#" @click.prevent="switchTab('OTP')">{{ $t('pin.otp_pairing') }}</a>
+        <a class="nav-link" :class="{active: currentTab !== '#PIN'}" href="#OTP" @click.prevent="switchTab('OTP')">{{ $t('pin.otp_pairing') }}</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{active: currentTab === 'PIN'}" href="#" @click.prevent="switchTab('PIN')">{{ $t('pin.pin_pairing') }}</a>
+        <a class="nav-link" :class="{active: currentTab === '#PIN'}" href="#PIN" @click.prevent="switchTab('PIN')">{{ $t('pin.pin_pairing') }}</a>
       </li>
     </ul>
-    <form v-if="currentTab === 'OTP'" class="form d-flex flex-column align-items-center" @submit.prevent="requestOTP">
+    <form v-if="currentTab === '#PIN'" class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
+      <div class="card flex-column d-flex p-4 mb-4">
+        <input type="text" pattern="\d*" :placeholder="`${$t('navbar.pin')}`" autofocus id="pin-input" class="form-control mt-2" required />
+        <input type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control my-4" />
+        <button class="btn btn-primary">{{ $t('pin.send') }}</button>
+      </div>
+      <div id="status"></div>
+    </form>
+    <form v-else class="form d-flex flex-column align-items-center" @submit.prevent="requestOTP">
       <div class="card flex-column d-flex p-4 mb-4">
         <div v-show="editingHost || (otp && hostAddr)" id="qrRef"></div>
         <p v-if="editingHost || (otp && hostAddr)" class="text-center text-secondary"><a class="text-secondary" :href="deepLink">art://{{ hostAddr }}:{{ hostPort }}</a> <i class="fas fa-fw fa-pen-to-square" @click="editHost"></i></p>
@@ -45,14 +53,6 @@
       </div>
       <div v-if="otpMessage" class="alert" :class="['alert-' + otpStatus]">{{ otpMessage }}</div>
       <div class="alert alert-info">{{ $t('pin.otp_msg') }}</div>
-    </form>
-    <form v-if="currentTab === 'PIN'" class="form d-flex flex-column align-items-center" id="form" @submit.prevent="registerDevice">
-      <div class="card flex-column d-flex p-4 mb-4">
-        <input type="text" pattern="\d*" :placeholder="`${$t('navbar.pin')}`" autofocus id="pin-input" class="form-control mt-2" required />
-        <input type="text" :placeholder="`${$t('pin.device_name')}`" id="name-input" class="form-control my-4" />
-        <button class="btn btn-primary">{{ $t('pin.send') }}</button>
-      </div>
-      <div id="status"></div>
     </form>
     <div class="alert alert-warning">
       <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
@@ -94,7 +94,7 @@
   const data = () => {
     return {
       editingHost: false,
-      currentTab: 'OTP',
+      currentTab: location.hash || '#OTP',
       otp: '',
       passphrase: '',
       otpMessage: '',
@@ -122,7 +122,8 @@
     },
     methods: {
       switchTab(currentTab) {
-        Object.assign(this, data(), {currentTab});
+        location.hash = currentTab;
+        Object.assign(this, data());
         hostInfoCache = null;
         clearTimeout(resetOTPTimeout);
       },
