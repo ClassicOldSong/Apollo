@@ -150,15 +150,14 @@ namespace nvhttp {
   };
 
   struct client_t {
-    std::vector<std::string> certs;
     std::vector<named_cert_t> named_devices;
   };
 
   struct pair_session_t {
     struct {
       std::string uniqueID;
-      std::string deviceName;
       std::string cert;
+      std::string name;
     } client;
 
     std::unique_ptr<crypto::aes_t> cipher_key;
@@ -288,7 +287,6 @@ namespace nvhttp {
             named_cert.cert = el.get_value<std::string>();
             named_cert.uuid = uuid_util::uuid_t::generate().string();
             client.named_devices.emplace_back(named_cert);
-            client.certs.emplace_back(named_cert.cert);
           }
         }
       }
@@ -301,15 +299,11 @@ namespace nvhttp {
         named_cert.cert = el.get_child("cert").get_value<std::string>();
         named_cert.uuid = el.get_child("uuid").get_value<std::string>();
         client.named_devices.emplace_back(named_cert);
-        client.certs.emplace_back(named_cert.cert);
       }
     }
 
     // Empty certificate chain and import certs from file
     cert_chain.clear();
-    for (auto &cert : client.certs) {
-      cert_chain.add(crypto::x509(cert));
-    }
     for (auto &named_cert : client.named_devices) {
       cert_chain.add(crypto::x509(named_cert.cert));
     }
@@ -318,17 +312,13 @@ namespace nvhttp {
   }
 
   void
-  update_id_client(const std::string &uniqueID, std::string &&cert, op_e op) {
-    switch (op) {
-      case op_e::ADD: {
-        client_t &client = client_root;
-        client.certs.emplace_back(std::move(cert));
-      } break;
-      case op_e::REMOVE:
-        client_t client;
-        client_root = client;
-        break;
-    }
+  add_authorized_client(const std::string &name, std::string &&cert) {
+    client_t &client = client_root;
+    named_cert_t named_cert;
+    named_cert.name = name;
+    named_cert.cert = std::move(cert);
+    named_cert.uuid = uuid_util::uuid_t::generate().string();
+    client.named_devices.emplace_back(named_cert);
 
     if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
       save_state();
@@ -500,15 +490,7 @@ namespace nvhttp {
       add_cert->raise(crypto::x509(client.cert));
 
       auto it = map_id_sess.find(client.uniqueID);
-
-      // set up named cert
-      named_cert_t named_cert;
-      named_cert.name = client.deviceName;
-      named_cert.cert = client.cert;
-      named_cert.uuid = uuid_util::uuid_t::generate().string();
-      client_root.named_devices.emplace_back(named_cert);
-
-      update_id_client(client.uniqueID, std::move(client.cert), op_e::ADD);
+      add_authorized_client(client.name, std::move(client.cert));
       map_id_sess.erase(it);
     }
     else {
@@ -611,7 +593,7 @@ namespace nvhttp {
         }
 
         sess.client.uniqueID = std::move(uniqID);
-        sess.client.deviceName = std::move(deviceName);
+        sess.client.name = std::move(deviceName);
         sess.client.cert = util::from_hex_vec(get_arg(args, "clientcert"), true);
 
         BOOST_LOG(debug) << sess.client.cert;
@@ -632,7 +614,7 @@ namespace nvhttp {
 
             if (hash.to_string_view() == it->second) {
               if (!otp_device_name.empty()) {
-                ptr->second.client.deviceName = std::move(otp_device_name);
+                ptr->second.client.name = std::move(otp_device_name);
               }
 
               getservercert(ptr->second, tree, one_time_pin);
@@ -715,7 +697,7 @@ namespace nvhttp {
     getservercert(sess, tree, pin);
 
     if (!name.empty()) {
-      sess.client.deviceName = name;
+      sess.client.name = name;
     }
 
     // response to the request for pin
@@ -1268,18 +1250,6 @@ namespace nvhttp {
     client_t &client = client_root;
     for (auto it = client.named_devices.begin(); it != client.named_devices.end();) {
       if ((*it).uuid == uuid) {
-        // Find matching cert and remove it
-        for (auto cert = client.certs.begin(); cert != client.certs.end();) {
-          if ((*cert) == (*it).cert) {
-            cert = client.certs.erase(cert);
-            removed++;
-          }
-          else {
-            ++cert;
-          }
-        }
-
-        // And then remove the named cert
         it = client.named_devices.erase(it);
         removed++;
       }
