@@ -163,6 +163,14 @@ namespace config {
     std::string undo_cmd;
     bool elevated;
   };
+
+  struct server_cmd_t {
+    server_cmd_t(std::string &&cmd_name, std::string &&cmd_val, bool &&elevated):
+        cmd_name(std::move(cmd_name)), cmd_val(std::move(cmd_val)), elevated(std::move(elevated)) {}
+    std::string cmd_name;
+    std::string cmd_val;
+    bool elevated;
+  };
   struct sunshine_t {
     bool hide_tray_controls;
     std::string locale;
@@ -188,6 +196,7 @@ namespace config {
     std::string log_file;
     bool notify_pre_releases;
     std::vector<prep_cmd_t> prep_cmds;
+    std::vector<server_cmd_t> server_cmds;
   };
 
   extern video_t video;

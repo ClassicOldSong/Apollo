@@ -46,6 +46,9 @@ extern "C" {
 #define IDX_RUMBLE_TRIGGER_DATA 12
 #define IDX_SET_MOTION_EVENT 13
 #define IDX_SET_RGB_LED 14
+#define IDX_EXEC_SERVER_CMD 15
+#define IDX_SET_CLIPBOARD 16
+#define IDX_FILE_TRANSFER_NONCE_REQUEST 17
 
 static const short packetTypes[] = {
   0x0305,  // Start A
@@ -63,6 +66,9 @@ static const short packetTypes[] = {
   0x5500,  // Rumble triggers (Sunshine protocol extension)
   0x5501,  // Set motion event (Sunshine protocol extension)
   0x5502,  // Set RGB LED (Sunshine protocol extension)
+  0x3000,  // Execute Server Command (Apollo protocol extension)
+  0x3001,  // Set Clipboard (Apollo protocol extension)
+  0x3002,  // File transfer nonce request (Apollo protocol extension)
 };
 
 namespace asio = boost::asio;
@@ -987,6 +993,37 @@ namespace stream {
       }
 
       input::passthrough(session->input, std::move(plaintext));
+    });
+
+    server->map(packetTypes[IDX_EXEC_SERVER_CMD], [server](session_t *session, const std::string_view &payload) {
+      BOOST_LOG(debug) << "type [IDX_EXEC_SERVER_CMD]: "sv;
+      uint8_t cmdIndex = *(uint8_t*)payload.data();
+
+      if (cmdIndex < config::sunshine.server_cmds.size()) {
+        const auto& cmd = config::sunshine.server_cmds[cmdIndex];
+        BOOST_LOG(info) << "Executing server command: " << cmd.cmd_name;
+
+        std::error_code ec;
+        auto env = proc::proc.get_env();
+        boost::filesystem::path working_dir = proc::find_working_directory(cmd.cmd_val, env);
+        auto child = platf::run_command(cmd.elevated, true, cmd.cmd_val, working_dir, {}, nullptr, ec, nullptr);
+
+        if (ec) {
+          BOOST_LOG(error) << "Failed to execute server command: " << ec.message();
+        } else {
+          child.detach();
+        }
+      } else {
+        BOOST_LOG(error) << "Invalid server command index: " << (int)cmdIndex;
+      }
+    });
+
+    server->map(packetTypes[IDX_SET_CLIPBOARD], [server](session_t *session, const std::string_view &payload) {
+      BOOST_LOG(info) << "type [IDX_SET_CLIPBOARD]: "sv << payload << " size: " << payload.size();
+    });
+
+    server->map(packetTypes[IDX_FILE_TRANSFER_NONCE_REQUEST], [server](session_t *session, const std::string_view &payload) {
+      BOOST_LOG(info) << "type [IDX_FILE_TRANSFER_NONCE_REQUEST]: "sv << payload << " size: " << payload.size();
     });
 
     server->map(packetTypes[IDX_ENCRYPTED], [server](session_t *session, const std::string_view &payload) {

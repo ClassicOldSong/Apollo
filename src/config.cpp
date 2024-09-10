@@ -455,6 +455,7 @@ namespace config {
     platf::appdata().string() + "/sunshine.log",  // log file
     false,  // notify_pre_releases
     {},  // prep commands
+    {},  // server commands
   };
 
   bool
@@ -847,6 +848,33 @@ namespace config {
   }
 
   void
+  list_server_cmd_f(std::unordered_map<std::string, std::string> &vars, const std::string &name, std::vector<server_cmd_t> &input) {
+    std::string string;
+    string_f(vars, name, string);
+
+    std::stringstream jsonStream;
+
+    // check if string is empty, i.e. when the value doesn't exist in the config file
+    if (string.empty()) {
+      return;
+    }
+
+    // We need to add a wrapping object to make it valid JSON, otherwise ptree cannot parse it.
+    jsonStream << "{\"server_cmd\":" << string << "}";
+
+    boost::property_tree::ptree jsonTree;
+    boost::property_tree::read_json(jsonStream, jsonTree);
+
+    for (auto &[_, prep_cmd] : jsonTree.get_child("server_cmd"s)) {
+      auto cmd_name = prep_cmd.get_optional<std::string>("name"s);
+      auto cmd_val = prep_cmd.get_optional<std::string>("cmd"s);
+      auto elevated = prep_cmd.get_optional<bool>("elevated"s);
+
+      input.emplace_back(cmd_name.value_or(""), cmd_val.value_or(""), elevated.value_or(false));
+    }
+  }
+
+  void
   list_int_f(std::unordered_map<std::string, std::string> &vars, const std::string &name, std::vector<int> &input) {
     std::vector<std::string> list;
     list_string_f(vars, name, list);
@@ -1037,6 +1065,7 @@ namespace config {
 
     string_f(vars, "external_ip", nvhttp.external_ip);
     list_prep_cmd_f(vars, "global_prep_cmd", config::sunshine.prep_cmds);
+    list_server_cmd_f(vars, "server_cmd", config::sunshine.server_cmds);
 
     string_f(vars, "audio_sink", audio.sink);
     string_f(vars, "virtual_sink", audio.virtual_sink);
@@ -1283,7 +1312,7 @@ namespace config {
     // so that service instance will do the work instead.
 
     if (!config_loaded && !shortcut_launch) {
-      BOOST_LOG(fatal) << "To relaunch Sunshine successfully, use the shortcut in the Start Menu. Do not run Sunshine.exe manually."sv;
+      BOOST_LOG(fatal) << "To relaunch Apollo successfully, use the shortcut in the Start Menu. Do not run sunshine.exe manually."sv;
       std::this_thread::sleep_for(10s);
 #else
     if (!config_loaded) {

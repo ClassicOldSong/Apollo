@@ -4,26 +4,35 @@ import { ref } from 'vue'
 const props = defineProps({
   platform: String,
   config: Object,
-  globalPrepCmd: Array
+  globalPrepCmd: Array,
+  serverCmd: Array
 })
 
 const config = ref(props.config)
 const globalPrepCmd = ref(props.globalPrepCmd)
+const serverCmd = ref(props.serverCmd)
 
-function addCmd() {
-  let template = {
-    do: "",
-    undo: "",
-  };
-
-  if (props.platform === 'windows') {
-    template = { ...template, elevated: false };
-  }
-  globalPrepCmd.value.push(template);
+const prepCmdTemplate = {
+  do: "",
+  undo: "",
 }
 
-function removeCmd(index) {
-  globalPrepCmd.value.splice(index,1)
+const serverCmdTemplate = {
+  name: "",
+  cmd: ""
+}
+
+function addCmd(cmdArr, template) {
+  const _tpl = Object.assign({}, template);
+
+  if (props.platform === 'windows') {
+    _tpl.elevated = false;
+  }
+  cmdArr.push(_tpl);
+}
+
+function removeCmd(cmdArr, index) {
+  cmdArr.splice(index,1)
 }
 </script>
 
@@ -114,17 +123,63 @@ function removeCmd(index) {
             </div>
           </td>
           <td>
-            <button class="btn btn-danger" @click="removeCmd(i)">
+            <button class="btn btn-danger" @click="removeCmd(globalPrepCmd, i)">
               <i class="fas fa-trash"></i>
             </button>
-            <button class="btn btn-success" @click="addCmd">
+            <button class="btn btn-success" @click="addCmd(globalPrepCmd, prepCmdTemplate)">
               <i class="fas fa-plus"></i>
             </button>
           </td>
         </tr>
         </tbody>
       </table>
-      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd">
+      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(globalPrepCmd, prepCmdTemplate)">
+        &plus; {{ $t('config.add') }}
+      </button>
+    </div>
+
+    <!-- Server Commands -->
+    <div id="server_cmd" class="mb-3 d-flex flex-column">
+      <label class="form-label">{{ $t('config.server_cmd') }}</label>
+      <div class="form-text">{{ $t('config.server_cmd_desc') }}</div>
+      <table class="table" v-if="serverCmd.length > 0">
+        <thead>
+        <tr>
+          <th scope="col"><i class="fas fa-tag"></i> {{ $t('_common.cmd_name') }}</th>
+          <th scope="col"><i class="fas fa-terminal"></i> {{ $t('_common.cmd_val') }}</th>
+          <th scope="col" v-if="platform === 'windows'">
+            <i class="fas fa-shield-alt"></i> {{ $t('_common.run_as') }}
+          </th>
+          <th scope="col"></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr v-for="(c, i) in serverCmd">
+          <td>
+            <input type="text" class="form-control" v-model="c.name" />
+          </td>
+          <td>
+            <input type="text" class="form-control monospace" v-model="c.cmd" />
+          </td>
+          <td v-if="platform === 'windows'">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" :id="'server-cmd-admin-' + i" v-model="c.elevated"
+                     true-value="true" false-value="false" />
+              <label :for="'server-cmd-admin-' + i" class="form-check-label">{{ $t('_common.elevated') }}</label>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-danger" @click="removeCmd(serverCmd, i)">
+              <i class="fas fa-trash"></i>
+            </button>
+            <button class="btn btn-success" @click="addCmd(serverCmd, serverCmdTemplate)">
+              <i class="fas fa-plus"></i>
+            </button>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(serverCmd, serverCmdTemplate)">
         &plus; {{ $t('config.add') }}
       </button>
     </div>

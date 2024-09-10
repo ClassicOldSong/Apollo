@@ -755,15 +755,26 @@ namespace nvhttp {
     tree.put("root.ExternalPort", net::map_port(PORT_HTTP));
     tree.put("root.MaxLumaPixelsHEVC", video::active_hevc_mode > 1 ? "1869449984" : "0");
 
-  #ifdef _WIN32
-    tree.put("root.VirtualDisplayCapable", true);
-    tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
-  #endif
-
     // Only include the MAC address for requests sent from paired clients over HTTPS.
     // For HTTP requests, use a placeholder MAC address that Moonlight knows to ignore.
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
       tree.put("root.mac", platf::get_mac_address(net::addr_to_normalized_string(local_endpoint.address())));
+
+      pt::ptree& root_node = tree.get_child("root");
+
+      if (config::sunshine.server_cmds.size() > 0) {
+        // Broadcast server_cmds
+        for (const auto& cmd : config::sunshine.server_cmds) {
+          pt::ptree cmd_node;
+          cmd_node.put_value(cmd.cmd_name);
+          root_node.push_back(std::make_pair("ServerCommand", cmd_node));
+        }
+      }
+
+    #ifdef _WIN32
+      tree.put("root.VirtualDisplayCapable", true);
+      tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
+    #endif
     }
     else {
       tree.put("root.mac", "00:00:00:00:00:00");

@@ -554,6 +554,11 @@ namespace proc {
     return _app.name;
   }
 
+  boost::process::environment
+  proc_t::get_env() {
+    return _env;
+  }
+
   proc_t::~proc_t() {
     // It's not safe to call terminate() here because our proc_t is a static variable
     // that may be destroyed after the Boost loggers have been destroyed. Instead,

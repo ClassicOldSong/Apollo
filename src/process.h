@@ -83,6 +83,7 @@ namespace proc {
     bool virtual_display;
     bool initial_hdr;
 
+
     proc_t(
       boost::process::environment &&env,
       std::vector<ctx_t> &&apps):
@@ -109,15 +110,17 @@ namespace proc {
     get_app_image(int app_id);
     std::string
     get_last_run_app_name();
+    boost::process::environment
+    get_env();
     void
     terminate();
 
   private:
     int _app_id;
+    boost::process::environment _env;
 
     std::shared_ptr<rtsp_stream::launch_session_t> _launch_session;
 
-    boost::process::environment _env;
     std::vector<ctx_t> _apps;
     ctx_t _app;
     std::chrono::steady_clock::time_point _app_launch_time;
@@ -132,6 +135,9 @@ namespace proc {
     std::vector<cmd_t>::const_iterator _app_prep_it;
     std::vector<cmd_t>::const_iterator _app_prep_begin;
   };
+
+  boost::filesystem::path
+  find_working_directory(const std::string &cmd, boost::process::environment &env);
 
   /**
    * @brief Calculate a stable id based on name and image data
