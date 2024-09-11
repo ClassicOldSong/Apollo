@@ -996,23 +996,27 @@ namespace stream {
     });
 
     server->map(packetTypes[IDX_EXEC_SERVER_CMD], [server](session_t *session, const std::string_view &payload) {
-      BOOST_LOG(debug) << "type [IDX_EXEC_SERVER_CMD]: "sv;
+      BOOST_LOG(debug) << "type [IDX_EXEC_SERVER_CMD]"sv;
       uint8_t cmdIndex = *(uint8_t*)payload.data();
 
       if (cmdIndex < config::sunshine.server_cmds.size()) {
         const auto& cmd = config::sunshine.server_cmds[cmdIndex];
         BOOST_LOG(info) << "Executing server command: " << cmd.cmd_name;
 
-        std::error_code ec;
-        auto env = proc::proc.get_env();
-        boost::filesystem::path working_dir = proc::find_working_directory(cmd.cmd_val, env);
-        auto child = platf::run_command(cmd.elevated, true, cmd.cmd_val, working_dir, {}, nullptr, ec, nullptr);
+        auto exec_thread = std::thread([&cmd]{
+          std::error_code ec;
+          auto env = proc::proc.get_env();
+          boost::filesystem::path working_dir = proc::find_working_directory(cmd.cmd_val, env);
+          auto child = platf::run_command(cmd.elevated, true, cmd.cmd_val, working_dir, env, nullptr, ec, nullptr);
 
-        if (ec) {
-          BOOST_LOG(error) << "Failed to execute server command: " << ec.message();
-        } else {
-          child.detach();
-        }
+          if (ec) {
+            BOOST_LOG(error) << "Failed to execute server command: " << ec.message();
+          } else {
+            child.detach();
+          }
+        });
+
+        exec_thread.detach();
       } else {
         BOOST_LOG(error) << "Invalid server command index: " << (int)cmdIndex;
       }
