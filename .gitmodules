@@ -18,10 +18,6 @@
 	path = third-party/inputtino
 	url = https://github.com/games-on-whales/inputtino.git
 	branch = stable
-[submodule "third-party/moonlight-common-c"]
-	path = third-party/moonlight-common-c
-	url = https://github.com/moonlight-stream/moonlight-common-c.git
-	branch = master
 [submodule "third-party/nanors"]
 	path = third-party/nanors
 	url = https://github.com/sleepybishop/nanors.git
@@ -57,4 +53,8 @@
 [submodule "third-party/wlr-protocols"]
 	path = third-party/wlr-protocols
 	url = https://gitlab.freedesktop.org/wlroots/wlr-protocols.git
+	branch = master
+[submodule "third-party/moonlight-common-c"]
+	path = third-party/moonlight-common-c
+	url = https://github.com/ClassicOldSong/moonlight-common-c
 	branch = master
