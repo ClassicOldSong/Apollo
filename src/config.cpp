@@ -1283,7 +1283,10 @@ namespace config {
 
       // Create empty config file if it does not exist
       if (!fs::exists(sunshine.config_file)) {
-        std::ofstream { sunshine.config_file };
+        auto cfg_file = std::ofstream { sunshine.config_file };
+      #ifdef _WIN32
+        cfg_file << "server_cmd = [{\"name\":\"Bubbles\",\"cmd\":\"bubbles.scr\",\"elevated\":false}]\n";
+      #endif
       }
 
       // Read config file
