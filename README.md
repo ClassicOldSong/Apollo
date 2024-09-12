@@ -30,7 +30,11 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 
 Enabling HDR is **not recommended** at this moment, probably in the long term. The issue with HDR is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy. Things are a little better if you're using Artemis as clients, since each client are remembered as a dedicated display with a fixed identity, Windows can auto select the calibration based on the device, but other Moonclients sharing one single identity are not that lucky.
 
-SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases. 
+SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
+
+## How to run multiple instances of Apollo for multiple virtual displays
+
+Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
 
 ## FAQ
 
@@ -127,6 +131,7 @@ No real time chat support will ever be provided for Apollo and Artemis. Includig
 - WeChat 
 
 > When there's a chat, there're dramas.
+>
 >                            ---- Confucius
 
 ## Downloads
@@ -143,7 +148,7 @@ This is what I got for finding a bug, opened an issue, getting no response, trou
 
 Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android) will no longer be compatible with OG Sunshine and OG Moonlight eventually, but they'll work even better with much more carefully designed features.
 
-The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ablilty but I got kicked out just for helping others. The funniest thing is, the repo starts updating after they got me banned!
+The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ablilty but I got kicked out just for helping others.
 
 **PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
 
