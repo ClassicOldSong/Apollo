@@ -142,6 +142,9 @@ function removeCmd(cmdArr, index) {
     <div id="server_cmd" class="mb-3 d-flex flex-column">
       <label class="form-label">{{ $t('config.server_cmd') }}</label>
       <div class="form-text">{{ $t('config.server_cmd_desc') }}</div>
+      <div class="form-text">
+        <a href="https://github.com/ClassicOldSong/Apollo/wiki/Server-Commands" target="_blank">{{ $t('_common.learn_more') }}</a>
+      </div>
       <table class="table" v-if="serverCmd.length > 0">
         <thead>
         <tr>
