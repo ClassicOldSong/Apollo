@@ -34,6 +34,14 @@ namespace crypto {
   using pkey_ctx_t = util::safe_ptr<EVP_PKEY_CTX, EVP_PKEY_CTX_free>;
   using bignum_t = util::safe_ptr<BIGNUM, BN_free>;
 
+  struct named_cert_t {
+    std::string name;
+    std::string uuid;
+    std::string cert;
+  };
+
+  using p_named_cert_t = std::shared_ptr<named_cert_t>;
+
   /**
    * @brief Hashes the given plaintext using SHA-256.
    * @param plaintext
@@ -76,16 +84,16 @@ namespace crypto {
     KITTY_DECL_CONSTR(cert_chain_t)
 
     void
-    add(x509_t &&cert);
+    add(p_named_cert_t& named_cert_p);
 
     void
     clear();
 
     const char *
-    verify(x509_t::element_type *cert);
+    verify(x509_t::element_type *cert, p_named_cert_t& named_cert_out);
 
   private:
-    std::vector<std::pair<x509_t, x509_store_t>> _certs;
+    std::vector<std::pair<p_named_cert_t, x509_store_t>> _certs;
     x509_store_ctx_t _cert_ctx;
   };
 

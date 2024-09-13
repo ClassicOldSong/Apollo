@@ -11,11 +11,11 @@ namespace crypto {
   cert_chain_t::cert_chain_t():
       _certs {}, _cert_ctx { X509_STORE_CTX_new() } {}
   void
-  cert_chain_t::add(x509_t &&cert) {
+  cert_chain_t::add(p_named_cert_t& named_cert_p) {
     x509_store_t x509_store { X509_STORE_new() };
 
-    X509_STORE_add_cert(x509_store.get(), cert.get());
-    _certs.emplace_back(std::make_pair(std::move(cert), std::move(x509_store)));
+    X509_STORE_add_cert(x509_store.get(), x509(named_cert_p->cert).get());
+    _certs.emplace_back(std::make_pair(named_cert_p, std::move(x509_store)));
   }
   void
   cert_chain_t::clear() {
@@ -52,9 +52,9 @@ namespace crypto {
    * @return nullptr if the certificate is valid, otherwise an error string.
    */
   const char *
-  cert_chain_t::verify(x509_t::element_type *cert) {
+  cert_chain_t::verify(x509_t::element_type *cert, p_named_cert_t& named_cert_out) {
     int err_code = 0;
-    for (auto &[_, x509_store] : _certs) {
+    for (auto &[named_cert_p, x509_store] : _certs) {
       auto fg = util::fail_guard([this]() {
         X509_STORE_CTX_cleanup(_cert_ctx.get());
       });
@@ -70,6 +70,7 @@ namespace crypto {
       auto err = X509_verify_cert(_cert_ctx.get());
 
       if (err == 1) {
+        named_cert_out = named_cert_p;
         return nullptr;
       }
 
