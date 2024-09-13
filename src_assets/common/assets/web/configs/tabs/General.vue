@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const props = defineProps({
   platform: String,
@@ -34,6 +34,13 @@ function addCmd(cmdArr, template) {
 function removeCmd(cmdArr, index) {
   cmdArr.splice(index,1)
 }
+
+onMounted(() => {
+  // Set default value for enable_pairing if not present
+  if (config.value.enable_pairing === undefined) {
+    config.value.enable_pairing = "enabled"
+  }
+})
 </script>
 
 <template>
@@ -185,6 +192,13 @@ function removeCmd(cmdArr, index) {
       <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(serverCmd, serverCmdTemplate)">
         &plus; {{ $t('config.add') }}
       </button>
+    </div>
+
+    <!-- Enable Pairing -->
+    <div class="mb-3 form-check">
+      <input type="checkbox" class="form-check-input" id="enable_pairing" v-model="config.enable_pairing" true-value="enabled" false-value="disabled"/>
+      <label for="enable_pairing" class="form-check-label">{{ $t('config.enable_pairing') }}</label>
+      <div class="form-text">{{ $t('config.enable_pairing_desc') }}</div>
     </div>
 
     <!-- Hide Tray Controls -->

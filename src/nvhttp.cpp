@@ -570,6 +570,13 @@ namespace nvhttp {
       response->close_connection_after_response = true;
     });
 
+    if (!config::sunshine.enable_pairing) {
+      tree.put("root.<xmlattr>.status_code", 403);
+      tree.put("root.<xmlattr>.status_message", "Pairing is disabled for this instance");
+
+      return;
+    }
+
     auto args = request->parse_query_string();
     if (args.find("uniqueid"s) == std::end(args)) {
       tree.put("root.<xmlattr>.status_code", 400);

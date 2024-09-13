@@ -170,6 +170,8 @@
     "credentials_file_desc": "Store Username/Password separately from Apollo's state file.",
     "ds4_back_as_touchpad_click": "Map Back/Select to Touchpad Click",
     "ds4_back_as_touchpad_click_desc": "When forcing DS4 emulation, map Back/Select to Touchpad Click",
+    "enable_pairing": "Enable Pairing",
+    "enable_pairing_desc": "Enable pairing for the Moonlight client. This allows the client to authenticate with the host and establish a secure connection.",
     "encoder": "Force a Specific Encoder",
     "encoder_desc": "Force a specific encoder, otherwise Apollo will select the best available option. Note: If you specify a hardware encoder on Windows, it must match the GPU where the display is connected.",
     "encoder_software": "Software",

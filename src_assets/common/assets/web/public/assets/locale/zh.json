@@ -168,6 +168,8 @@
     "credentials_file_desc": "将用户名/密码与 Apollo 的状态文件分开保存。",
     "ds4_back_as_touchpad_click": "映射回/选择触摸板点击",
     "ds4_back_as_touchpad_click_desc": "强制使用 DS4 模拟时，将“返回”/“选择”映射到触摸板点击",
+    "enable_pairing": "启用配对",
+    "enable_pairing_desc": "启用 Moonlight 客户端的配对。这允许客户端与主机进行身份验证并建立安全连接。",
     "encoder": "强制指定编码器",
     "encoder_desc": "强制指定一个特定编码器，否则 Apollo 将选择最佳可用选项。注意：如果您在 Windows 上指定了硬件编码器，它必须匹配连接显示器的 GPU。",
     "encoder_software": "软件",
