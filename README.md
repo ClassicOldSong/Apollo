@@ -122,7 +122,7 @@ SudoVDA: Virtual Display Adapter Driver used in Apollo
 
 Currently support is only provided via GitHub Issues/Discussions.
 
-No real time chat support will ever be provided for Apollo and Artemis. Includig but not limited to:
+No real time chat support will ever be provided for Apollo and Artemis. Including but not limited to:
 
 - Discord
 - Telegram
