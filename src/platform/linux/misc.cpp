@@ -32,6 +32,8 @@
 #include "src/platform/common.h"
 #include "vaapi.h"
 
+#include <linux/rtnetlink.h>
+
 #ifdef __GNUC__
   #define SUNSHINE_GNUC_EXTENSION __extension__
 #else
