@@ -93,7 +93,7 @@
   "client_card": {
     "clients": "Clients",
     "clients_desc": "Clients that are specifically tuned to work the best with Apollo",
-    "generic_moonlight_clients_desc": "Gereric Moonlight clients are still usable with Apollo."
+    "generic_moonlight_clients_desc": "Generic Moonlight clients are still usable with Apollo."
   },
   "config": {
     "adapter_name": "Adapter Name",
