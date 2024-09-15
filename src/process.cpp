@@ -213,7 +213,6 @@ namespace proc {
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           launch_session->unique_id.c_str(),
           launch_session->device_name.c_str(),
-          _app.name.c_str(),
           render_width,
           render_height,
           launch_session->fps,

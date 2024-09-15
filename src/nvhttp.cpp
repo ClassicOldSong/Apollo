@@ -336,7 +336,7 @@ namespace nvhttp {
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, const args_t &args, const std::string& uuid) {
+  make_launch_session(bool host_audio, const args_t &args, const std::string& device_name, const std::string& uuid) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
@@ -355,7 +355,8 @@ namespace nvhttp {
       if (x == 2) launch_session->fps = atoi(segment.c_str());
       x++;
     }
-    launch_session->device_name = (get_arg(args, "devicename", "unknown"));
+
+    launch_session->device_name = device_name.empty() ? "ApolloDisplay"s : device_name;
     launch_session->unique_id = uuid;
     launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
@@ -960,7 +961,7 @@ namespace nvhttp {
     }
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p->uuid);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p->name, named_cert_p->uuid);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1079,7 +1080,7 @@ namespace nvhttp {
       }
     }
 
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p->uuid);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p->name, named_cert_p->uuid);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
