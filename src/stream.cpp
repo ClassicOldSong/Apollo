@@ -20,6 +20,7 @@ extern "C" {
 }
 
 #include "config.h"
+#include "crypto.h"
 #include "globals.h"
 #include "input.h"
 #include "logging.h"
@@ -403,6 +404,9 @@ namespace stream {
     } control;
 
     std::uint32_t launch_session_id;
+    std::string device_name;
+    std::string device_uuid;
+    crypto::PERM permission;
 
     safe::mail_raw_t::event_t<bool> shutdown_event;
     safe::signal_t controlEnd;
@@ -992,11 +996,17 @@ namespace stream {
         std::copy(payload.end() - 16, payload.end(), std::begin(iv));
       }
 
-      input::passthrough(session->input, std::move(plaintext));
+      input::passthrough(session->input, std::move(plaintext), session->permission);
     });
 
     server->map(packetTypes[IDX_EXEC_SERVER_CMD], [server](session_t *session, const std::string_view &payload) {
       BOOST_LOG(debug) << "type [IDX_EXEC_SERVER_CMD]"sv;
+
+      if (!(session->permission & crypto::PERM::server_cmd)) {
+        BOOST_LOG(debug) << "Permission Exec Server Cmd deined for [" << session->device_name << "]";
+        return;
+      }
+
       uint8_t cmdIndex = *(uint8_t*)payload.data();
 
       if (cmdIndex < config::sunshine.server_cmds.size()) {
@@ -1024,10 +1034,20 @@ namespace stream {
 
     server->map(packetTypes[IDX_SET_CLIPBOARD], [server](session_t *session, const std::string_view &payload) {
       BOOST_LOG(info) << "type [IDX_SET_CLIPBOARD]: "sv << payload << " size: " << payload.size();
+
+      if (!(session->permission & crypto::PERM::clipboard_set)) {
+        BOOST_LOG(debug) << "Permission Clipboard Set deined for [" << session->device_name << "]";
+        return;
+      }
     });
 
     server->map(packetTypes[IDX_FILE_TRANSFER_NONCE_REQUEST], [server](session_t *session, const std::string_view &payload) {
       BOOST_LOG(info) << "type [IDX_FILE_TRANSFER_NONCE_REQUEST]: "sv << payload << " size: " << payload.size();
+
+      if (!(session->permission & crypto::PERM::file_upload)) {
+        BOOST_LOG(debug) << "Permission File Upload deined for [" << session->device_name << "]";
+        return;
+      }
     });
 
     server->map(packetTypes[IDX_ENCRYPTED], [server](session_t *session, const std::string_view &payload) {
@@ -1091,7 +1111,7 @@ namespace stream {
       // IDX_INPUT_DATA callback will attempt to decrypt unencrypted data, therefore we need pass it directly
       if (type == packetTypes[IDX_INPUT_DATA]) {
         plaintext.erase(std::begin(plaintext), std::begin(plaintext) + 4);
-        input::passthrough(session->input, std::move(plaintext));
+        input::passthrough(session->input, std::move(plaintext), session->permission);
       }
       else {
         server->call(type, session, next_payload, true);
@@ -2051,6 +2071,9 @@ namespace stream {
 
       session->shutdown_event = mail->event<bool>(mail::shutdown);
       session->launch_session_id = launch_session.id;
+      session->device_name = launch_session.device_name;
+      session->device_uuid = launch_session.unique_id;
+      session->permission = launch_session.perm;
 
       session->config = config;
 

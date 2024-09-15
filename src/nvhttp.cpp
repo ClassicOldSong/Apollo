@@ -314,7 +314,7 @@ namespace nvhttp {
         named_cert_p->name = el.get<std::string>("name");
         named_cert_p->cert = el.get<std::string>("cert");
         named_cert_p->uuid = el.get<std::string>("uuid");
-        named_cert_p->perm = (PERM)el.get("perm", (uint32_t)PERM::_all);
+        named_cert_p->perm = (PERM)el.get("perm", (uint32_t)PERM::_all) & PERM::_all;
         client.named_devices.emplace_back(named_cert_p);
       }
     }
@@ -340,7 +340,7 @@ namespace nvhttp {
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, const args_t &args, const std::string& device_name, const std::string& uuid) {
+  make_launch_session(bool host_audio, const args_t &args, const crypto::named_cert_t* named_cert_p) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
@@ -360,8 +360,9 @@ namespace nvhttp {
       x++;
     }
 
-    launch_session->device_name = device_name.empty() ? "ApolloDisplay"s : device_name;
-    launch_session->unique_id = uuid;
+    launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;
+    launch_session->unique_id = named_cert_p->uuid;
+    launch_session->perm = named_cert_p->perm;
     launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
     launch_session->surround_info = util::from_view(get_arg(args, "surroundAudioInfo", "196610"));
@@ -797,15 +798,13 @@ namespace nvhttp {
     tree.put("root.ExternalPort", net::map_port(PORT_HTTP));
     tree.put("root.MaxLumaPixelsHEVC", video::active_hevc_mode > 1 ? "1869449984" : "0");
 
-    crypto::named_cert_t* named_cert_p;
-
     // Only include the MAC address for requests sent from paired clients over HTTPS.
     // For HTTP requests, use a placeholder MAC address that Moonlight knows to ignore.
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
       tree.put("root.mac", platf::get_mac_address(net::addr_to_normalized_string(local_endpoint.address())));
 
-      named_cert_p = get_verified_cert(request);
-      if (named_cert_p->perm >= PERM::server_cmd) {
+      auto named_cert_p = get_verified_cert(request);
+      if (!!(named_cert_p->perm & PERM::server_cmd)) {
         pt::ptree& root_node = tree.get_child("root");
 
         if (config::sunshine.server_cmds.size() > 0) {
@@ -820,12 +819,14 @@ namespace nvhttp {
         BOOST_LOG(debug) << "Permission Get ServerCommand denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
       }
 
+      tree.put("root.Permission", std::to_string((uint32_t)named_cert_p->perm));
+
     #ifdef _WIN32
       tree.put("root.VirtualDisplayCapable", true);
-      if (named_cert_p->perm < PERM::list) {
-        tree.put("root.VirtualDisplayDriverReady", true);
-      } else {
+      if (!!(named_cert_p->perm & PERM::list)) {
         tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
+      } else {
+        tree.put("root.VirtualDisplayDriverReady", true);
       }
     #endif
     }
@@ -931,7 +932,17 @@ namespace nvhttp {
     apps.put("<xmlattr>.status_code", 200);
 
     auto named_cert_p = get_verified_cert(request);
-    if (named_cert_p->perm < PERM::list) {
+    if (!!(named_cert_p->perm & PERM::list)) {
+      for (auto &proc : proc::proc.get_apps()) {
+        pt::ptree app;
+
+        app.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
+        app.put("AppTitle"s, proc.name);
+        app.put("ID", proc.id);
+
+        apps.push_back(std::make_pair("App", std::move(app)));
+      }
+    } else {
       BOOST_LOG(debug) << "Permission ListApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       pt::ptree app;
@@ -943,16 +954,6 @@ namespace nvhttp {
       apps.push_back(std::make_pair("App", std::move(app)));
 
       return;
-    } else {
-      for (auto &proc : proc::proc.get_apps()) {
-        pt::ptree app;
-
-        app.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        app.put("AppTitle"s, proc.name);
-        app.put("ID", proc.id);
-
-        apps.push_back(std::make_pair("App", std::move(app)));
-      }
     }
 
   }
@@ -971,7 +972,7 @@ namespace nvhttp {
     });
 
     auto named_cert_p = get_verified_cert(request);
-    if (named_cert_p->perm < PERM::launch) {
+    if (!(named_cert_p->perm & PERM::launch)) {
       BOOST_LOG(debug) << "Permission LaunchApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
@@ -1012,7 +1013,7 @@ namespace nvhttp {
     }
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p->name, named_cert_p->uuid);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1079,7 +1080,7 @@ namespace nvhttp {
     });
 
     auto named_cert_p = get_verified_cert(request);
-    if (named_cert_p->perm < PERM::view) {
+    if (!(named_cert_p->perm & PERM::view)) {
       BOOST_LOG(debug) << "Permission ViewApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
@@ -1140,7 +1141,7 @@ namespace nvhttp {
       }
     }
 
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p->name, named_cert_p->uuid);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1176,7 +1177,7 @@ namespace nvhttp {
     });
 
     auto named_cert_p = get_verified_cert(request);
-    if (named_cert_p->perm < PERM::launch) {
+    if (!(named_cert_p->perm & PERM::launch)) {
       BOOST_LOG(debug) << "Permission CancelApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
@@ -1215,7 +1216,7 @@ namespace nvhttp {
 
     auto named_cert_p = get_verified_cert(request);
 
-    if (named_cert_p->perm < PERM::list) {
+    if (!(named_cert_p->perm & PERM::list)) {
       BOOST_LOG(debug) << "Permission Get AppAsset denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       fg.disable();

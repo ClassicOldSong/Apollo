@@ -21,9 +21,11 @@ namespace rtsp_stream {
     std::string av_ping_payload;
     uint32_t control_connect_data;
 
-    bool host_audio;
     std::string device_name;
     std::string unique_id;
+    crypto::PERM perm;
+
+    bool host_audio;
     int width;
     int height;
     int fps;
