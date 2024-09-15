@@ -39,7 +39,7 @@ namespace VDISPLAY {
 		uint32_t width,
 		uint32_t height,
 		uint32_t fps,
-		GUID& guid
+		const GUID& guid
 	);
 	bool removeVirtualDisplay(const GUID& guid);
 }

@@ -336,7 +336,7 @@ namespace nvhttp {
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, const args_t &args) {
+  make_launch_session(bool host_audio, const args_t &args, const std::string& uuid) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
@@ -356,7 +356,7 @@ namespace nvhttp {
       x++;
     }
     launch_session->device_name = (get_arg(args, "devicename", "unknown"));
-    launch_session->unique_id = (get_arg(args, "uniqueid", "unknown"));
+    launch_session->unique_id = uuid;
     launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
     launch_session->surround_info = util::from_view(get_arg(args, "surroundAudioInfo", "196610"));
@@ -532,6 +532,11 @@ namespace nvhttp {
   struct tunnel<SimpleWeb::HTTP> {
     static auto constexpr to_string = "NONE"sv;
   };
+
+  inline crypto::named_cert_t*
+  get_verified_cert(req_https_t request) {
+    return (crypto::named_cert_t*)request->userp.get();
+  }
 
   template <class T>
   void
@@ -757,10 +762,9 @@ namespace nvhttp {
   serverinfo(std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
     print_req<T>(request);
 
-
     int pair_status = 0;
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
-      BOOST_LOG(info) << "Device " << ((crypto::named_cert_t*)request->userp.get())->name << " getting server info!!!";
+      BOOST_LOG(info) << "Device " << get_verified_cert(request)->name << " getting server info!!!";
 
       auto args = request->parse_query_string();
       auto clientID = args.find("uniqueid"s);
@@ -914,6 +918,8 @@ namespace nvhttp {
   launch(bool &host_audio, resp_https_t response, req_https_t request) {
     print_req<SunshineHTTPS>(request);
 
+    auto named_cert_p = get_verified_cert(request);
+
     pt::ptree tree;
     auto g = util::fail_guard([&]() {
       std::ostringstream data;
@@ -954,7 +960,7 @@ namespace nvhttp {
     }
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, args);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p->uuid);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1010,6 +1016,8 @@ namespace nvhttp {
   void
   resume(bool &host_audio, resp_https_t response, req_https_t request) {
     print_req<SunshineHTTPS>(request);
+
+    auto named_cert_p = get_verified_cert(request);
 
     pt::ptree tree;
     auto g = util::fail_guard([&]() {
@@ -1071,7 +1079,7 @@ namespace nvhttp {
       }
     }
 
-    auto launch_session = make_launch_session(host_audio, args);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p->uuid);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {

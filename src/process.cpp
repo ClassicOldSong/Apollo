@@ -29,6 +29,7 @@
 #include "system_tray.h"
 #include "utility.h"
 #include "video.h"
+#include "uuid.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -205,7 +206,9 @@ namespace proc {
           VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
         }
 
-        memcpy(&launch_session->display_guid, &http::uuid, sizeof(GUID));
+        auto device_uuid = uuid_util::uuid_t::parse(launch_session->unique_id);
+
+        memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
 
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           launch_session->unique_id.c_str(),
