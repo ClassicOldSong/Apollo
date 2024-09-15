@@ -34,10 +34,25 @@ namespace crypto {
   using pkey_ctx_t = util::safe_ptr<EVP_PKEY_CTX, EVP_PKEY_CTX_free>;
   using bignum_t = util::safe_ptr<BIGNUM, BN_free>;
 
+  /**
+   * @brief The permissions of a client.
+   */
+  enum class PERM: uint32_t {
+    list        = 1 << 0,       // Allow list apps
+    view        = 1 << 3,       // Allow view streams
+    input       = 1 << 7,       // Allow any input: kbd/mouse, controller
+    server_cmd  = 1 << 10,      // Allow execute server cmd
+    launch      = 1 << 15,      // Allow launch apps
+    _default    = view | list,  // Default permissions for new clients
+    _all        = launch | server_cmd | input | view | list, // All current permissions
+    _no         = 0,            // No permissions are granted
+  };
+
   struct named_cert_t {
     std::string name;
     std::string uuid;
     std::string cert;
+    PERM        perm;
   };
 
   using p_named_cert_t = std::shared_ptr<named_cert_t>;
