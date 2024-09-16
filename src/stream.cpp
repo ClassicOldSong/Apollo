@@ -1969,6 +1969,40 @@ namespace stream {
       return session.state.load(std::memory_order_relaxed);
     }
 
+    inline bool
+    send(session_t& session, const std::string_view &payload) {
+      return session.broadcast_ref->control_server.send(payload, session.control.peer);
+    }
+
+    std::string
+    uuid(const session_t& session) {
+      return session.device_uuid;
+    }
+
+    bool
+    uuid_match(const session_t &session, const std::string& uuid) {
+      return session.device_uuid == uuid;
+    }
+
+    bool
+    update_device_info(session_t& session, const std::string& name, const crypto::PERM& newPerm) {
+      session.permission = newPerm;
+      if (!(newPerm & crypto::PERM::_allow_view)) {
+        BOOST_LOG(debug) << "Session: View permission revoked for [" << session.device_name << "], disconnecting...";
+        graceful_stop(session);
+        return true;
+      }
+
+      BOOST_LOG(debug) << "Session: Permission updated for [" << session.device_name << "]";
+
+      if (session.device_name != name) {
+        BOOST_LOG(debug) << "Session: Device name changed from [" << session.device_name << "] to [" << name << "]";
+        session.device_name = name;
+      }
+
+      return false;
+    }
+
     void
     stop(session_t &session) {
       while_starting_do_nothing(session.state);
@@ -1979,6 +2013,40 @@ namespace stream {
       }
 
       session.shutdown_event->raise(true);
+    }
+
+    void
+    graceful_stop(session_t& session) {
+      while_starting_do_nothing(session.state);
+      auto expected = state_e::RUNNING;
+      auto already_stopping = !session.state.compare_exchange_strong(expected, state_e::STOPPING);
+      if (already_stopping) {
+        return;
+      }
+
+      // reason: graceful termination
+      std::uint32_t reason = 0x80030023;
+
+      control_terminate_t plaintext;
+      plaintext.header.type = packetTypes[IDX_TERMINATION];
+      plaintext.header.payloadLength = sizeof(plaintext.ec);
+      plaintext.ec = util::endian::big<uint32_t>(reason);
+
+      // We may not have gotten far enough to have an ENet connection yet
+      if (session.control.peer) {
+        std::array<std::uint8_t,
+          sizeof(control_encrypted_t) + crypto::cipher::round_to_pkcs7_padded(sizeof(plaintext)) + crypto::cipher::tag_size>
+          encrypted_payload;
+        auto payload = stream::encode_control(&session, util::view(plaintext), encrypted_payload);
+
+        if (send(session, payload)) {
+          TUPLE_2D(port, addr, platf::from_sockaddr_ex((sockaddr *) &session.control.peer->address.address));
+          BOOST_LOG(warning) << "Couldn't send termination code to ["sv << addr << ':' << port << ']';
+        }
+      }
+
+      session.shutdown_event->raise(true);
+      session.controlEnd.raise(true);
     }
 
     void

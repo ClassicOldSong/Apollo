@@ -268,8 +268,8 @@ namespace system_tray {
     snprintf(msg, std::size(msg), "Streaming started for %s", app_name.c_str());
     snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
   #ifdef _WIN32
-    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
-    strcpy(force_close_msg, convertUtf8ToCurrentCodepage(force_close_msg).c_str());
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(force_close_msg, convertUtf8ToCurrentCodepage(force_close_msg).c_str(), std::size(force_close_msg) - 1);
   #endif
     tray.notification_text = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
@@ -293,7 +293,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Streaming paused for %s", app_name.c_str());
   #ifdef _WIN32
-    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON_PAUSING;
     tray.notification_title = "Stream Paused";
@@ -318,7 +318,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Streaming stopped for %s", app_name.c_str());
   #ifdef _WIN32
-    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON;
     tray.notification_icon = TRAY_ICON;
@@ -344,7 +344,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Application %s exited too fast with code %d. Click here to terminate the stream.", app_name.c_str(), exit_code);
   #ifdef _WIN32
-    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON;
     tray.notification_icon = TRAY_ICON;
@@ -382,7 +382,30 @@ namespace system_tray {
   }
 
   void
-  update_tray_otp_pair(std::string device_name) {
+  update_tray_paired(std::string device_name) {
+    if (!tray_initialized) {
+      return;
+    }
+
+    tray.notification_title = NULL;
+    tray.notification_text = NULL;
+    tray.notification_cb = NULL;
+    tray.notification_icon = NULL;
+    tray_update(&tray);
+    char msg[256];
+    snprintf(msg, std::size(msg), "Device %s paired Succesfully. Please make sure you have access to the device.", device_name.c_str());
+  #ifdef _WIN32
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1 - 1);
+  #endif
+    tray.notification_title = "Device Paired Succesfully";
+    tray.notification_text = msg;
+    tray.notification_icon = TRAY_ICON;
+    tray.tooltip = PROJECT_NAME;
+    tray_update(&tray);
+  }
+
+  void
+  update_tray_client_connected(std::string client_name) {
     if (!tray_initialized) {
       return;
     }
@@ -394,14 +417,13 @@ namespace system_tray {
     tray.icon = TRAY_ICON;
     tray_update(&tray);
     char msg[256];
-    snprintf(msg, std::size(msg), "OTP Pairing started for device \"%s\". Please make sure you have access to the device initiating the pairing request.", device_name.c_str());
+    snprintf(msg, std::size(msg), "%s has connected to the session.", client_name.c_str());
   #ifdef _WIN32
-    strcpy(msg, convertUtf8ToCurrentCodepage(msg).c_str());
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
   #endif
-    tray.icon = TRAY_ICON;
-    tray.notification_title = "Incoming OTP Pairing Request";
+    tray.notification_title = "Client Connected";
     tray.notification_text = msg;
-    tray.notification_icon = TRAY_ICON_LOCKED;
+    tray.notification_icon = TRAY_ICON;
     tray.tooltip = PROJECT_NAME;
     tray_update(&tray);
   }

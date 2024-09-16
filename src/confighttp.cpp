@@ -867,6 +867,38 @@ namespace confighttp {
   }
 
   void
+  updateClient(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    std::stringstream ss;
+    ss << request->content.rdbuf();
+
+    pt::ptree inputTree, outputTree;
+
+    auto g = util::fail_guard([&]() {
+      std::ostringstream data;
+      pt::write_json(data, outputTree);
+      response->write(data.str());
+    });
+
+    try {
+      pt::read_json(ss, inputTree);
+      std::string uuid = inputTree.get<std::string>("uuid");
+      std::string name = inputTree.get<std::string>("name");
+      auto perm = (crypto::PERM)inputTree.get<uint32_t>("perm") & crypto::PERM::_all;
+      outputTree.put("status", nvhttp::update_device_info(uuid, name, perm));
+    }
+    catch (std::exception &e) {
+      BOOST_LOG(warning) << "Update Client: "sv << e.what();
+      outputTree.put("status", false);
+      outputTree.put("error", e.what());
+      return;
+    }
+  }
+
+  void
   unpair(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
 
@@ -894,6 +926,35 @@ namespace confighttp {
       outputTree.put("status", false);
       outputTree.put("error", e.what());
       return;
+    }
+  }
+
+  void
+  disconnect(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    std::stringstream ss;
+    ss << request->content.rdbuf();
+
+    pt::ptree inputTree, outputTree;
+
+    auto g = util::fail_guard([&]() {
+      std::ostringstream data;
+      pt::write_json(data, outputTree);
+      response->write(data.str());
+    });
+    
+    try {
+      pt::read_json(ss, inputTree);
+      std::string uuid = inputTree.get<std::string>("uuid");
+      outputTree.put("status", nvhttp::find_and_stop_session(uuid, true));
+    }
+    catch (std::exception &e) {
+      BOOST_LOG(warning) << "Disconnect: "sv << e.what();
+      outputTree.put("status", false);
+      outputTree.put("error", e.what());
     }
   }
 
@@ -969,7 +1030,9 @@ namespace confighttp {
     server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
     server.resource["^/api/clients/unpair-all$"]["POST"] = unpairAll;
     server.resource["^/api/clients/list$"]["GET"] = listClients;
+    server.resource["^/api/clients/update$"]["POST"] = updateClient;
     server.resource["^/api/clients/unpair$"]["POST"] = unpair;
+    server.resource["^/api/clients/disconnect$"]["POST"] = disconnect;
     server.resource["^/api/apps/close$"]["POST"] = closeApp;
     server.resource["^/api/covers/upload$"]["POST"] = uploadCover;
     server.resource["^/images/apollo.ico$"]["GET"] = getFaviconImage;

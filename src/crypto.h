@@ -59,6 +59,7 @@ namespace crypto {
     list             = _action << 0,     // Allow list apps
     view             = _action << 1,     // Allow view streams
     launch           = _action << 2,     // Allow launch apps
+    _allow_view      = view | launch,    // If no view permission is granted, disconnect the device upon permission update
     _all_actions     = list | view | launch,
 
     _default         = view | list,      // Default permissions for new clients

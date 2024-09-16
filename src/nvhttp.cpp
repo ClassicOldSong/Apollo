@@ -31,6 +31,7 @@
 #include "platform/common.h"
 #include "process.h"
 #include "rtsp.h"
+#include "stream.h"
 #include "system_tray.h"
 #include "utility.h"
 #include "uuid.h"
@@ -331,7 +332,12 @@ namespace nvhttp {
   void
   add_authorized_client(const p_named_cert_t& named_cert_p) {
     client_t &client = client_root;
-    client.named_devices.emplace_back(named_cert_p);
+    client.named_devices.push_back(named_cert_p);
+
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_paired(named_cert_p->name);
+#endif
 
     if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
       save_state();
@@ -657,10 +663,6 @@ namespace nvhttp {
 
             if (hash.to_string_view() == it->second) {
 
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
-              system_tray::update_tray_otp_pair(ptr->second.client.name);
-#endif
-
               if (!otp_device_name.empty()) {
                 ptr->second.client.name = std::move(otp_device_name);
               }
@@ -823,7 +825,7 @@ namespace nvhttp {
 
     #ifdef _WIN32
       tree.put("root.VirtualDisplayCapable", true);
-      if (!!(named_cert_p->perm & PERM::list)) {
+      if (!!(named_cert_p->perm & PERM::_all_actions)) {
         tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
       } else {
         tree.put("root.VirtualDisplayDriverReady", true);
@@ -902,11 +904,29 @@ namespace nvhttp {
   get_all_clients() {
     pt::ptree named_cert_nodes;
     client_t &client = client_root;
+
+    std::list<std::string> connected_uuids = rtsp_stream::get_all_session_uuids();
+
     for (auto &named_cert_p : client.named_devices) {
       pt::ptree named_cert_node;
       named_cert_node.put("name"s, named_cert_p->name);
       named_cert_node.put("uuid"s, named_cert_p->uuid);
       named_cert_node.put("perm", (uint32_t)named_cert_p->perm);
+
+      if (connected_uuids.empty()) {
+        named_cert_node.put("connected"s, false);
+      } else {
+        bool connected = false;
+        for (auto it = connected_uuids.begin(); it != connected_uuids.end(); ++it) {
+            if (*it == named_cert_p->uuid) {
+                connected = true;
+                connected_uuids.erase(it);
+                break;
+            }
+        }
+        named_cert_node.put("connected"s, connected);
+      }
+
       named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
     }
 
@@ -932,7 +952,7 @@ namespace nvhttp {
     apps.put("<xmlattr>.status_code", 200);
 
     auto named_cert_p = get_verified_cert(request);
-    if (!!(named_cert_p->perm & PERM::list)) {
+    if (!!(named_cert_p->perm & PERM::_all_actions)) {
       for (auto &proc : proc::proc.get_apps()) {
         pt::ptree app;
 
@@ -949,7 +969,7 @@ namespace nvhttp {
 
       app.put("IsHdrSupported"s, 0);
       app.put("AppTitle"s, "Permission Denied");
-      app.put("ID", "PERMISSION_DENIED");
+      app.put("ID", "1145141919810");
 
       apps.push_back(std::make_pair("App", std::move(app)));
 
@@ -1080,7 +1100,7 @@ namespace nvhttp {
     });
 
     auto named_cert_p = get_verified_cert(request);
-    if (!(named_cert_p->perm & PERM::view)) {
+    if (!(named_cert_p->perm & PERM::_allow_view)) {
       BOOST_LOG(debug) << "Permission ViewApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
@@ -1161,6 +1181,10 @@ namespace nvhttp {
     tree.put("root.resume", 1);
 
     rtsp_stream::launch_session_raise(launch_session);
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_client_connected(named_cert_p->name);
+#endif
   }
 
   void
@@ -1216,7 +1240,7 @@ namespace nvhttp {
 
     auto named_cert_p = get_verified_cert(request);
 
-    if (!(named_cert_p->perm & PERM::list)) {
+    if (!(named_cert_p->perm & PERM::_all_actions)) {
       BOOST_LOG(debug) << "Permission Get AppAsset denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       fg.disable();
@@ -1383,6 +1407,54 @@ namespace nvhttp {
     load_state();
   }
 
+  void stop_session(stream::session_t& session, bool graceful) {
+    if (graceful) {
+      stream::session::graceful_stop(session);
+    } else {
+      stream::session::stop(session);
+    }
+  }
+
+  bool find_and_stop_session(const std::string& uuid, bool graceful) {
+    auto session = rtsp_stream::find_session(uuid);
+    if (session) {
+      stop_session(*session, graceful);
+      return true;
+    }
+    return false;
+  }
+
+  void update_session_info(stream::session_t& session, const std::string& name, const crypto::PERM newPerm) {
+    stream::session::update_device_info(session, name, newPerm);
+  }
+
+  bool find_and_udpate_session_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm) {
+    auto session = rtsp_stream::find_session(uuid);
+    if (session) {
+      update_session_info(*session, name, newPerm);
+      return true;
+    }
+    return false;
+  }
+
+  bool update_device_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm) {
+    find_and_udpate_session_info(uuid, name, newPerm);
+
+    client_t &client = client_root;
+    auto it = client.named_devices.begin();
+    for (; it != client.named_devices.end(); ++it) {
+      auto named_cert_p = *it;
+      if (named_cert_p->uuid == uuid) {
+        named_cert_p->name = name;
+        named_cert_p->perm = newPerm;
+        save_state();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   int
   unpair_client(std::string uuid) {
     int removed = 0;
@@ -1399,6 +1471,18 @@ namespace nvhttp {
 
     save_state();
     load_state();
+
+    if (removed) {
+      auto session = rtsp_stream::find_session(uuid);
+      if (session) {
+        stop_session(*session, true);
+      }
+
+      if (client.named_devices.empty()) {
+        proc::proc.terminate();
+      }
+    }
+
     return removed;
   }
 }  // namespace nvhttp

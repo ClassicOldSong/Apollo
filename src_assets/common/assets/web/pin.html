@@ -57,6 +57,71 @@
     <div class="alert alert-warning">
       <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
     </div>
+    <!-- Unpair Clients -->
+    <div class="card my-4 align-self-stretch">
+      <div class="card-body">
+        <div class="p-2">
+          <div class="d-flex justify-content-end align-items-center">
+            <h2 id="unpair" class="me-auto">{{ $t('pin.device_management') }}</h2>
+            <button class="btn btn-danger" :disabled="unpairAllPressed" @click="unpairAll">
+              {{ $t('pin.unpair_all') }}
+            </button>
+          </div>
+          <br />
+          <p class="mb-0">{{ $t('pin.device_management_desc') }}</p>
+          <div id="apply-alert" class="alert alert-success d-flex align-items-center mt-3" :style="{ 'display': (showApplyMessage ? 'flex !important': 'none !important') }">
+            <div class="me-2"><b>{{ $t('_common.success') }}</b> {{ $t('pin.unpair_single_success') }}</div>
+            <button class="btn btn-success ms-auto apply" @click="clickedApplyBanner">{{ $t('_common.dismiss') }}</button>
+          </div>
+          <div class="alert alert-success mt-3" v-if="unpairAllStatus === true">
+            {{ $t('pin.unpair_all_success') }}
+          </div>
+          <div class="alert alert-danger mt-3" v-if="unpairAllStatus === false">
+            {{ $t('pin.unpair_all_error') }}
+          </div>
+        </div>
+      </div>
+      <ul id="client-list" class="list-group list-group-flush list-group-item-light" v-if="clients && clients.length > 0">
+        <template v-for="client in clients" class="list-group-item d-flex align-items-center">
+          <div v-if="client.editing" class="list-group-item d-flex align-items-stretch flex-column">
+            <div class="d-flex align-items-center">
+              <div class="p-2 flex-grow-1 d-flex align-items-center">
+                <span class="badge" :class="client.editPerm >= 0x04000000 ? 'bg-danger' : 'bg-primary'">
+                  [ {{permToStr(client.editPerm)}} ]
+                </span>
+                &nbsp;
+                <input v-model="client.editName" @keyup.enter="saveClient(client)" class="form-control flex-grow-1" type="text" :placeholder="$t('pin.device_name')">
+              </div>
+              <div class="me-2 btn btn-success" @click="saveClient(client)"><i class="fas fa-check"></i></div>
+              <div class="me-2 btn btn-secondary" @click="cancelEdit(client)"><i class="fas fa-times"></i></div>
+            </div>
+            <div class="align-items-top d-flex flex-row justify-content-center">
+              <div v-for="group in permissionGroups" class="d-flex flex-column mx-2">
+                <div class="mx-2">{{ group.name }}:</div>
+                <button v-for="perm in group.permissions" class="my-1 btn btn-sm" :disabled="isSupressed(client.editPerm, perm.name, perm.supressed_by)" :class="(isSupressed(client.editPerm, perm.name, perm.supressed_by) || checkPermission(client.editPerm, perm.name)) ? 'btn-success' : 'btn-outline-secondary'" @click="togglePermission(client, perm.name)">
+                  {{ $t(`permissions.${perm.name}`) }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-else class="list-group-item d-flex align-items-center">
+            <div class="p-2 flex-grow-1 d-flex align-items-center">
+              <span class="badge" :class="client.perm >= 0x04000000 ? 'bg-danger' : 'bg-primary'">
+                [ {{permToStr(client.perm)}} ]
+              </span>
+              &nbsp;
+              <span class="me-2">{{client.name != "" ? client.name : $t('pin.unpair_single_unknown')}}</span>
+            </div>
+            <div v-if="client.connected" class="me-2 btn btn-warning" @click="disconnectClient(client.uuid)"><i class="fas fa-link-slash"></i></div>
+            <div class="me-2 btn btn-primary" @click="editClient(client)"><i class="fas fa-edit"></i></div>
+            <div class="me-2 btn btn-danger" @click="unpairSingle(client.uuid)"><i class="fas fa-trash"></i></div>
+          </div>
+        </template>
+      </ul>
+      <ul v-else class="list-group list-group-flush list-group-item-light">
+        <div class="list-group-item p-3 text-center"><em>{{ $t('pin.unpair_single_no_devices') }}</em></div>
+      </ul>
+    </div>
   </div>
 </body>
 
@@ -91,6 +156,106 @@
     }
   }
 
+  /**
+   * Permissions:
+   enum class PERM: uint32_t {
+      _reserved        = 1,
+
+      _input           = _reserved << 8,   // Input permission group
+      input_controller = _input << 0,      // Allow controller input
+      input_touch      = _input << 1,      // Allow touch input
+      input_pen        = _input << 2,      // Allow pen input
+      input_kbdm       = _input << 3,      // Allow kbd/mouse input
+      _all_inputs      = input_controller | input_touch | input_pen | input_kbdm,
+
+      _operation       = _input << 8,      // Operation permission group
+      clipboard_set    = _operation << 0,  // Allow set clipboard from client
+      clipboard_read   = _operation << 1,  // Allow read clipboard from host
+      file_upload      = _operation << 2,  // Allow upload files to host
+      file_dwnload     = _operation << 3,  // Allow download files from host
+      server_cmd       = _operation << 4,  // Allow execute server cmd
+      _all_opeiations  = clipboard_set | clipboard_read | file_upload | file_dwnload | server_cmd,
+
+      _action          = _operation << 8,  // Action permission group
+      list             = _action << 0,     // Allow list apps
+      view             = _action << 1,     // Allow view streams
+      launch           = _action << 2,     // Allow launch apps
+      _allow_view      = view | launch,    // Launch contains view permission
+      _all_actions     = list | view | launch,
+
+      _default         = view | list,      // Default permissions for new clients
+      _no              = 0,                // No permissions are granted
+      _all             = _all_inputs | _all_opeiations | _all_actions, // All current permissions
+    };
+  */
+
+  const permissionMapping = {
+    // Input permission group
+    input_controller: 0x00000100,
+    input_touch: 0x00000200,
+    input_pen: 0x00000400,
+    input_kbdm: 0x00000800,
+    _all_inputs: 0x00000F00,
+
+    // Operation permission group
+    clipboard_set: 0x00010000,
+    clipboard_read: 0x00020000,
+    file_upload: 0x00040000,
+    file_dwnload: 0x00080000,
+    server_cmd: 0x00100000,
+    _all_operations: 0x001F0000,
+
+    // Action permission group
+    list: 0x01000000,
+    view: 0x02000000,
+    launch: 0x04000000,
+    _allow_view: 0x06000000,
+    _all_actions: 0x07000000,
+
+    // Special permissions
+    _default: 0x03000000,
+    _no: 0x00000000,
+    _all: 0x071F0F00
+  };
+
+  const permissionGroups = [
+    { name: 'Action', permissions: [
+      {
+        name: 'list',
+        supressed_by: ['view', 'launch']
+      }, {
+        name: 'view',
+        supressed_by: ['launch']
+      }, {
+        name: 'launch',
+        supressed_by: []
+      }
+    ] },
+    { name: 'Operation', permissions: [
+      {
+        name: 'server_cmd',
+        supressed_by: []
+      }
+    ] },
+    { name: 'Input', permissions: [
+      {
+        name: 'input_controller',
+        supressed_by: []
+      }, {
+        name: 'input_touch',
+        supressed_by: []
+      }, {
+        name: 'input_pen',
+        supressed_by: []
+      }, {
+        name: 'input_kbdm',
+        supressed_by: []
+      }
+    ] },
+  ];
+
+  let currentEditingClient = null;
+
   const data = () => {
     return {
       editingHost: false,
@@ -102,7 +267,12 @@
       deviceName: '',
       hostAddr: '',
       hostPort: '',
-      hostName: ''
+      hostName: '',
+      permissionGroups,
+      clients: [],
+      showApplyMessage: false,
+      unpairAllPressed: false,
+      unpairAllStatus: null
     }
   }
 
@@ -120,10 +290,14 @@
         return !!(this.hostAddr && this.hostPort);
       }
     },
+    created() {
+      this.refreshClients();
+    },
     methods: {
       switchTab(currentTab) {
         location.hash = currentTab;
-        Object.assign(this, data());
+        const clients = this.clients;
+        Object.assign(this, data(), { clients });
         hostInfoCache = null;
         clearTimeout(resetOTPTimeout);
       },
@@ -155,6 +329,8 @@
               ).innerHTML = `<div class="alert alert-success" role="alert">${this.i18n.t('pin.pair_success')}</div>`;
               document.querySelector("#pin-input").value = "";
               document.querySelector("#name-input").value = "";
+
+              setTimeout(() => this.refreshClients(), 1000);
             } else {
               document.querySelector(
                 "#status"
@@ -217,7 +393,128 @@
             }
           }
         })
-      }
+      },
+      clickedApplyBanner() {
+        this.showApplyMessage = false;
+      },
+      editClient(client) {
+        if (currentEditingClient) {
+          this.cancelEdit(currentEditingClient);
+        }
+        currentEditingClient = client;
+        client.editing = true;
+        client.editPerm = client.perm;
+        client.editName = client.name;
+      },
+      cancelEdit(client) {
+        client.editing = false;
+        client.editPerm = client.perm;
+        client.editName = client.name;
+        currentEditingClient = null;
+      },
+      saveClient(client) {
+        client.editing = false;
+        currentEditingClient = null;
+        const editedClient = {
+          uuid: client.uuid,
+          name: client.editName,
+          perm: client.editPerm & permissionMapping._all
+        }
+        fetch("/api/clients/update", {
+          credentials: 'include',
+          method: "POST",
+          body: JSON.stringify(editedClient)
+        }).finally(() => {
+          setTimeout(() => {
+            this.refreshClients();
+          }, 1000);
+        });
+      },
+      permToStr(perm) {
+        const permSegments = [];
+        permSegments.push((perm >> 24) & 0xFF);
+        permSegments.push((perm >> 16) & 0xFF);
+        permSegments.push((perm >> 8) & 0xFF);
+        return permSegments.map(seg => seg.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+      },
+      checkPermission(perm, permission) {
+        return (perm & permissionMapping[permission]) !== 0;
+      },
+      isSupressed(perm, permission, supressed_by) {
+        for (const supressed of supressed_by) {
+          if (this.checkPermission(perm, supressed)) {
+            return true;
+          }
+        }
+        return false;
+      },
+      togglePermission(client, permission) {
+        client.editPerm ^= permissionMapping[permission];
+      },
+      disconnectClient(uuid) {
+        fetch("/api/clients/disconnect", {
+          credentials: 'include',
+          method: "POST",
+          body: JSON.stringify({ uuid })
+        }).finally(() => {
+          setTimeout(() => {
+            this.refreshClients();
+          }, 1000);
+        });
+      },
+      unpairAll() {
+        this.unpairAllPressed = true;
+        fetch("/api/clients/unpair-all", {
+          credentials: 'include',
+          method: "POST"
+        })
+          .then((r) => r.json())
+          .then((r) => {
+            this.unpairAllPressed = false;
+            this.unpairAllStatus = r.status.toString() === "true";
+            setTimeout(() => {
+              this.unpairAllStatus = null;
+            }, 5000);
+            this.refreshClients();
+          });
+      },
+      unpairSingle(uuid) {
+        fetch("/api/clients/unpair", {
+          credentials: 'include',
+          method: "POST",
+          body: JSON.stringify({ uuid })
+        }).then(() => {
+          this.showApplyMessage = true;
+          this.refreshClients();
+        });
+      },
+      refreshClients() {
+        if (currentEditingClient) {
+          this.cancelEdit(currentEditingClient);
+        }
+        fetch("/api/clients/list", { credentials: 'include' })
+          .then((response) => response.json())
+          .then((response) => {
+            const clientList = document.querySelector("#client-list");
+            if (response.status === 'true' && response.named_certs && response.named_certs.length) {
+              this.clients = response.named_certs.map(({name, uuid, perm, connected}) => {
+                const permInt = parseInt(perm, 10);
+                return {
+                  name,
+                  uuid,
+                  perm: permInt,
+                  connected: connected === 'true',
+                  editing: false,
+                  editPerm: permInt,
+                  editName: name
+                }
+              })
+              currentEditingClient = null;
+            } else {
+              this.clients = [];
+            }
+          });
+      },
     }
   });
 

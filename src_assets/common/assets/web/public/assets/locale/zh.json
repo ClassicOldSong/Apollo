@@ -388,6 +388,20 @@
     "password_change": "更改密码",
     "success_msg": "密码已成功更改！此页面即将重新加载，您的浏览器将要求您输入新的账户信息。"
   },
+  "permissions": {
+    "input_controller": "手柄输入",
+    "input_touch": "触摸输入",
+    "input_pen": "笔输入",
+    "input_kbdm": "键鼠输入",
+    "clipboard_set": "上传剪贴板",
+    "clipboard_read": "获取剪贴板",
+    "file_upload": "上传文件",
+    "file_dwnload": "下载文件",
+    "server_cmd": "服务端命令",
+    "list": "列出APP",
+    "view": "查看串流",
+    "launch": "启动APP"
+  },
   "pin": {
     "device_name": "设备名称",
     "pair_failure": "配对失败：请检查 PIN 码是否正确输入",
@@ -402,7 +416,15 @@
     "otp_expired_msg": "口令已过期，请重新请求。",
     "otp_success": "一次性 PIN 请求成功，3分钟内有效。",
     "otp_msg": "一次性口令目前仅支持最新的 Artemis 客户端使用。其他客户端请使用传统配对方式。",
-    "otp_pair_now": "PIN 请求成功，是否一键配对？"
+    "otp_pair_now": "PIN 请求成功，是否一键配对？",
+    "device_management": "设备管理",
+    "device_management_desc": "管理已配对的设备。",
+    "unpair_all": "全部取消配对",
+    "unpair_all_success": "全部取消配对成功！",
+    "unpair_all_error": "取消配对时出错",
+    "unpair_single_no_devices": "没有配对的设备。",
+    "unpair_single_success": "然而，设备可能仍然处于活动会话中，使用上面的“强制关闭”按钮结束任何打开的会话。",
+    "unpair_single_unknown": "未知客户端"
   },
   "resource_card": {
     "github_discussions": "Github 讨论区",
@@ -430,15 +452,7 @@
     "quit_apollo_success": "Apollo 已成功退出。",
     "quit_apollo_success_ongoing": "Apollo 正在退出...",
     "quit_apollo_confirm": "确定要退出 Apollo 吗？如果没有其他操作方式，你将无法再次启动 Apollo。",
-    "troubleshooting": "故障排除",
-    "unpair_all": "全部取消配对",
-    "unpair_all_error": "取消配对时出错",
-    "unpair_all_success": "取消配对成功！",
-    "unpair_desc": "删除您已配对的设备。未配对的单独设备与活动会话将保持连接，但不能启动或继续会话。",
-    "unpair_single_no_devices": "没有配对的设备。",
-    "unpair_single_success": "然而，设备可能仍然处于活动会话中，使用上面的“强制关闭”按钮结束任何打开的会话。",
-    "unpair_single_unknown": "未知客户端",
-    "unpair_title": "取消配对设备"
+    "troubleshooting": "故障排除"
   },
   "welcome": {
     "confirm_password": "确认密码",
