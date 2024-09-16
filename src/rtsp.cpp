@@ -618,6 +618,31 @@ namespace rtsp_stream {
       return nullptr;
     }
 
+    std::shared_ptr<stream::session_t>
+    find_session(const std::string& uuid) {
+      auto lg = _session_slots.lock();
+
+      for (auto &slot : *_session_slots) {
+        if (slot && stream::session::uuid_match(*slot, uuid)) {
+          return slot;
+        }
+      }
+
+      return nullptr;
+    }
+
+    std::list<std::string>
+    get_all_session_uuids() {
+      std::list<std::string> uuids;
+      auto lg = _session_slots.lock();
+      for (auto &slot : *_session_slots) {
+        if (slot) {
+          uuids.push_back(stream::session::uuid(*slot));
+        }
+      }
+      return uuids;
+    }
+
   private:
     std::unordered_map<std::string_view, cmd_func_t> _map_cmd_cb;
 
@@ -650,6 +675,16 @@ namespace rtsp_stream {
     server.clear(false);
 
     return server.session_count();
+  }
+
+  std::shared_ptr<stream::session_t>
+  find_session(const std::string& uuid) {
+    return server.find_session(uuid);
+  }
+
+  std::list<std::string>
+  get_all_session_uuids() {
+    return server.get_all_session_uuids();
   }
 
   int

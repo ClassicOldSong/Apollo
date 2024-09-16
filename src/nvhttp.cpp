@@ -31,6 +31,7 @@
 #include "platform/common.h"
 #include "process.h"
 #include "rtsp.h"
+#include "stream.h"
 #include "system_tray.h"
 #include "utility.h"
 #include "uuid.h"
@@ -45,6 +46,15 @@ namespace nvhttp {
 
   namespace fs = std::filesystem;
   namespace pt = boost::property_tree;
+
+  using p_named_cert_t = crypto::p_named_cert_t;
+  using PERM = crypto::PERM;
+
+  struct client_t {
+    std::vector<p_named_cert_t> named_devices;
+  };
+
+  struct pair_session_t;
 
   crypto::cert_chain_t cert_chain;
   static std::string one_time_pin;
@@ -76,7 +86,7 @@ namespace nvhttp {
       context.use_private_key_file(private_key_file, boost::asio::ssl::context::pem);
     }
 
-    std::function<int(SSL *)> verify;
+    std::function<bool(std::shared_ptr<Request>, SSL*)> verify;
     std::function<void(std::shared_ptr<Response>, std::shared_ptr<Request>)> on_verify_failed;
 
   protected:
@@ -120,7 +130,7 @@ namespace nvhttp {
             if (!lock)
               return;
             if (!ec) {
-              if (verify && !verify(session->connection->socket->native_handle()))
+              if (verify && !verify(session->request, session->connection->socket->native_handle()))
                 this->write(session, on_verify_failed);
               else
                 this->read(session);
@@ -142,16 +152,6 @@ namespace nvhttp {
     std::string servercert;
     std::string pkey;
   } conf_intern;
-
-  struct named_cert_t {
-    std::string name;
-    std::string uuid;
-    std::string cert;
-  };
-
-  struct client_t {
-    std::vector<named_cert_t> named_devices;
-  };
 
   struct pair_session_t {
     struct {
@@ -225,12 +225,28 @@ namespace nvhttp {
     pt::ptree node;
 
     pt::ptree named_cert_nodes;
-    for (auto &named_cert : client.named_devices) {
-      pt::ptree named_cert_node;
-      named_cert_node.put("name"s, named_cert.name);
-      named_cert_node.put("cert"s, named_cert.cert);
-      named_cert_node.put("uuid"s, named_cert.uuid);
-      named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
+    std::unordered_set<std::string> unique_certs;
+    std::unordered_map<std::string, int> name_counts;
+    for (auto &named_cert_p : client.named_devices) {
+      if (unique_certs.insert(named_cert_p->cert).second) {
+        pt::ptree named_cert_node;
+        std::string base_name = named_cert_p->name;
+        // Remove existing pending id if present
+        size_t pos = base_name.find(" (");
+        if (pos != std::string::npos) {
+          base_name = base_name.substr(0, pos);
+        }
+        int count = name_counts[base_name]++;
+        std::string final_name = base_name;
+        if (count > 0) {
+          final_name += " (" + std::to_string(count + 1) + ")";
+        }
+        named_cert_node.put("name"s, final_name);
+        named_cert_node.put("cert"s, named_cert_p->cert);
+        named_cert_node.put("uuid"s, named_cert_p->uuid);
+        named_cert_node.put("perm"s, (uint32_t)named_cert_p->perm);
+        named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
+      }
     }
     root.add_child("root.named_devices"s, named_cert_nodes);
 
@@ -282,11 +298,12 @@ namespace nvhttp {
 
         if (device_node.count("certs")) {
           for (auto &[_, el] : device_node.get_child("certs")) {
-            named_cert_t named_cert;
-            named_cert.name = ""s;
-            named_cert.cert = el.get_value<std::string>();
-            named_cert.uuid = uuid_util::uuid_t::generate().string();
-            client.named_devices.emplace_back(named_cert);
+            auto named_cert_p = std::make_shared<crypto::named_cert_t>();
+            named_cert_p->name = ""s;
+            named_cert_p->cert = el.get_value<std::string>();
+            named_cert_p->uuid = uuid_util::uuid_t::generate().string();
+            named_cert_p->perm = PERM::_all;
+            client.named_devices.emplace_back(named_cert_p);
           }
         }
       }
@@ -294,39 +311,42 @@ namespace nvhttp {
 
     if (root.count("named_devices")) {
       for (auto &[_, el] : root.get_child("named_devices")) {
-        named_cert_t named_cert;
-        named_cert.name = el.get_child("name").get_value<std::string>();
-        named_cert.cert = el.get_child("cert").get_value<std::string>();
-        named_cert.uuid = el.get_child("uuid").get_value<std::string>();
-        client.named_devices.emplace_back(named_cert);
+        auto named_cert_p = std::make_shared<crypto::named_cert_t>();
+        named_cert_p->name = el.get<std::string>("name");
+        named_cert_p->cert = el.get<std::string>("cert");
+        named_cert_p->uuid = el.get<std::string>("uuid");
+        named_cert_p->perm = (PERM)el.get("perm", (uint32_t)PERM::_all) & PERM::_all;
+        client.named_devices.emplace_back(named_cert_p);
       }
     }
 
     // Empty certificate chain and import certs from file
     cert_chain.clear();
     for (auto &named_cert : client.named_devices) {
-      cert_chain.add(crypto::x509(named_cert.cert));
+      cert_chain.add(named_cert);
     }
 
     client_root = client;
   }
 
   void
-  add_authorized_client(const std::string &name, std::string &&cert) {
+  add_authorized_client(const p_named_cert_t& named_cert_p) {
     client_t &client = client_root;
-    named_cert_t named_cert;
-    named_cert.name = name;
-    named_cert.cert = std::move(cert);
-    named_cert.uuid = uuid_util::uuid_t::generate().string();
-    client.named_devices.emplace_back(named_cert);
+    client.named_devices.push_back(named_cert_p);
+
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_paired(named_cert_p->name);
+#endif
 
     if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
       save_state();
+      load_state();
     }
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, const args_t &args) {
+  make_launch_session(bool host_audio, const args_t &args, const crypto::named_cert_t* named_cert_p) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
@@ -345,8 +365,10 @@ namespace nvhttp {
       if (x == 2) launch_session->fps = atoi(segment.c_str());
       x++;
     }
-    launch_session->device_name = (get_arg(args, "devicename", "unknown"));
-    launch_session->unique_id = (get_arg(args, "uniqueid", "unknown"));
+
+    launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;
+    launch_session->unique_id = named_cert_p->uuid;
+    launch_session->perm = named_cert_p->perm;
     launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
     launch_session->surround_info = util::from_view(get_arg(args, "surroundAudioInfo", "196610"));
@@ -458,7 +480,7 @@ namespace nvhttp {
   }
 
   void
-  clientpairingsecret(std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, pair_session_t &sess, pt::ptree &tree, const args_t &args) {
+  clientpairingsecret(pair_session_t &sess, pt::ptree &tree, const args_t &args) {
     auto &client = sess.client;
 
     auto pairingsecret = util::from_hex_vec(get_arg(args, "clientpairingsecret"), true);
@@ -487,11 +509,26 @@ namespace nvhttp {
     // if hash not correct, probably MITM
     if (!std::memcmp(hash.data(), sess.clienthash.data(), hash.size()) && crypto::verify256(crypto::x509(client.cert), secret, sign)) {
       tree.put("root.paired", 1);
-      add_cert->raise(crypto::x509(client.cert));
+
+      auto named_cert_p = std::make_shared<crypto::named_cert_t>();
+      named_cert_p->name = client.name;
+      for (char& c : named_cert_p->name) {
+        if (c == '(') c = '[';
+        else if (c == ')') c = ']';
+      }
+      named_cert_p->cert = std::move(client.cert);
+      named_cert_p->uuid = uuid_util::uuid_t::generate().string();
+      // If the device is the first one paired with the server, assign full permission.
+      if (client_root.named_devices.empty()) {
+        named_cert_p->perm = PERM::_all;
+      } else {
+        named_cert_p->perm = PERM::_default;
+      }
 
       auto it = map_id_sess.find(client.uniqueID);
-      add_authorized_client(client.name, std::move(client.cert));
       map_id_sess.erase(it);
+
+      add_authorized_client(named_cert_p);
     }
     else {
       map_id_sess.erase(client.uniqueID);
@@ -513,6 +550,11 @@ namespace nvhttp {
   struct tunnel<SimpleWeb::HTTP> {
     static auto constexpr to_string = "NONE"sv;
   };
+
+  inline crypto::named_cert_t*
+  get_verified_cert(req_https_t request) {
+    return (crypto::named_cert_t*)request->userp.get();
+  }
 
   template <class T>
   void
@@ -557,7 +599,7 @@ namespace nvhttp {
 
   template <class T>
   void
-  pair(std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
+  pair(std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
     print_req<T>(request);
 
     pt::ptree tree;
@@ -621,10 +663,6 @@ namespace nvhttp {
 
             if (hash.to_string_view() == it->second) {
 
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
-              system_tray::update_tray_otp_pair(ptr->second.client.name);
-#endif
-
               if (!otp_device_name.empty()) {
                 ptr->second.client.name = std::move(otp_device_name);
               }
@@ -673,7 +711,7 @@ namespace nvhttp {
       serverchallengeresp(sess_it->second, tree, args);
     }
     else if (it = args.find("clientpairingsecret"); it != std::end(args)) {
-      clientpairingsecret(add_cert, sess_it->second, tree, args);
+      clientpairingsecret(sess_it->second, tree, args);
     }
     else {
       tree.put("root.<xmlattr>.status_code", 404);
@@ -767,20 +805,31 @@ namespace nvhttp {
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
       tree.put("root.mac", platf::get_mac_address(net::addr_to_normalized_string(local_endpoint.address())));
 
-      pt::ptree& root_node = tree.get_child("root");
+      auto named_cert_p = get_verified_cert(request);
+      if (!!(named_cert_p->perm & PERM::server_cmd)) {
+        pt::ptree& root_node = tree.get_child("root");
 
-      if (config::sunshine.server_cmds.size() > 0) {
-        // Broadcast server_cmds
-        for (const auto& cmd : config::sunshine.server_cmds) {
-          pt::ptree cmd_node;
-          cmd_node.put_value(cmd.cmd_name);
-          root_node.push_back(std::make_pair("ServerCommand", cmd_node));
+        if (config::sunshine.server_cmds.size() > 0) {
+          // Broadcast server_cmds
+          for (const auto& cmd : config::sunshine.server_cmds) {
+            pt::ptree cmd_node;
+            cmd_node.put_value(cmd.cmd_name);
+            root_node.push_back(std::make_pair("ServerCommand", cmd_node));
+          }
         }
+      } else {
+        BOOST_LOG(debug) << "Permission Get ServerCommand denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
       }
+
+      tree.put("root.Permission", std::to_string((uint32_t)named_cert_p->perm));
 
     #ifdef _WIN32
       tree.put("root.VirtualDisplayCapable", true);
-      tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
+      if (!!(named_cert_p->perm & PERM::_all_actions)) {
+        tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);
+      } else {
+        tree.put("root.VirtualDisplayDriverReady", true);
+      }
     #endif
     }
     else {
@@ -833,10 +882,16 @@ namespace nvhttp {
     }
     tree.put("root.ServerCodecModeSupport", codec_mode_flags);
 
-    auto current_appid = proc::proc.running();
     tree.put("root.PairStatus", pair_status);
-    tree.put("root.currentgame", current_appid);
-    tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
+
+    if constexpr (std::is_same_v<SunshineHTTPS, T>) {
+      auto current_appid = proc::proc.running();
+      tree.put("root.currentgame", current_appid);
+      tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
+    } else {
+      tree.put("root.currentgame", 0);
+      tree.put("root.state", "SUNSHINE_SERVER_FREE");
+    }
 
     std::ostringstream data;
 
@@ -849,10 +904,29 @@ namespace nvhttp {
   get_all_clients() {
     pt::ptree named_cert_nodes;
     client_t &client = client_root;
-    for (auto &named_cert : client.named_devices) {
+
+    std::list<std::string> connected_uuids = rtsp_stream::get_all_session_uuids();
+
+    for (auto &named_cert_p : client.named_devices) {
       pt::ptree named_cert_node;
-      named_cert_node.put("name"s, named_cert.name);
-      named_cert_node.put("uuid"s, named_cert.uuid);
+      named_cert_node.put("name"s, named_cert_p->name);
+      named_cert_node.put("uuid"s, named_cert_p->uuid);
+      named_cert_node.put("perm", (uint32_t)named_cert_p->perm);
+
+      if (connected_uuids.empty()) {
+        named_cert_node.put("connected"s, false);
+      } else {
+        bool connected = false;
+        for (auto it = connected_uuids.begin(); it != connected_uuids.end(); ++it) {
+            if (*it == named_cert_p->uuid) {
+                connected = true;
+                connected_uuids.erase(it);
+                break;
+            }
+        }
+        named_cert_node.put("connected"s, connected);
+      }
+
       named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
     }
 
@@ -877,15 +951,31 @@ namespace nvhttp {
 
     apps.put("<xmlattr>.status_code", 200);
 
-    for (auto &proc : proc::proc.get_apps()) {
+    auto named_cert_p = get_verified_cert(request);
+    if (!!(named_cert_p->perm & PERM::_all_actions)) {
+      for (auto &proc : proc::proc.get_apps()) {
+        pt::ptree app;
+
+        app.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
+        app.put("AppTitle"s, proc.name);
+        app.put("ID", proc.id);
+
+        apps.push_back(std::make_pair("App", std::move(app)));
+      }
+    } else {
+      BOOST_LOG(debug) << "Permission ListApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
+
       pt::ptree app;
 
-      app.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-      app.put("AppTitle"s, proc.name);
-      app.put("ID", proc.id);
+      app.put("IsHdrSupported"s, 0);
+      app.put("AppTitle"s, "Permission Denied");
+      app.put("ID", "1145141919810");
 
       apps.push_back(std::make_pair("App", std::move(app)));
+
+      return;
     }
+
   }
 
   void
@@ -900,6 +990,17 @@ namespace nvhttp {
       response->write(data.str());
       response->close_connection_after_response = true;
     });
+
+    auto named_cert_p = get_verified_cert(request);
+    if (!(named_cert_p->perm & PERM::launch)) {
+      BOOST_LOG(debug) << "Permission LaunchApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
+
+      tree.put("root.resume", 0);
+      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_message", "Permission denied");
+
+      return;
+    }
 
     if (rtsp_stream::session_count() == config::stream.channels) {
       tree.put("root.resume", 0);
@@ -932,7 +1033,7 @@ namespace nvhttp {
     }
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, args);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -998,6 +1099,17 @@ namespace nvhttp {
       response->close_connection_after_response = true;
     });
 
+    auto named_cert_p = get_verified_cert(request);
+    if (!(named_cert_p->perm & PERM::_allow_view)) {
+      BOOST_LOG(debug) << "Permission ViewApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
+
+      tree.put("root.resume", 0);
+      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_message", "Permission denied");
+
+      return;
+    }
+
     // It is possible that due a race condition that this if-statement gives a false negative,
     // that is automatically resolved in rtsp_server_t
     if (rtsp_stream::session_count() == config::stream.channels) {
@@ -1049,7 +1161,7 @@ namespace nvhttp {
       }
     }
 
-    auto launch_session = make_launch_session(host_audio, args);
+    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1069,6 +1181,10 @@ namespace nvhttp {
     tree.put("root.resume", 1);
 
     rtsp_stream::launch_session_raise(launch_session);
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_client_connected(named_cert_p->name);
+#endif
   }
 
   void
@@ -1083,6 +1199,17 @@ namespace nvhttp {
       response->write(data.str());
       response->close_connection_after_response = true;
     });
+
+    auto named_cert_p = get_verified_cert(request);
+    if (!(named_cert_p->perm & PERM::launch)) {
+      BOOST_LOG(debug) << "Permission CancelApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
+
+      tree.put("root.resume", 0);
+      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_message", "Permission denied");
+
+      return;
+    }
 
     // It is possible that due a race condition that this if-statement gives a false positive,
     // the client should try again
@@ -1106,8 +1233,26 @@ namespace nvhttp {
   appasset(resp_https_t response, req_https_t request) {
     print_req<SunshineHTTPS>(request);
 
+    auto fg = util::fail_guard([&]() {
+      response->write(SimpleWeb::StatusCode::server_error_internal_server_error);
+      response->close_connection_after_response = true;
+    });
+
+    auto named_cert_p = get_verified_cert(request);
+
+    if (!(named_cert_p->perm & PERM::_all_actions)) {
+      BOOST_LOG(debug) << "Permission Get AppAsset denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
+
+      fg.disable();
+      response->write(SimpleWeb::StatusCode::client_error_unauthorized);
+      response->close_connection_after_response = true;
+      return;
+    }
+
     auto args = request->parse_query_string();
     auto app_image = proc::proc.get_app_image(util::from_view(get_arg(args, "appid")));
+
+    fg.disable();
 
     std::ifstream in(app_image, std::ios::binary);
     SimpleWeb::CaseInsensitiveMultimap headers;
@@ -1133,8 +1278,6 @@ namespace nvhttp {
     conf_intern.pkey = file_handler::read_file(config::nvhttp.pkey.c_str());
     conf_intern.servercert = file_handler::read_file(config::nvhttp.cert.c_str());
 
-    auto add_cert = std::make_shared<safe::queue_t<crypto::x509_t>>(30);
-
     // resume doesn't always get the parameter "localAudioPlayMode"
     // launch will store it in host_audio
     bool host_audio {};
@@ -1143,43 +1286,39 @@ namespace nvhttp {
     http_server_t http_server;
 
     // Verify certificates after establishing connection
-    https_server.verify = [add_cert](SSL *ssl) {
+    https_server.verify = [](req_https_t req, SSL *ssl) {
       crypto::x509_t x509 { SSL_get_peer_certificate(ssl) };
       if (!x509) {
         BOOST_LOG(info) << "unknown -- denied"sv;
-        return 0;
+        return false;
       }
 
-      int verified = 0;
+      bool verified = false;
+      p_named_cert_t named_cert_p;
 
       auto fg = util::fail_guard([&]() {
         char subject_name[256];
 
         X509_NAME_oneline(X509_get_subject_name(x509.get()), subject_name, sizeof(subject_name));
 
-        BOOST_LOG(debug) << subject_name << " -- "sv << (verified ? "verified"sv : "denied"sv);
+        if (verified) {
+          BOOST_LOG(debug) << subject_name << " -- "sv << "verified, device name: "sv << named_cert_p->name;
+        } else {
+          BOOST_LOG(debug) << subject_name << " -- "sv << "denied"sv;
+        }
+
       });
 
-      while (add_cert->peek()) {
-        char subject_name[256];
-
-        auto cert = add_cert->pop();
-        X509_NAME_oneline(X509_get_subject_name(cert.get()), subject_name, sizeof(subject_name));
-
-        BOOST_LOG(debug) << "Added cert ["sv << subject_name << ']';
-        cert_chain.add(std::move(cert));
-      }
-
-      auto err_str = cert_chain.verify(x509.get());
+      auto err_str = cert_chain.verify(x509.get(), named_cert_p);
       if (err_str) {
         BOOST_LOG(warning) << "SSL Verification error :: "sv << err_str;
-
         return verified;
       }
 
-      verified = 1;
+      verified = true;
+      req->userp = named_cert_p;
 
-      return verified;
+      return true;
     };
 
     https_server.on_verify_failed = [](resp_https_t resp, req_https_t req) {
@@ -1199,7 +1338,7 @@ namespace nvhttp {
 
     https_server.default_resource["GET"] = not_found<SunshineHTTPS>;
     https_server.resource["^/serverinfo$"]["GET"] = serverinfo<SunshineHTTPS>;
-    https_server.resource["^/pair$"]["GET"] = [&add_cert](auto resp, auto req) { pair<SunshineHTTPS>(add_cert, resp, req); };
+    https_server.resource["^/pair$"]["GET"] = pair<SunshineHTTPS>;
     https_server.resource["^/applist$"]["GET"] = applist;
     https_server.resource["^/appasset$"]["GET"] = appasset;
     https_server.resource["^/launch$"]["GET"] = [&host_audio](auto resp, auto req) { launch(host_audio, resp, req); };
@@ -1212,7 +1351,7 @@ namespace nvhttp {
 
     http_server.default_resource["GET"] = not_found<SimpleWeb::HTTP>;
     http_server.resource["^/serverinfo$"]["GET"] = serverinfo<SimpleWeb::HTTP>;
-    http_server.resource["^/pair$"]["GET"] = [&add_cert](auto resp, auto req) { pair<SimpleWeb::HTTP>(add_cert, resp, req); };
+    http_server.resource["^/pair$"]["GET"] = pair<SimpleWeb::HTTP>;
 
     http_server.config.reuse_address = true;
     http_server.config.address = net::af_to_any_address_string(address_family);
@@ -1265,6 +1404,55 @@ namespace nvhttp {
     client_root = client;
     cert_chain.clear();
     save_state();
+    load_state();
+  }
+
+  void stop_session(stream::session_t& session, bool graceful) {
+    if (graceful) {
+      stream::session::graceful_stop(session);
+    } else {
+      stream::session::stop(session);
+    }
+  }
+
+  bool find_and_stop_session(const std::string& uuid, bool graceful) {
+    auto session = rtsp_stream::find_session(uuid);
+    if (session) {
+      stop_session(*session, graceful);
+      return true;
+    }
+    return false;
+  }
+
+  void update_session_info(stream::session_t& session, const std::string& name, const crypto::PERM newPerm) {
+    stream::session::update_device_info(session, name, newPerm);
+  }
+
+  bool find_and_udpate_session_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm) {
+    auto session = rtsp_stream::find_session(uuid);
+    if (session) {
+      update_session_info(*session, name, newPerm);
+      return true;
+    }
+    return false;
+  }
+
+  bool update_device_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm) {
+    find_and_udpate_session_info(uuid, name, newPerm);
+
+    client_t &client = client_root;
+    auto it = client.named_devices.begin();
+    for (; it != client.named_devices.end(); ++it) {
+      auto named_cert_p = *it;
+      if (named_cert_p->uuid == uuid) {
+        named_cert_p->name = name;
+        named_cert_p->perm = newPerm;
+        save_state();
+        return true;
+      }
+    }
+
+    return false;
   }
 
   int
@@ -1272,7 +1460,7 @@ namespace nvhttp {
     int removed = 0;
     client_t &client = client_root;
     for (auto it = client.named_devices.begin(); it != client.named_devices.end();) {
-      if ((*it).uuid == uuid) {
+      if ((*it)->uuid == uuid) {
         it = client.named_devices.erase(it);
         removed++;
       }
@@ -1283,6 +1471,18 @@ namespace nvhttp {
 
     save_state();
     load_state();
+
+    if (removed) {
+      auto session = rtsp_stream::find_session(uuid);
+      if (session) {
+        stop_session(*session, true);
+      }
+
+      if (client.named_devices.empty()) {
+        proc::proc.terminate();
+      }
+    }
+
     return removed;
   }
 }  // namespace nvhttp

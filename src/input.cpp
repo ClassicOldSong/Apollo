@@ -1628,7 +1628,61 @@ namespace input {
    * @param input_data The input message.
    */
   void
-  passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data) {
+  passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data, const crypto::PERM& permission) {
+    // No input permissions at all
+    if (!(permission & crypto::PERM::_all_inputs)) {
+      return;
+    }
+
+    // Have some input permission
+    // Otherwise have all input permission
+    if ((permission & crypto::PERM::_all_inputs) != crypto::PERM::_all_inputs) {
+      PNV_INPUT_HEADER payload = (PNV_INPUT_HEADER)input_data.data();
+
+      // Check permission
+      switch (util::endian::little(payload->magic)) {
+        case MULTI_CONTROLLER_MAGIC_GEN5:
+        case SS_CONTROLLER_ARRIVAL_MAGIC:
+        case SS_CONTROLLER_TOUCH_MAGIC:
+        case SS_CONTROLLER_MOTION_MAGIC:
+        case SS_CONTROLLER_BATTERY_MAGIC:
+          if (!(permission & crypto::PERM::input_controller)) {
+            return;
+          } else {
+            break;
+          }
+        case MOUSE_MOVE_REL_MAGIC_GEN5:
+        case MOUSE_MOVE_ABS_MAGIC:
+        case MOUSE_BUTTON_DOWN_EVENT_MAGIC_GEN5:
+        case MOUSE_BUTTON_UP_EVENT_MAGIC_GEN5:
+        case SCROLL_MAGIC_GEN5:
+        case SS_HSCROLL_MAGIC:
+        case KEY_DOWN_EVENT_MAGIC:
+        case KEY_UP_EVENT_MAGIC:
+        case UTF8_TEXT_EVENT_MAGIC:
+          if (!(permission & crypto::PERM::input_kbdm)) {
+            return;
+          } else {
+            break;
+          }
+        case SS_TOUCH_MAGIC:
+          if (!(permission & crypto::PERM::input_touch)) {
+            return;
+          } else {
+            break;
+          }
+        case SS_PEN_MAGIC:
+          if (!(permission & crypto::PERM::input_pen)) {
+            return;
+          } else {
+            break;
+          }
+        default:
+          // Unknown input event
+          return;
+      }
+    }
+
     {
       std::lock_guard<std::mutex> lg(input->input_queue_lock);
       input->input_queue.push_back(std::move(input_data));

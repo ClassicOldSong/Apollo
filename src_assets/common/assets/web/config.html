@@ -405,6 +405,17 @@
             }, 5000);
             fetch("/api/restart", {
               method: "POST"
+            })
+            .then((resp) => {
+              if (resp.status !== 200) {
+                location.href = './login'
+                return
+              }
+            })
+            .catch((e) => {
+              location.href = './login'
+              console.error(e)
+              return
             });
           }
         });

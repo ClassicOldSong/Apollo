@@ -93,7 +93,7 @@
   "client_card": {
     "clients": "Clients",
     "clients_desc": "Clients that are specifically tuned to work the best with Apollo",
-    "generic_moonlight_clients_desc": "Gereric Moonlight clients are still usable with Apollo."
+    "generic_moonlight_clients_desc": "Generic Moonlight clients are still usable with Apollo."
   },
   "config": {
     "adapter_name": "Adapter Name",
@@ -388,6 +388,20 @@
     "password_change": "Password Change",
     "success_msg": "Password has been changed successfully! This page will reload soon, your browser will ask you for the new credentials."
   },
+  "permissions": {
+    "input_controller": "Controller Input",
+    "input_touch": "Touch Input",
+    "input_pen": "Pen Input",
+    "input_kbdm": "Keyboard & Mouse Input",
+    "clipboard_set": "Clipboard Set",
+    "clipboard_read": "Clipboard Read",
+    "file_upload": "File Upload",
+    "file_dwnload": "File Download",
+    "server_cmd": "Server Command",
+    "list": "List Apps",
+    "view": "View Streams",
+    "launch": "Launch Apps"
+  },
   "pin": {
     "device_name": "Optional: Device Name",
     "pair_failure": "Pairing Failed: Check if the PIN is typed correctly",
@@ -402,7 +416,15 @@
     "otp_expired_msg": "OTP expired. Please request a new one.",
     "otp_success": "PIN request success, the PIN is available within 3 minutes.",
     "otp_msg": "OTP pairing is only available for the latest Artemis clients. Please use legacy pairing method for other clients.",
-    "otp_pair_now": "PIN generated successfully, do you want to pair now?"
+    "otp_pair_now": "PIN generated successfully, do you want to pair now?",
+    "device_management": "Device Management",
+    "device_management_desc": "Manage your paired devices.",
+    "unpair_all": "Unpair All",
+    "unpair_all_success": "All devices unpaired.",
+    "unpair_all_error": "Error while unpairing",
+    "unpair_single_no_devices": "There are no paired devices.",
+    "unpair_single_success": "However, the device(s) may still be in an active session. Use the 'Force Close' button above to end any open sessions.",
+    "unpair_single_unknown": "Unknown Client"
   },
   "resource_card": {
     "github_discussions": "GitHub Discussions",
@@ -430,15 +452,7 @@
     "quit_apollo_success": "Apollo has exited.",
     "quit_apollo_success_ongoing": "Apollo is quitting...",
     "quit_apollo_confirm": "Do you really want to quit Apollo? You'll not be able to start Apollo again if you have no other methods to operate your computer.",
-    "troubleshooting": "Troubleshooting",
-    "unpair_all": "Unpair All",
-    "unpair_all_error": "Error while unpairing",
-    "unpair_all_success": "All devices unpaired.",
-    "unpair_desc": "Remove your paired devices. Individually unpaired devices with an active session will remain connected, but cannot start or resume a session.",
-    "unpair_single_no_devices": "There are no paired devices.",
-    "unpair_single_success": "However, the device(s) may still be in an active session. Use the 'Force Close' button above to end any open sessions.",
-    "unpair_single_unknown": "Unknown Client",
-    "unpair_title": "Unpair Devices"
+    "troubleshooting": "Troubleshooting"
   },
   "welcome": {
     "confirm_password": "Confirm password",

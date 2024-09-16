@@ -35,11 +35,10 @@ namespace VDISPLAY {
 	std::wstring createVirtualDisplay(
 		const char* s_client_uid,
 		const char* s_client_name,
-		const char* s_app_name,
 		uint32_t width,
 		uint32_t height,
 		uint32_t fps,
-		GUID& guid
+		const GUID& guid
 	);
 	bool removeVirtualDisplay(const GUID& guid);
 }

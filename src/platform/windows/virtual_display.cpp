@@ -290,32 +290,13 @@ bool setRenderAdapterByName(const std::wstring& adapterName) {
 std::wstring createVirtualDisplay(
 	const char* s_client_uid,
 	const char* s_client_name,
-	const char* s_app_name,
 	uint32_t width,
 	uint32_t height,
 	uint32_t fps,
-	GUID& guid
+	const GUID& guid
 ) {
 	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
 		return std::wstring();
-	}
-
-	if (!s_app_name || !strlen(s_app_name) || !strcmp(s_app_name, "unknown")) {
-		s_app_name = "ApolloVDisp";
-	}
-
-	if (!s_client_name || !strlen(s_client_name) || !strcmp(s_client_name, "unknown")) {
-		s_client_name = s_app_name;
-	}
-
-	if (s_client_uid && strcmp(s_client_uid, "unknown")) {
-		size_t len = strlen(s_client_uid);
-		if (len > sizeof(GUID)) {
-			len = sizeof(GUID);
-		}
-		memcpy((void*)&guid, (void*)s_client_uid, len);
-	} else {
-		s_client_uid = "unknown";
 	}
 
 	VIRTUAL_DISPLAY_ADD_OUT output;

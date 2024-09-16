@@ -5,9 +5,15 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 
 #include "crypto.h"
 #include "thread_safe.h"
+
+// Resolve circular dependencies
+namespace stream {
+  struct session_t;
+}
 
 namespace rtsp_stream {
   constexpr auto RTSP_SETUP_PORT = 21;
@@ -21,9 +27,11 @@ namespace rtsp_stream {
     std::string av_ping_payload;
     uint32_t control_connect_data;
 
-    bool host_audio;
     std::string device_name;
     std::string unique_id;
+    crypto::PERM perm;
+
+    bool host_audio;
     int width;
     int height;
     int fps;
@@ -57,6 +65,12 @@ namespace rtsp_stream {
 
   int
   session_count();
+
+  std::shared_ptr<stream::session_t>
+  find_session(const std::string& uuid);
+
+  std::list<std::string>
+  get_all_session_uuids();
 
   void
   rtpThread();
