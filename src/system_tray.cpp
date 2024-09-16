@@ -395,7 +395,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Device %s paired Succesfully. Please make sure you have access to the device.", device_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1 - 1);
+    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.notification_title = "Device Paired Succesfully";
     tray.notification_text = msg;

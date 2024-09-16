@@ -2,6 +2,11 @@
 
 Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
 
+Major features:
+
+- Built-in Virtual Display with HDR support
+- Permission management for clients
+
 ## Usage
 
 Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestream.readthedocs.io/) for now.
@@ -28,7 +33,7 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 
 ## About HDR
 
-Enabling HDR is **not recommended** at this moment, probably in the long term. The issue with HDR is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy. Things are a little better if you're using Artemis as clients, since each client are remembered as a dedicated display with a fixed identity, Windows can auto select the calibration based on the device, but other Moonclients sharing one single identity are not that lucky.
+Enabling HDR is **not recommended** at this moment, probably in the long term. The issue with HDR is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy.
 
 SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
 
