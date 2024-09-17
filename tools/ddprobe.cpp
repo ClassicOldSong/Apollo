@@ -72,28 +72,28 @@ syncThreadDesktop() {
 }
 
 /**
- * @brief Checks whether a given frame is entirely dark by evaluating the RGB values of each pixel.
- *
- * This function determines if the provided frame is completely dark by analyzing the RGB values of every pixel.
- * It iterates over all pixels in the frame and compares each pixel's RGB channels to a defined darkness threshold.
- * If any pixel's RGB values exceed this threshold, the function concludes that the frame is not entirely dark and returns `false`.
- * If all pixels are below the threshold, indicating a completely dark frame, the function returns `true`.
- *
- * @param mappedResource A reference to a `D3D11_MAPPED_SUBRESOURCE` structure containing the mapped subresource data of the frame to be analyzed.
- * @param frameDesc A reference to a `D3D11_TEXTURE2D_DESC` structure describing the texture properties, including width and height.
- * @param darknessThreshold A floating-point value representing the threshold above which a pixel's RGB values are considered non-dark. The value ranges from 0.0f to 1.0f, with a default value of 0.1f.
- * @return bool Returns `true` if the frame is determined to be entirely dark, otherwise returns `false`.
- */
+  * @brief Determines if a given frame is valid by checking if it contains any non-dark pixels.
+  *
+  * This function analyzes the provided frame to determine if it contains any pixels that exceed a specified darkness threshold.
+  * It iterates over all pixels in the frame, comparing each pixel's RGB values to the defined darkness threshold.
+  * If any pixel's RGB values exceed this threshold, the function concludes that the frame is valid (i.e., not entirely dark) and returns `true`.
+  * If all pixels are below or equal to the threshold, indicating a completely dark frame, the function returns `false`.
+
+  * @param mappedResource A reference to a `D3D11_MAPPED_SUBRESOURCE` structure containing the mapped subresource data of the frame to be analyzed.
+  * @param frameDesc A reference to a `D3D11_TEXTURE2D_DESC` structure describing the texture properties, including width and height.
+  * @param darknessThreshold A floating-point value representing the threshold above which a pixel's RGB values are considered dark. The value ranges from 0.0f to 1.0f, with a default value of 0.1f.
+  * @return Returns `true` if the frame contains any non-dark pixels, indicating it is valid; otherwise, returns `false`.
+  */
 bool
 is_valid_frame(const D3D11_MAPPED_SUBRESOURCE &mappedResource, const D3D11_TEXTURE2D_DESC &frameDesc, float darknessThreshold = 0.1f) {
-  const uint8_t *pixels = static_cast<const uint8_t *>(mappedResource.pData);
+  const auto *pixels = static_cast<const uint8_t *>(mappedResource.pData);
   const int bytesPerPixel = 4;  // (8 bits per channel, excluding alpha). Factoring HDR is not needed because it doesn't cause black levels to raise enough to be a concern.
   const int stride = mappedResource.RowPitch;
   const int width = frameDesc.Width;
   const int height = frameDesc.Height;
 
   // Convert the darkness threshold to an integer value for comparison
-  const int threshold = static_cast<int>(darknessThreshold * 255);
+  const auto threshold = static_cast<int>(darknessThreshold * 255);
 
   // Iterate over each pixel in the frame
   for (int y = 0; y < height; ++y) {
@@ -116,18 +116,17 @@ is_valid_frame(const D3D11_MAPPED_SUBRESOURCE &mappedResource, const D3D11_TEXTU
  * This function attempts to acquire and analyze up to 10 frames from a DXGI output duplication object (`dup`).
  * It checks if each frame is non-empty (not entirely dark) by using the `is_valid_frame` function.
  * If any non-empty frame is found, the function returns `S_OK`.
- * If all 10 frames are empty, it returns `S_FALSE`, suggesting potential issues with the capture process.
+ * If all 10 frames are empty, it returns `E_FAIL`, suggesting potential issues with the capture process.
  * If any error occurs during the frame acquisition or analysis process, the corresponding `HRESULT` error code is returned.
  *
  * @param dup A reference to the DXGI output duplication object (`dxgi::dup_t&`) used to acquire frames.
  * @param device A ComPtr to the ID3D11Device interface representing the device associated with the Direct3D context.
- * @return HRESULT Returns `S_OK` if a non-empty frame is captured successfully, `E_FAIL` if all frames are empty, or an error code if any failure occurs during the process.
+ * @return Returns `S_OK` if a non-empty frame is captured successfully, `E_FAIL` if all frames are empty, or an error code if any failure occurs during the process.
  */
 HRESULT
 test_frame_capture(dxgi::dup_t &dup, ComPtr<ID3D11Device> device) {
   for (int i = 0; i < 10; ++i) {
     std::cout << "Attempting to acquire frame " << (i + 1) << " of 10..." << std::endl;
-
     ComPtr<IDXGIResource> frameResource;
     DXGI_OUTDUPL_FRAME_INFO frameInfo;
     ComPtr<ID3D11DeviceContext> context;
@@ -136,22 +135,19 @@ test_frame_capture(dxgi::dup_t &dup, ComPtr<ID3D11Device> device) {
     HRESULT status = dup->AcquireNextFrame(500, &frameInfo, &frameResource);
     device->GetImmediateContext(&context);
 
-    auto cleanup = util::fail_guard([&dup, &context, &stagingTexture]() {
-      if (stagingTexture) {
-        context->Unmap(stagingTexture.Get(), 0);
-      }
-      dup->ReleaseFrame();
-    });
-
     if (FAILED(status)) {
       std::cout << "Error: Failed to acquire next frame [0x"sv << util::hex(status).to_string_view() << ']' << std::endl;
       return status;
     }
 
+    auto cleanup = util::fail_guard([&dup]() {
+      dup->ReleaseFrame();
+    });
+
     std::cout << "Frame acquired successfully." << std::endl;
 
     ComPtr<ID3D11Texture2D> frameTexture;
-    status = frameResource->QueryInterface(__uuidof(ID3D11Texture2D), reinterpret_cast<void **>(frameTexture.GetAddressOf()));
+    status = frameResource->QueryInterface(IID_PPV_ARGS(&frameTexture));
     if (FAILED(status)) {
       std::cout << "Error: Failed to query texture interface from frame resource [0x"sv << util::hex(status).to_string_view() << ']' << std::endl;
       return status;
@@ -178,6 +174,10 @@ test_frame_capture(dxgi::dup_t &dup, ComPtr<ID3D11Device> device) {
       std::cout << "Error: Failed to map the staging texture for inspection [0x"sv << util::hex(status).to_string_view() << ']' << std::endl;
       return status;
     }
+
+    auto contextCleanup = util::fail_guard([&context, &stagingTexture]() {
+      context->Unmap(stagingTexture.Get(), 0);
+    });
 
     if (is_valid_frame(mappedResource, frameDesc)) {
       std::cout << "Frame " << (i + 1) << " is non-empty (contains visible content)." << std::endl;

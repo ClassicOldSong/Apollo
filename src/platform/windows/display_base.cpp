@@ -352,6 +352,52 @@ namespace platf::dxgi {
     return true;
   }
 
+  bool
+  validate_and_test_gpu_preference(const std::string &display_name, bool verify_frame_capture) {
+    std::string cmd = "tools\\ddprobe.exe";
+
+    // We start at 1 because 0 is automatic selection which can be overridden by
+    // the GPU driver control panel options. Since ddprobe.exe can have different
+    // GPU driver overrides than Sunshine.exe, we want to avoid a scenario where
+    // autoselection might work for ddprobe.exe but not for us.
+    for (int i = 1; i < 5; i++) {
+      // Run the probe tool. It returns the status of DuplicateOutput().
+      //
+      // Arg format: [GPU preference] [Display name] [--verify-frame-capture]
+      HRESULT result;
+      std::vector<std::string> args = { std::to_string(i), display_name };
+      try {
+        if (verify_frame_capture) {
+          args.emplace_back("--verify-frame-capture");
+        }
+        result = bp::system(cmd, bp::args(args), bp::std_out > bp::null, bp::std_err > bp::null);
+      }
+      catch (bp::process_error &e) {
+        BOOST_LOG(error) << "Failed to start ddprobe.exe: "sv << e.what();
+        return false;
+      }
+
+      BOOST_LOG(info) << "ddprobe.exe " << boost::algorithm::join(args, " ") << " returned 0x"
+                      << util::hex(result).to_string_view();
+
+      // E_ACCESSDENIED can happen at the login screen. If we get this error,
+      // we know capture would have been supported, because DXGI_ERROR_UNSUPPORTED
+      // would have been raised first if it wasn't.
+      if (result == S_OK || result == E_ACCESSDENIED) {
+        // We found a working GPU preference, so set ourselves to use that.
+        if (set_gpu_preference_on_self(i)) {
+          return true;
+        }
+        else {
+          return false;
+        }
+      }
+    }
+
+    // If no valid configuration was found, return false
+    return false;
+  }
+
   // On hybrid graphics systems, Windows will change the order of GPUs reported by
   // DXGI in accordance with the user's GPU preference. If the selected GPU is a
   // render-only device with no displays, DXGI will add virtual outputs to the
@@ -365,61 +411,23 @@ namespace platf::dxgi {
   bool
   probe_for_gpu_preference(const std::string &display_name) {
     static bool set_gpu_preference = false;
-    static bool verify_frame_capture = true;
 
     // If we've already been through here, there's nothing to do this time.
     if (set_gpu_preference) {
       return true;
     }
 
-    std::string cmd = "tools\\ddprobe.exe";
-
-    // We start at 1 because 0 is automatic selection which can be overridden by
-    // the GPU driver control panel options. Since ddprobe.exe can have different
-    // GPU driver overrides than Sunshine.exe, we want to avoid a scenario where
-    // autoselection might work for ddprobe.exe but not for us.
-    for (int i = 1; i < 5; i++) {
-      // Run the probe tool. It returns the status of DuplicateOutput().
-      //
-      // Arg format: [GPU preference] [Display name] [--verify--frame-capture]
-      HRESULT result;
-      std::vector<std::string> args = { std::to_string(i), display_name };
-      try {
-        if (verify_frame_capture) {
-          args.push_back("--verify-frame-capture");
-        }
-        result = bp::system(cmd, bp::args(args), bp::std_out > bp::null, bp::std_err > bp::null);
-      }
-      catch (bp::process_error &e) {
-        BOOST_LOG(error) << "Failed to start ddprobe.exe: "sv << e.what();
-        return false;
-      }
-
-      BOOST_LOG(info) << "ddprobe.exe " << boost::algorithm::join(args, " ") << "returned 0x"
-                      << util::hex(result).to_string_view();
-
-      // E_ACCESSDENIED can happen at the login screen. If we get this error,
-      // we know capture would have been supported, because DXGI_ERROR_UNSUPPORTED
-      // would have been raised first if it wasn't.
-      if (result == S_OK || result == E_ACCESSDENIED) {
-        // We found a working GPU preference, so set ourselves to use that.
-        if (set_gpu_preference_on_self(i)) {
-          set_gpu_preference = true;
-          return true;
-        }
-        else {
-          return false;
-        }
-      }
-      else {
-        // This configuration didn't work, so continue testing others
-        continue;
-      }
+    // Try probing with different GPU preferences and verify_frame_capture flag
+    if (validate_and_test_gpu_preference(display_name, true)) {
+      return true;
     }
 
-    // If none of the manual options worked, leave the GPU preference alone
-    // And set the verify frame capture option to false, just in case there is a chance for a false negative.
-    verify_frame_capture = false;
+    // If no valid configuration was found, try again with verify_frame_capture == false
+    if (validate_and_test_gpu_preference(display_name, false)) {
+      return true;
+    }
+
+    // If neither worked, return false
     return false;
   }
 
