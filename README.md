@@ -13,6 +13,10 @@ Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestr
 
 Currently Virtual Display support is Windows only, Linux support is planned and will implement in the future.
 
+## About Permission System
+
+Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
+
 ## About Virtual Display
 
 > [!WARNING]
