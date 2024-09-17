@@ -996,7 +996,7 @@ namespace nvhttp {
       BOOST_LOG(debug) << "Permission LaunchApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
-      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_code", 403);
       tree.put("root.<xmlattr>.status_message", "Permission denied");
 
       return;
@@ -1104,7 +1104,7 @@ namespace nvhttp {
       BOOST_LOG(debug) << "Permission ViewApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
-      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_code", 403);
       tree.put("root.<xmlattr>.status_message", "Permission denied");
 
       return;
@@ -1205,7 +1205,7 @@ namespace nvhttp {
       BOOST_LOG(debug) << "Permission CancelApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
-      tree.put("root.<xmlattr>.status_code", 503);
+      tree.put("root.<xmlattr>.status_code", 403);
       tree.put("root.<xmlattr>.status_message", "Permission denied");
 
       return;
