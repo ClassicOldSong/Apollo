@@ -130,7 +130,7 @@ onMounted(() => {
             </div>
           </td>
           <td>
-            <button class="btn btn-danger" @click="removeCmd(globalPrepCmd, i)">
+            <button class="btn btn-danger me-2" @click="removeCmd(globalPrepCmd, i)">
               <i class="fas fa-trash"></i>
             </button>
             <button class="btn btn-success" @click="addCmd(globalPrepCmd, prepCmdTemplate)">
@@ -179,7 +179,7 @@ onMounted(() => {
             </div>
           </td>
           <td>
-            <button class="btn btn-danger" @click="removeCmd(serverCmd, i)">
+            <button class="btn btn-danger me-2" @click="removeCmd(serverCmd, i)">
               <i class="fas fa-trash"></i>
             </button>
             <button class="btn btn-success" @click="addCmd(serverCmd, serverCmdTemplate)">
