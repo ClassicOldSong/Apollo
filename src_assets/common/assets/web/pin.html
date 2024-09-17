@@ -98,7 +98,7 @@
             <div class="align-items-top d-flex flex-row justify-content-center">
               <div v-for="group in permissionGroups" class="d-flex flex-column mx-2">
                 <div class="mx-2">{{ group.name }}:</div>
-                <button v-for="perm in group.permissions" class="my-1 btn btn-sm" :disabled="isSupressed(client.editPerm, perm.name, perm.supressed_by)" :class="(isSupressed(client.editPerm, perm.name, perm.supressed_by) || checkPermission(client.editPerm, perm.name)) ? 'btn-success' : 'btn-outline-secondary'" @click="togglePermission(client, perm.name)">
+                <button v-for="perm in group.permissions" class="my-1 btn btn-sm" :disabled="isSuppressed(client.editPerm, perm.name, perm.suppressed_by)" :class="(isSuppressed(client.editPerm, perm.name, perm.suppressed_by) || checkPermission(client.editPerm, perm.name)) ? 'btn-success' : 'btn-outline-secondary'" @click="togglePermission(client, perm.name)">
                   {{ $t(`permissions.${perm.name}`) }}
                 </button>
               </div>
@@ -222,34 +222,34 @@
     { name: 'Action', permissions: [
       {
         name: 'list',
-        supressed_by: ['view', 'launch']
+        suppressed_by: ['view', 'launch']
       }, {
         name: 'view',
-        supressed_by: ['launch']
+        suppressed_by: ['launch']
       }, {
         name: 'launch',
-        supressed_by: []
+        suppressed_by: []
       }
     ] },
     { name: 'Operation', permissions: [
       {
         name: 'server_cmd',
-        supressed_by: []
+        suppressed_by: []
       }
     ] },
     { name: 'Input', permissions: [
       {
         name: 'input_controller',
-        supressed_by: []
+        suppressed_by: []
       }, {
         name: 'input_touch',
-        supressed_by: []
+        suppressed_by: []
       }, {
         name: 'input_pen',
-        supressed_by: []
+        suppressed_by: []
       }, {
         name: 'input_kbdm',
-        supressed_by: []
+        suppressed_by: []
       }
     ] },
   ];
@@ -440,9 +440,9 @@
       checkPermission(perm, permission) {
         return (perm & permissionMapping[permission]) !== 0;
       },
-      isSupressed(perm, permission, supressed_by) {
-        for (const supressed of supressed_by) {
-          if (this.checkPermission(perm, supressed)) {
+      isSuppressed(perm, permission, suppressed_by) {
+        for (const suppressed of suppressed_by) {
+          if (this.checkPermission(perm, suppressed)) {
             return true;
           }
         }
