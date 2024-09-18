@@ -170,8 +170,8 @@ namespace proc {
     _app_id = app_id;
     _launch_session = launch_session;
 
-    uint32_t client_width = launch_session->width;
-    uint32_t client_height = launch_session->height;
+    uint32_t client_width = launch_session->width ? launch_session->width : 1920;
+    uint32_t client_height = launch_session->height ? launch_session->height : 1080;
 
     uint32_t render_width = client_width;
     uint32_t render_height = client_height;
@@ -215,7 +215,7 @@ namespace proc {
           launch_session->device_name.c_str(),
           render_width,
           render_height,
-          launch_session->fps,
+          launch_session->fps ? launch_session->fps : 60,
           launch_session->display_guid
         );
 
@@ -223,8 +223,11 @@ namespace proc {
 
         std::wstring currentPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
 
-        // Apply display settings
-        VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
+        // When launched through config ui, don't change display settings
+        if (launch_session->width && launch_session->height && launch_session->fps) {
+          // Apply display settings
+          VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
+        }
 
         // Determine if we need to set the virtual display as primary
         bool shouldSetPrimary = false;
@@ -237,11 +240,12 @@ namespace proc {
 
         // Set primary display if needed
         if (shouldSetPrimary) {
-          VDISPLAY::setPrimaryDisplay(
-            (launch_session->virtual_display || _app.virtual_display_primary)
-            ? vdisplayName.c_str()
-            : prevPrimaryDisplayName.c_str()
-          );
+          auto disp = (launch_session->virtual_display || _app.virtual_display_primary)
+            ? vdisplayName
+            : prevPrimaryDisplayName;
+          BOOST_LOG(info) << "Setting display " << disp << " primary!!!";
+
+          VDISPLAY::setPrimaryDisplay(disp.c_str());
         }
 
         // Set virtual_display to true when everything went fine
@@ -373,7 +377,7 @@ namespace proc {
 
   #ifdef _WIN32
     auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
-      // Windows doesn't seem to be able to set HDR correctly when a display is just connected,
+      // Windows doesn't seem to be able to set HDR correctly when a display is just connected / changed resolution,
       // so we have tooggle HDR for the virtual display manually after a delay.
       auto retryInterval = 200ms;
       while (is_changing_settings_going_to_fail()) {
@@ -384,6 +388,7 @@ namespace proc {
         std::this_thread::sleep_for(retryInterval);
         retryInterval *= 2;
       }
+
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
       if (!currentDisplay.empty()) {
@@ -418,6 +423,10 @@ namespace proc {
   #endif
 
     fg.disable();
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_playing(_app.name);
+#endif
 
     return 0;
   }
@@ -778,36 +787,6 @@ namespace proc {
       std::set<std::string> ids;
       std::vector<proc::ctx_t> apps;
       int i = 0;
-
-    #ifdef _WIN32
-      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
-        proc::ctx_t ctx;
-        ctx.name = "Virtual Display";
-        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
-        ctx.virtual_display = true;
-        ctx.virtual_display_primary = true;
-        ctx.scale_factor = 100;
-
-        ctx.elevated = false;
-        ctx.auto_detach = true;
-        ctx.wait_all = true;
-        ctx.exit_timeout = 5s;
-
-        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-        if (ids.count(std::get<0>(possible_ids)) == 0) {
-          // Avoid using index to generate id if possible
-          ctx.id = std::get<0>(possible_ids);
-        }
-        else {
-          // Fallback to include index on collision
-          ctx.id = std::get<1>(possible_ids);
-        }
-        ids.insert(ctx.id);
-
-        apps.emplace_back(std::move(ctx));
-      }
-    #endif
-
       for (auto &[_, app_node] : apps_node) {
         proc::ctx_t ctx;
 
@@ -914,6 +893,35 @@ namespace proc {
 
         apps.emplace_back(std::move(ctx));
       }
+
+    #ifdef _WIN32
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        proc::ctx_t ctx;
+        ctx.name = "Virtual Display";
+        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+        ctx.virtual_display = true;
+        ctx.virtual_display_primary = true;
+        ctx.scale_factor = 100;
+
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = true;
+        ctx.exit_timeout = 5s;
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          // Avoid using index to generate id if possible
+          ctx.id = std::get<0>(possible_ids);
+        }
+        else {
+          // Fallback to include index on collision
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        apps.emplace_back(std::move(ctx));
+      }
+    #endif
 
       return proc::proc_t {
         std::move(this_env), std::move(apps)

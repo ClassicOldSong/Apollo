@@ -89,10 +89,13 @@
           <tr v-for="(app,i) in apps" :key="i">
             <td>{{app.name}}</td>
             <td>
-              <button class="btn btn-primary mx-1" @click="editApp(i)">
+              <button class="btn btn-success me-2" :disabled="app.launching" @click="launchApp(i)">
+                <i class="fas fa-play"></i> {{ $t('apps.launch') }}
+              </button>
+              <button class="btn btn-primary me-2" :disabled="app.launching" @click="editApp(i)">
                 <i class="fas fa-edit"></i> {{ $t('apps.edit') }}
               </button>
-              <button class="btn btn-danger mx-1" @click="showDeleteForm(i)">
+              <button class="btn btn-danger" :disabled="app.launching" @click="showDeleteForm(i)">
                 <i class="fas fa-trash"></i> {{ $t('apps.delete') }}
               </button>
             </td>
@@ -407,14 +410,7 @@
       };
     },
     created() {
-      fetch("/api/apps", {
-        credentials: 'include'
-      })
-        .then((r) => r.json())
-        .then((r) => {
-          console.log(r);
-          this.apps = r.apps;
-        });
+      this.loadApps();
 
       fetch("/api/config", {
         credentials: 'include'
@@ -423,6 +419,15 @@
         .then(r => this.platform = r.platform);
     },
     methods: {
+      loadApps() {
+        fetch("/api/apps", {
+          credentials: 'include'
+        })
+          .then(r => r.json())
+          .then(r => {
+            this.apps = r.apps.map(i => ({...i, launching: false}));
+          });
+      },
       newApp() {
         this.editForm = {
           name: "",
@@ -442,6 +447,25 @@
         };
         this.editForm.index = -1;
         this.showEditForm = true;
+      },
+      launchApp(id) {
+        const app = this.apps[id];
+        if (confirm(this.$t('apps.launch_warning'))) {
+          app.launching = true;
+          fetch("/api/apps/launch?id=" + id, {
+            credentials: 'include',
+            method: "POST",
+          })
+          .then(r => r.json())
+          .then(r => {
+            if (r.status == "true") {
+              alert(this.$t('apps.launch_success'));
+            } else {
+              alert(this.$t('apps.launch_failed') + r.error);
+            }
+          })
+          .finally(() => app.launching = false);
+        }
       },
       editApp(id) {
         this.editForm = JSON.parse(JSON.stringify(this.apps[id]));

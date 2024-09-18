@@ -89,6 +89,7 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 
 			result = ChangeDisplaySettingsExW(displayDevice.DeviceName, &devMode, NULL, CDS_UPDATEREGISTRY | CDS_NORESET, NULL);
 			if (result != DISP_CHANGE_SUCCESSFUL) {
+				wprintf(L"[SUDOVDA] Changing config for display %ls failed!\n\n", displayDevice.DeviceName);
 				return false;
 			}
 		}
@@ -98,10 +99,17 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 	primaryDevMode.dmPosition.x = 0;
 	primaryDevMode.dmPosition.y = 0;
 	primaryDevMode.dmFields = DM_POSITION;
-	ChangeDisplaySettingsExW(primaryDeviceName, &primaryDevMode, NULL, CDS_UPDATEREGISTRY | CDS_NORESET | CDS_SET_PRIMARY, NULL);
+	result = ChangeDisplaySettingsExW(primaryDeviceName, &primaryDevMode, NULL, CDS_UPDATEREGISTRY | CDS_NORESET | CDS_SET_PRIMARY, NULL);
+	if (result != DISP_CHANGE_SUCCESSFUL) {
+		wprintf(L"[SUDOVDA] Changing config for primary display %ls failed!\n\n", primaryDeviceName);
+		return false;
+	}
+
+	wprintf(L"[SUDOVDA] Applying primary display %ls ...\n\n", primaryDeviceName);
 
 	result = ChangeDisplaySettingsExW(NULL, NULL, NULL, 0, NULL);
 	if (result != DISP_CHANGE_SUCCESSFUL) {
+		wprintf(L"[SUDOVDA] Applying display coinfig failed!\n\n");
 		return false;
 	}
 

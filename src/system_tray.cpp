@@ -262,10 +262,10 @@ namespace system_tray {
 
     tray_update(&tray);
     tray.icon = TRAY_ICON_PLAYING;
-    tray.notification_title = "Stream Started";
+    tray.notification_title = "App launched";
     char msg[256];
     static char force_close_msg[256];
-    snprintf(msg, std::size(msg), "Streaming started for %s", app_name.c_str());
+    snprintf(msg, std::size(msg), "%s launched.", app_name.c_str());
     snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
   #ifdef _WIN32
     strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
@@ -273,7 +273,7 @@ namespace system_tray {
   #endif
     tray.notification_text = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
-    tray.tooltip = msg;
+    tray.tooltip = PROJECT_NAME;
     tray.menu[2].text = force_close_msg;
     tray_update(&tray);
   }
@@ -299,7 +299,7 @@ namespace system_tray {
     tray.notification_title = "Stream Paused";
     tray.notification_text = msg;
     tray.notification_icon = TRAY_ICON_PAUSING;
-    tray.tooltip = msg;
+    tray.tooltip = PROJECT_NAME;
     tray_update(&tray);
   }
 

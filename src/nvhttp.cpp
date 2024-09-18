@@ -180,7 +180,6 @@ namespace nvhttp {
   client_t client_root;
   std::atomic<uint32_t> session_id_counter;
 
-  using args_t = SimpleWeb::CaseInsensitiveMultimap;
   using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>;
   using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Request>;
   using resp_http_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Response>;
@@ -192,7 +191,7 @@ namespace nvhttp {
   };
 
   std::string
-  get_arg(const args_t &args, const char *name, const char *default_value = nullptr) {
+  get_arg(const args_t &args, const char *name, const char *default_value) {
     auto it = args.find(name);
     if (it == std::end(args)) {
       if (default_value != NULL) {
@@ -346,30 +345,58 @@ namespace nvhttp {
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, const args_t &args, const crypto::named_cert_t* named_cert_p) {
+  make_launch_session(bool host_audio, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
 
-    auto rikey = util::from_hex_vec(get_arg(args, "rikey"), true);
-    std::copy(rikey.cbegin(), rikey.cend(), std::back_inserter(launch_session->gcm_key));
+    // If launched from client
+    if (named_cert_p->uuid != http::unique_id) {
+      auto rikey = util::from_hex_vec(get_arg(args, "rikey"), true);
+      std::copy(rikey.cbegin(), rikey.cend(), std::back_inserter(launch_session->gcm_key));
 
-    launch_session->host_audio = host_audio;
-    std::stringstream mode = std::stringstream(get_arg(args, "mode", "0x0x0"));
-    // Split mode by the char "x", to populate width/height/fps
-    int x = 0;
-    std::string segment;
-    while (std::getline(mode, segment, 'x')) {
-      if (x == 0) launch_session->width = atoi(segment.c_str());
-      if (x == 1) launch_session->height = atoi(segment.c_str());
-      if (x == 2) launch_session->fps = atoi(segment.c_str());
-      x++;
+      launch_session->host_audio = host_audio;
+      std::stringstream mode = std::stringstream(get_arg(args, "mode", "0x0x0"));
+      // Split mode by the char "x", to populate width/height/fps
+      int x = 0;
+      std::string segment;
+      while (std::getline(mode, segment, 'x')) {
+        if (x == 0) launch_session->width = atoi(segment.c_str());
+        if (x == 1) launch_session->height = atoi(segment.c_str());
+        if (x == 2) launch_session->fps = atoi(segment.c_str());
+        x++;
+      }
+
+      // Encrypted RTSP is enabled with client reported corever >= 1
+      auto corever = util::from_view(get_arg(args, "corever", "0"));
+      if (corever >= 1) {
+        launch_session->rtsp_cipher = crypto::cipher::gcm_t {
+          launch_session->gcm_key, false
+        };
+        launch_session->rtsp_iv_counter = 0;
+      }
+      launch_session->rtsp_url_scheme = launch_session->rtsp_cipher ? "rtspenc://"s : "rtsp://"s;
+
+      // Generate the unique identifiers for this connection that we will send later during RTSP handshake
+      unsigned char raw_payload[8];
+      RAND_bytes(raw_payload, sizeof(raw_payload));
+      launch_session->av_ping_payload = util::hex_vec(raw_payload);
+      RAND_bytes((unsigned char *) &launch_session->control_connect_data, sizeof(launch_session->control_connect_data));
+
+      launch_session->iv.resize(16);
+      uint32_t prepend_iv = util::endian::big<uint32_t>(util::from_view(get_arg(args, "rikeyid")));
+      auto prepend_iv_p = (uint8_t *) &prepend_iv;
+      std::copy(prepend_iv_p, prepend_iv_p + sizeof(prepend_iv), std::begin(launch_session->iv));
+    } else {
+      launch_session->width = 0;
+      launch_session->height = 0;
+      launch_session->fps = 0;
     }
 
     launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;
     launch_session->unique_id = named_cert_p->uuid;
     launch_session->perm = named_cert_p->perm;
-    launch_session->appid = util::from_view(get_arg(args, "appid", "unknown"));
+    launch_session->appid = appid;
     launch_session->enable_sops = util::from_view(get_arg(args, "sops", "0"));
     launch_session->surround_info = util::from_view(get_arg(args, "surroundAudioInfo", "196610"));
     launch_session->surround_params = (get_arg(args, "surroundParams", ""));
@@ -378,26 +405,6 @@ namespace nvhttp {
     launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0"));
     launch_session->scale_factor = util::from_view(get_arg(args, "scaleFactor", "100"));
 
-    // Encrypted RTSP is enabled with client reported corever >= 1
-    auto corever = util::from_view(get_arg(args, "corever", "0"));
-    if (corever >= 1) {
-      launch_session->rtsp_cipher = crypto::cipher::gcm_t {
-        launch_session->gcm_key, false
-      };
-      launch_session->rtsp_iv_counter = 0;
-    }
-    launch_session->rtsp_url_scheme = launch_session->rtsp_cipher ? "rtspenc://"s : "rtsp://"s;
-
-    // Generate the unique identifiers for this connection that we will send later during RTSP handshake
-    unsigned char raw_payload[8];
-    RAND_bytes(raw_payload, sizeof(raw_payload));
-    launch_session->av_ping_payload = util::hex_vec(raw_payload);
-    RAND_bytes((unsigned char *) &launch_session->control_connect_data, sizeof(launch_session->control_connect_data));
-
-    launch_session->iv.resize(16);
-    uint32_t prepend_iv = util::endian::big<uint32_t>(util::from_view(get_arg(args, "rikeyid")));
-    auto prepend_iv_p = (uint8_t *) &prepend_iv;
-    std::copy(prepend_iv_p, prepend_iv_p + sizeof(prepend_iv), std::begin(launch_session->iv));
     return launch_session;
   }
 
@@ -1032,8 +1039,11 @@ namespace nvhttp {
       return;
     }
 
+    auto appid_str = get_arg(args, "appid");
+    auto appid = util::from_view(appid_str);
+
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
+    auto launch_session = make_launch_session(host_audio, appid, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1045,9 +1055,6 @@ namespace nvhttp {
 
       return;
     }
-
-    auto appid = util::from_view(get_arg(args, "appid"));
-    auto appid_str = std::to_string(appid);
 
     if (appid > 0) {
       const auto& apps = proc::proc.get_apps();
@@ -1161,7 +1168,7 @@ namespace nvhttp {
       }
     }
 
-    auto launch_session = make_launch_session(host_audio, args, named_cert_p);
+    auto launch_session = make_launch_session(host_audio, 0, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {

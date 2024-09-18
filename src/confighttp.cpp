@@ -929,6 +929,66 @@ namespace confighttp {
     }
   }
 
+  void launchApp(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    pt::ptree outputTree;
+
+    auto g = util::fail_guard([&]() {
+      std::ostringstream data;
+      pt::write_json(data, outputTree);
+      response->write(data.str());
+    });
+
+    auto args = request->parse_query_string();
+    if (
+      args.find("id"s) == std::end(args)
+    ) {
+      outputTree.put("status", false);
+      outputTree.put("error", "Missing a required launch parameter");
+
+      return;
+    }
+
+    auto idx_str = nvhttp::get_arg(args, "id");
+    auto idx = util::from_view(idx_str);
+
+    const auto& apps = proc::proc.get_apps();
+
+    if (idx >= apps.size()) {
+      BOOST_LOG(error) << "Couldn't find app with index ["sv << idx_str << ']';
+      outputTree.put("status", false);
+      outputTree.put("error", "Cannot find requested application");
+      return;
+    }
+
+    auto& app = apps[idx];
+    auto appid = util::from_view(app.id);
+
+    crypto::named_cert_t named_cert {
+      .name = "",
+      .uuid = http::unique_id,
+      .perm = crypto::PERM::_all,
+    };
+
+    BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
+
+    auto launch_session = nvhttp::make_launch_session(true, appid, args, &named_cert);
+    auto err = proc::proc.execute(appid, app, launch_session);
+    if (err) {
+      outputTree.put("status", false);
+      outputTree.put("error",
+        err == 503
+        ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
+        : "Failed to start the specified application");
+      return;
+    } else {
+      outputTree.put("status", true);
+    }
+  }
+
   void
   disconnect(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -945,7 +1005,7 @@ namespace confighttp {
       pt::write_json(data, outputTree);
       response->write(data.str());
     });
-    
+
     try {
       pt::read_json(ss, inputTree);
       std::string uuid = inputTree.get<std::string>("uuid");
@@ -1033,6 +1093,7 @@ namespace confighttp {
     server.resource["^/api/clients/update$"]["POST"] = updateClient;
     server.resource["^/api/clients/unpair$"]["POST"] = unpair;
     server.resource["^/api/clients/disconnect$"]["POST"] = disconnect;
+    server.resource["^/api/apps/launch$"]["POST"] = launchApp;
     server.resource["^/api/apps/close$"]["POST"] = closeApp;
     server.resource["^/api/covers/upload$"]["POST"] = uploadCover;
     server.resource["^/images/apollo.ico$"]["GET"] = getFaviconImage;

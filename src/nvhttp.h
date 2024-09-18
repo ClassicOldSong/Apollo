@@ -10,6 +10,7 @@
 #include <chrono>
 
 // lib includes
+#include <Simple-Web-Server/server_https.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 // local includes
@@ -23,6 +24,8 @@ using namespace std::chrono_literals;
  * @brief Contains all the functions and variables related to the nvhttp (GameStream) server.
  */
 namespace nvhttp {
+
+  using args_t = SimpleWeb::CaseInsensitiveMultimap;
 
   /**
    * @brief The protocol version.
@@ -56,6 +59,12 @@ namespace nvhttp {
    */
   void
   start();
+
+  std::string
+  get_arg(const args_t &args, const char *name, const char *default_value = nullptr);
+
+  std::shared_ptr<rtsp_stream::launch_session_t>
+  make_launch_session(bool host_audio, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p);
 
   /**
    * @brief Compare the user supplied pin to the Moonlight pin.
