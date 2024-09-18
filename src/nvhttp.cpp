@@ -1385,6 +1385,8 @@ namespace nvhttp {
     // Wait for any event
     shutdown_event->view();
 
+    map_id_sess.clear();
+
     https_server.stop();
     http_server.stop();
 
