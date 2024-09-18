@@ -142,7 +142,9 @@ namespace confighttp {
 
     auto fg = util::fail_guard([&]() {
       if (needsRedirect) {
-        send_redirect(response, request, "/login");
+        std::string redir_path = "/login?redir=.";
+        redir_path += request->path;
+        send_redirect(response, request, redir_path.c_str());
       } else {
         send_unauthorized(response, request);
       }
@@ -244,6 +246,11 @@ namespace confighttp {
   void
   getLoginPage(resp_https_t response, req_https_t request) {
     if (!checkIPOrigin(response, request)) {
+      return;
+    }
+
+    if (config::sunshine.username.empty()) {
+      send_redirect(response, request, "/welcome");
       return;
     }
 

@@ -91,7 +91,14 @@
           if (res.status === 200) {
             this.success = true;
             localStorage.setItem('login', JSON.stringify(this.passwordData));
-            location.href = './';
+            const url = new URL(window.location);
+            const redirectUrl = url.searchParams.get('redir');
+            const hash = url.hash;
+            if (redirectUrl) {
+              location.href = redirectUrl + hash;
+            } else {
+              location.href = './' + hash;
+            }
           } else {
             if (res.status === 401) {
               throw new Error('Please check your username and password')
