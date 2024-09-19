@@ -229,20 +229,29 @@ namespace proc {
           VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
         }
 
-        // Determine if we need to set the virtual display as primary
-        bool shouldSetPrimary = false;
+        bool shouldActuallySetPrimary = false;
 
-        if (launch_session->virtual_display || _app.virtual_display_primary) {
-            shouldSetPrimary = (currentPrimaryDisplayName != vdisplayName);
+        // Determine if we need to set the virtual display as primary
+        // Client request overrides local config
+        bool shouldSetVDisplayPrimary = launch_session->virtual_display;
+        if (!shouldSetVDisplayPrimary) {
+          // App config overrides global config
+          if (_app.virtual_display) {
+            shouldSetVDisplayPrimary = _app.virtual_display_primary;
+          } else {
+            shouldSetVDisplayPrimary = config::video.set_vdisplay_primary;
+          }
+        }
+
+        if (shouldSetVDisplayPrimary) {
+          shouldActuallySetPrimary = (currentPrimaryDisplayName != vdisplayName);
         } else {
-            shouldSetPrimary = (currentPrimaryDisplayName != prevPrimaryDisplayName);
+          shouldActuallySetPrimary = (currentPrimaryDisplayName != prevPrimaryDisplayName);
         }
 
         // Set primary display if needed
-        if (shouldSetPrimary) {
-          auto disp = (launch_session->virtual_display || _app.virtual_display_primary)
-            ? vdisplayName
-            : prevPrimaryDisplayName;
+        if (shouldActuallySetPrimary) {
+          auto disp = shouldSetVDisplayPrimary ? vdisplayName : prevPrimaryDisplayName;
           BOOST_LOG(info) << "Setting display " << disp << " primary!!!";
 
           VDISPLAY::setPrimaryDisplay(disp.c_str());

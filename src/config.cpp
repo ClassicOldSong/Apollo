@@ -328,6 +328,7 @@ namespace config {
   video_t video {
     false, // headless_mode
     false, // follow_client_hdr
+    true, // set_vdisplay_primary
     28,  // qp
 
     0,  // hevc_mode
@@ -983,6 +984,7 @@ namespace config {
 
     bool_f(vars, "headless_mode", video.headless_mode);
     bool_f(vars, "follow_client_hdr", video.follow_client_hdr);
+    bool_f(vars, "set_vdisplay_primary", video.set_vdisplay_primary);
     int_f(vars, "qp", video.qp);
     int_f(vars, "min_threads", video.min_threads);
     int_between_f(vars, "hevc_mode", video.hevc_mode, { 0, 3 });

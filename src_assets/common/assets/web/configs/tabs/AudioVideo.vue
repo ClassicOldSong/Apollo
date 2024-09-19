@@ -135,13 +135,21 @@ const validateFallbackMode = (event) => {
       <div class="form-text pre-wrap">{{ $t('config.follow_client_hdr_desc') }}</div>
     </div>
 
-    <!--headless_mode-->
+    <!-- Headless Mode -->
     <div class="mb-3 form-check" v-if="platform === 'windows'">
       <input type="checkbox" class="form-check-input" id="headless_mode" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
-      <label for="qp" class="form-check-label">{{ $t('config.headless_mode') }}</label>
+      <label for="headless_mode" class="form-check-label">{{ $t('config.headless_mode') }}</label>
       <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
     </div>
 
+    <!-- Set VDisplay Primary -->
+    <div class="mb-3 form-check" v-if="platform === 'windows'">
+      <input type="checkbox" class="form-check-input" id="set_vdisplay_primary" v-model="config.set_vdisplay_primary" true-value="enabled" false-value="disabled"/>
+      <label for="set_vdisplay_primary" class="form-check-label">{{ $t('config.set_vdisplay_primary') }}</label>
+      <div class="form-text">{{ $t('config.set_vdisplay_primary_desc') }}</div>
+    </div>
+
+    <!-- SudoVDA Driver Status -->
     <div class="alert" :class="[vdisplay === '0' ? 'alert-success' : 'alert-warning']" v-if="platform === 'windows'">
       <i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}
     </div>
