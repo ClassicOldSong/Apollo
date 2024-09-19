@@ -785,41 +785,30 @@ namespace platf {
     }
 
     auto raw_target = raw_cmd_parts.at(0);
-    std::wstring lookup_string;
-    HRESULT res;
-
     if (PathIsURLW(raw_target.c_str())) {
-      std::array<WCHAR, 128> scheme;
-
-      DWORD out_len = scheme.size();
-      res = UrlGetPartW(raw_target.c_str(), scheme.data(), &out_len, URL_PART_SCHEME, 0);
-      if (res != S_OK) {
-        BOOST_LOG(warning) << "Failed to extract URL scheme from URL: "sv << raw_target << " ["sv << util::hex(res).to_string_view() << ']';
-        return from_utf8(raw_cmd);
-      }
-
-      // If the target is a URL, the class is found using the URL scheme (prior to and not including the ':')
-      lookup_string = scheme.data();
+      // If the target is a URL, handle it directly with rundll32.exe
+      std::wstring cmd = L"rundll32.exe url.dll,FileProtocolHandler " + raw_target;
+      return cmd;
     }
-    else {
-      // If the target is not a URL, assume it's a regular file path
-      auto extension = PathFindExtensionW(raw_target.c_str());
-      if (extension == nullptr || *extension == 0) {
-        // If the file has no extension, assume it's a command and allow CreateProcess()
-        // to try to find it via PATH
-        return from_utf8(raw_cmd);
-      }
-      else if (boost::iequals(extension, L".exe")) {
-        // If the file has an .exe extension, we will bypass the resolution here and
-        // directly pass the unmodified command string to CreateProcess(). The argument
-        // escaping rules are subtly different between CreateProcess() and ShellExecute(),
-        // and we want to preserve backwards compatibility with older configs.
-        return from_utf8(raw_cmd);
-      }
 
-      // For regular files, the class is found using the file extension (including the dot)
-      lookup_string = extension;
+    // If the target is not a URL, assume it's a regular file path
+    auto extension = PathFindExtensionW(raw_target.c_str());
+    if (extension == nullptr || *extension == 0) {
+      // If the file has no extension, assume it's a command and allow CreateProcess()
+      // to try to find it via PATH
+      return from_utf8(raw_cmd);
     }
+    else if (boost::iequals(extension, L".exe")) {
+      // If the file has an .exe extension, we will bypass the resolution here and
+      // directly pass the unmodified command string to CreateProcess(). The argument
+      // escaping rules are subtly different between CreateProcess() and ShellExecute(),
+      // and we want to preserve backwards compatibility with older configs.
+      return from_utf8(raw_cmd);
+    }
+
+    // For regular files, the class is found using the file extension (including the dot)
+    std::wstring lookup_string = extension;
+    HRESULT res;
 
     std::array<WCHAR, MAX_PATH> shell_command_string;
     bool needs_cmd_escaping = false;
