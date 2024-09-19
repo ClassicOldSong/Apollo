@@ -77,6 +77,8 @@ namespace config {
     std::string encoder;
     std::string adapter_name;
     std::string output_name;
+
+    std::string fallback_mode;
   };
 
   struct audio_t {

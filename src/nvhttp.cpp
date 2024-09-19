@@ -356,16 +356,6 @@ namespace nvhttp {
       std::copy(rikey.cbegin(), rikey.cend(), std::back_inserter(launch_session->gcm_key));
 
       launch_session->host_audio = host_audio;
-      std::stringstream mode = std::stringstream(get_arg(args, "mode", "0x0x0"));
-      // Split mode by the char "x", to populate width/height/fps
-      int x = 0;
-      std::string segment;
-      while (std::getline(mode, segment, 'x')) {
-        if (x == 0) launch_session->width = atoi(segment.c_str());
-        if (x == 1) launch_session->height = atoi(segment.c_str());
-        if (x == 2) launch_session->fps = atoi(segment.c_str());
-        x++;
-      }
 
       // Encrypted RTSP is enabled with client reported corever >= 1
       auto corever = util::from_view(get_arg(args, "corever", "0"));
@@ -387,10 +377,17 @@ namespace nvhttp {
       uint32_t prepend_iv = util::endian::big<uint32_t>(util::from_view(get_arg(args, "rikeyid")));
       auto prepend_iv_p = (uint8_t *) &prepend_iv;
       std::copy(prepend_iv_p, prepend_iv_p + sizeof(prepend_iv), std::begin(launch_session->iv));
-    } else {
-      launch_session->width = 0;
-      launch_session->height = 0;
-      launch_session->fps = 0;
+    }
+
+    std::stringstream mode = std::stringstream(get_arg(args, "mode", config::video.fallback_mode.c_str()));
+    // Split mode by the char "x", to populate width/height/fps
+    int x = 0;
+    std::string segment;
+    while (std::getline(mode, segment, 'x')) {
+      if (x == 0) launch_session->width = atoi(segment.c_str());
+      if (x == 1) launch_session->height = atoi(segment.c_str());
+      if (x == 2) launch_session->fps = atoi(segment.c_str());
+      x++;
     }
 
     launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;

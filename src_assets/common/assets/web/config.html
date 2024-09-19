@@ -343,6 +343,11 @@
       serialize() {
         this.config.global_prep_cmd = JSON.stringify(this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo));
         this.config.server_cmd = JSON.stringify(this.server_cmd.filter(cmd => cmd.name && cmd.cmd));
+
+        // Validate fallback mode
+        if (this.config.fallback_mode && !this.config.fallback_mode.match(/^\d+x\d+x\d+$/)) {
+          this.config.fallback_mode = "1920x1080x60";
+        }
       },
       save() {
         this.saved = false;

@@ -380,6 +380,8 @@ namespace config {
     {},  // encoder
     {},  // adapter_name
     {},  // output_name
+
+    "1920x1080x60",  // fallback_mode
   };
 
   audio_t audio {
@@ -1052,6 +1054,7 @@ namespace config {
     string_f(vars, "encoder", video.encoder);
     string_f(vars, "adapter_name", video.adapter_name);
     string_f(vars, "output_name", video.output_name);
+    string_f(vars, "fallback_mode", video.fallback_mode);
     int_between_f(vars, "min_fps_factor", video.min_fps_factor, { 1, 3 });
 
     path_f(vars, "pkey", nvhttp.pkey);

@@ -1,5 +1,5 @@
 <script setup>
-import {ref, computed} from 'vue'
+import {ref, computed, inject} from 'vue'
 import {$tp} from '../../platform-i18n'
 import PlatformLayout from '../../PlatformLayout.vue'
 import AdapterNameSelector from './audiovideo/AdapterNameSelector.vue'
@@ -7,6 +7,8 @@ import LegacyDisplayOutputSelector from './audiovideo/LegacyDisplayOutputSelecto
 import NewDisplayOutputSelector from './audiovideo/NewDisplayOutputSelector.vue'
 import DisplayDeviceOptions from "./audiovideo/DisplayDeviceOptions.vue";
 import DisplayModesSettings from "./audiovideo/DisplayModesSettings.vue";
+
+const $t = inject('i18n').t;
 
 const props = defineProps([
   'platform',
@@ -26,6 +28,17 @@ const sudovdaStatus = {
 const currentDriverStatus = computed(() => sudovdaStatus[props.vdisplay])
 
 const config = ref(props.config)
+
+const validateFallbackMode = (event) => {
+  const value = event.target.value;
+  if (!value.match(/^\d+x\d+x\d+$/)) {
+    event.target.setCustomValidity($t('config.fallback_mode_error'));
+  } else {
+    event.target.setCustomValidity('');
+  }
+
+  event.target.reportValidity();
+}
 </script>
 
 <template>
@@ -101,6 +114,20 @@ const config = ref(props.config)
         :config="config"
         :min_fps_factor="min_fps_factor"
     />
+
+    <!-- Fallback Display Mode -->
+    <div class="mb-3">
+      <label for="fallback_mode" class="form-label">{{ $t('config.fallback_mode') }}</label>
+      <input 
+        type="text" 
+        class="form-control" 
+        id="fallback_mode" 
+        v-model="config.fallback_mode" 
+        placeholder="1920x1080x60"
+        @input="validateFallbackMode"
+      />
+      <div class="form-text">{{ $t('config.fallback_mode_desc') }}</div>
+    </div>
 
     <div class="mb-3 form-check" v-if="platform === 'windows'">
       <input type="checkbox" class="form-check-input" id="follow_client_hdr" v-model="config.follow_client_hdr" true-value="enabled" false-value="disabled"/>
