@@ -114,6 +114,8 @@
   import ContainerEncoders from './configs/tabs/ContainerEncoders.vue'
   import {$tp, usePlatformI18n} from './platform-i18n'
 
+  let fallbackDisplayModeCache = "";
+
   const app = createApp({
     components: {
       Navbar,
@@ -319,6 +321,8 @@
           this.vdisplayStatus = this.config.vdisplayStatus;
           delete this.config.vdisplayStatus;
 
+          fallbackDisplayModeCache = this.config.fallback_mode || "";
+
           // TODO: let each tab's Component handle it's own data instead of doing it here
 
           // Populate default values from tabs options
@@ -346,7 +350,9 @@
 
         // Validate fallback mode
         if (this.config.fallback_mode && !this.config.fallback_mode.match(/^\d+x\d+x\d+$/)) {
-          this.config.fallback_mode = "1920x1080x60";
+          this.config.fallback_mode = fallbackDisplayModeCache;
+        } else {
+          fallbackDisplayModeCache = this.config.fallback_mode;
         }
       },
       save() {
