@@ -44,8 +44,9 @@ namespace crypto {
     input_controller = _input << 0,      // Allow controller input
     input_touch      = _input << 1,      // Allow touch input
     input_pen        = _input << 2,      // Allow pen input
-    input_kbdm       = _input << 3,      // Allow kbd/mouse input
-    _all_inputs      = input_controller | input_touch | input_pen | input_kbdm,
+    input_mouse      = _input << 3,      // Allow mouse input
+    input_kbd        = _input << 4,      // Allow keyboard input 
+    _all_inputs      = input_controller | input_touch | input_pen | input_mouse | input_kbd,
 
     _operation       = _input << 8,      // Operation permission group
     clipboard_set    = _operation << 0,  // Allow set clipboard from client

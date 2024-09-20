@@ -1657,10 +1657,15 @@ namespace input {
         case MOUSE_BUTTON_UP_EVENT_MAGIC_GEN5:
         case SCROLL_MAGIC_GEN5:
         case SS_HSCROLL_MAGIC:
+          if (!(permission & crypto::PERM::input_mouse)) {
+            return;
+          } else {
+            break;
+          }
         case KEY_DOWN_EVENT_MAGIC:
         case KEY_UP_EVENT_MAGIC:
         case UTF8_TEXT_EVENT_MAGIC:
-          if (!(permission & crypto::PERM::input_kbdm)) {
+          if (!(permission & crypto::PERM::input_kbd)) {
             return;
           } else {
             break;

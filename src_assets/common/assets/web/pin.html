@@ -165,8 +165,9 @@
       input_controller = _input << 0,      // Allow controller input
       input_touch      = _input << 1,      // Allow touch input
       input_pen        = _input << 2,      // Allow pen input
-      input_kbdm       = _input << 3,      // Allow kbd/mouse input
-      _all_inputs      = input_controller | input_touch | input_pen | input_kbdm,
+      input_mouse      = _input << 3,      // Allow mouse input
+      input_kbd        = _input << 4,      // Allow keyboard input
+      _all_inputs      = input_controller | input_touch | input_pen | input_mouse | input_kbd,
 
       _operation       = _input << 8,      // Operation permission group
       clipboard_set    = _operation << 0,  // Allow set clipboard from client
@@ -194,8 +195,9 @@
     input_controller: 0x00000100,
     input_touch: 0x00000200,
     input_pen: 0x00000400,
-    input_kbdm: 0x00000800,
-    _all_inputs: 0x00000F00,
+    input_mouse: 0x00000800,
+    input_kbd: 0x00001000,
+    _all_inputs: 0x00001F00,
 
     // Operation permission group
     clipboard_set: 0x00010000,
@@ -215,7 +217,7 @@
     // Special permissions
     _default: 0x03000000,
     _no: 0x00000000,
-    _all: 0x071F0F00
+    _all: 0x071F1F00
   };
 
   const permissionGroups = [
@@ -248,7 +250,10 @@
         name: 'input_pen',
         suppressed_by: []
       }, {
-        name: 'input_kbdm',
+        name: 'input_mouse',
+        suppressed_by: []
+      }, {
+        name: 'input_kbd',
         suppressed_by: []
       }
     ] },
