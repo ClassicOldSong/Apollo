@@ -148,7 +148,6 @@
           this.refreshLogs();
         }, 5000);
         this.refreshLogs();
-        this.refreshClients();
       },
       beforeDestroy() {
         clearInterval(this.logInterval);
@@ -190,14 +189,14 @@
           })
           .then((resp) => {
             if (resp.status !== 200) {
-              location.href = './login'
+              location.reload();
               return
             }
           })
           .catch((e) => {
             this.serverRestarting = false
-            location.href = './login'
             console.error(e)
+            location.reload();
             return
           });
         },

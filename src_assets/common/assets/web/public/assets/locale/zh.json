@@ -429,6 +429,7 @@
     "otp_pair_now": "PIN 请求成功，是否一键配对？",
     "device_management": "设备管理",
     "device_management_desc": "管理已配对的设备。",
+    "save_client_error": "保存客户端时出错：",
     "unpair_all": "全部取消配对",
     "unpair_all_success": "全部取消配对成功！",
     "unpair_all_error": "取消配对时出错",

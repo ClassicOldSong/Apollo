@@ -422,13 +422,13 @@
             })
             .then((resp) => {
               if (resp.status !== 200) {
-                location.href = './login'
+                location.reload();
                 return
               }
             })
             .catch((e) => {
-              location.href = './login'
               console.error(e)
+              location.reload();
               return
             });
           }

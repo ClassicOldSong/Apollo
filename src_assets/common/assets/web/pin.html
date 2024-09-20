@@ -429,7 +429,11 @@
           credentials: 'include',
           method: "POST",
           body: JSON.stringify(editedClient)
-        }).finally(() => {
+        })
+        .catch(err => {
+          alert(this.i18n.t('pin.save_client_error') + err);
+        })
+        .finally(() => {
           setTimeout(() => {
             this.refreshClients();
           }, 1000);
@@ -518,6 +522,10 @@
             } else {
               this.clients = [];
             }
+          })
+          .catch(e => {
+            console.error(e)
+            location.reload();
           });
       },
     }
