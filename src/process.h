@@ -12,6 +12,7 @@
 #include <unordered_map>
 
 #include <boost/process.hpp>
+#include <boost/property_tree/ptree.hpp>
 
 #include "config.h"
 #include "platform/common.h"
@@ -59,6 +60,7 @@ namespace proc {
      */
     std::vector<std::string> detached;
 
+    std::string uuid;
     std::string name;
     std::string cmd;
     std::string working_dir;
@@ -70,6 +72,7 @@ namespace proc {
     bool wait_all;
     bool virtual_display;
     bool virtual_display_primary;
+    bool use_app_identity;
     int  scale_factor;
     std::chrono::seconds exit_timeout;
   };
@@ -150,6 +153,8 @@ namespace proc {
   validate_app_image_path(std::string app_image_path);
   void
   refresh(const std::string &file_name);
+  void
+  migrate_apps(boost::property_tree::ptree* fileTree_p, boost::property_tree::ptree* inputTree_p);
   std::optional<proc::proc_t>
   parse(const std::string &file_name);
 

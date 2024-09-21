@@ -92,7 +92,9 @@
     "virtual_display_primary": "Enforce Virtual Display Primary",
     "virtual_display_primary_desc": "Automatically set the virtual display as primary display when the app starts. Virtual display will always be set to primary when client requests to use virtual display. (Recommended to keep on)",
     "resolution_scale_factor": "Resolution Scale Factor",
-    "resolution_scale_factor_desc": "Scale the client requested resolution based on this factor. e.g. 2000x1000 with a factor of 120% will become 2400x1200. Overrides client requested factor when the number isn't 100%. This option won't affect client requested streaming resolution."
+    "resolution_scale_factor_desc": "Scale the client requested resolution based on this factor. e.g. 2000x1000 with a factor of 120% will become 2400x1200. Overrides client requested factor when the number isn't 100%. This option won't affect client requested streaming resolution.",
+    "use_app_identity": "Use App Identity",
+    "use_app_identity_desc": "Use the app's own identity while creating virtual displays instead of client's. This is useful when you want display configuration for each APP separately."
   },
   "client_card": {
     "clients": "Clients",

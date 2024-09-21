@@ -86,16 +86,16 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(app,i) in apps" :key="i">
+          <tr v-for="(app,i) in apps" :key="app.uuid">
             <td>{{app.name}}</td>
             <td>
-              <button class="btn btn-success me-2" :disabled="app.launching" @click="launchApp(i)">
+              <button class="btn btn-success me-2" :disabled="app.launching" @click="launchApp(app)">
                 <i class="fas fa-play"></i> {{ $t('apps.launch') }}
               </button>
-              <button class="btn btn-primary me-2" :disabled="app.launching" @click="editApp(i)">
+              <button class="btn btn-primary me-2" :disabled="app.launching" @click="editApp(app)">
                 <i class="fas fa-edit"></i> {{ $t('apps.edit') }}
               </button>
-              <button class="btn btn-danger" :disabled="app.launching" @click="showDeleteForm(i)">
+              <button class="btn btn-danger" :disabled="app.launching" @click="showDeleteForm(app)">
                 <i class="fas fa-trash"></i> {{ $t('apps.delete') }}
               </button>
             </td>
@@ -274,15 +274,22 @@
         <div class="mb-3 form-check" v-if="platform === 'windows'">
           <label for="virtualDisplay" class="form-check-label">{{ $t('apps.virtual_display') }}</label>
           <input type="checkbox" class="form-check-input" id="virtualDisplay" v-model="editForm['virtual-display']"
-            true-value="true" false-value="false" />
+          true-value="true" false-value="false" />
           <div class="form-text">{{ $t('apps.virtual_display_desc') }}</div>
         </div>
         <!-- set virtual display to primary -->
         <div class="mb-3 form-check" v-if="platform === 'windows' && editForm['virtual-display'] == 'true'">
           <label for="virtualDisplayPrimary" class="form-check-label">{{ $t('apps.virtual_display_primary') }}</label>
           <input type="checkbox" class="form-check-input" id="virtualDisplayPrimary" v-model="editForm['virtual-display-primary']"
-            true-value="true" false-value="false" />
+          true-value="true" false-value="false" />
           <div class="form-text">{{ $t('apps.virtual_display_primary_desc') }}</div>
+        </div>
+        <!-- use app identity -->
+        <div class="mb-3 form-check">
+          <label for="useAppIdentity" class="form-check-label">{{ $t('apps.use_app_identity') }}</label>
+          <input type="checkbox" class="form-check-input" id="useAppIdentity" v-model="editForm['use-app-identity']"
+            true-value="true" false-value="false" />
+          <div class="form-text">{{ $t('apps.use_app_identity_desc') }}</div>
         </div>
         <!-- resolution scale factor -->
         <div class="mb-3" v-if="platform === 'windows'">
@@ -392,6 +399,23 @@
   import PlatformLayout from './PlatformLayout.vue'
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
+  const newApp = {
+    name: "",
+    output: "",
+    cmd: [],
+    "exclude-global-prep-cmd": false,
+    elevated: false,
+    "auto-detach": true,
+    "wait-all": true,
+    "exit-timeout": 5,
+    "prep-cmd": [],
+    detached: [],
+    "image-path": "",
+    "virtual-display-primary": true,
+    "scale-factor": "100",
+    "use-app-identity": false
+  }
+
   const app = createApp({
     components: {
       Navbar,
@@ -429,30 +453,13 @@
           });
       },
       newApp() {
-        this.editForm = {
-          name: "",
-          output: "",
-          cmd: [],
-          index: -1,
-          "exclude-global-prep-cmd": false,
-          elevated: false,
-          "auto-detach": true,
-          "wait-all": true,
-          "exit-timeout": 5,
-          "prep-cmd": [],
-          detached: [],
-          "image-path": "",
-          "virtual-display-primary": true,
-          "scale-factor": "100"
-        };
-        this.editForm.index = -1;
+        this.editForm = Object.assign({}, newApp);
         this.showEditForm = true;
       },
-      launchApp(id) {
-        const app = this.apps[id];
+      launchApp(app) {
         if (confirm(this.$t('apps.launch_warning'))) {
           app.launching = true;
-          fetch("/api/apps/launch?id=" + id, {
+          fetch("/api/apps/launch?uuid=" + app.uuid, {
             credentials: 'include',
             method: "POST",
           })
@@ -467,56 +474,31 @@
           .finally(() => app.launching = false);
         }
       },
-      editApp(id) {
-        this.editForm = JSON.parse(JSON.stringify(this.apps[id]));
-        this.editForm.index = id;
-        if (this.editForm["prep-cmd"] === undefined)
-          this.editForm["prep-cmd"] = [];
-        if (this.editForm["detached"] === undefined)
-          this.editForm["detached"] = [];
-        if (this.editForm["exclude-global-prep-cmd"] === undefined)
-          this.editForm["exclude-global-prep-cmd"] = [];
-        if (this.editForm["elevated"] === undefined && this.platform === 'windows') {
-          this.editForm["elevated"] = [];
-        }
-        if (this.editForm["auto-detach"] === undefined) {
-          this.editForm["auto-detach"] = true;
-        }
-        if (this.editForm["wait-all"] === undefined) {
-          this.editForm["wait-all"] = true;
-        }
-        if (this.editForm["exit-timeout"] === undefined) {
-          this.editForm["exit-timeout"] = 5;
-        }
-        if (typeof this.editForm["virtual-display-primary"] === "undefined") {
-          this.editForm["virtual-display-primary"] = true;
-        }
-        if (typeof this.editForm["scale-factor"] === "undefined") {
-          this.editForm["scale-factor"] = "100"
-        }
+      editApp(app) {
+        this.editForm = Object.assign({}, newApp, JSON.parse(JSON.stringify(app)));
         this.showEditForm = true;
       },
-      showDeleteForm(id) {
-        let resp = confirm(
-          "Are you sure to delete " + this.apps[id].name + "?"
+      showDeleteForm(app) {
+        const resp = confirm(
+          "Are you sure to delete " + app.name + "?"
         );
         if (resp) {
-          fetch("/api/apps/" + id, {
+          fetch("/api/apps/delete?uuid=" + app.uuid, {
             credentials: 'include',
-            method: "DELETE"
+            method: "POST"
           }).then((r) => {
             if (r.status == 200) document.location.reload();
           });
         }
       },
       addPrepCmd() {
-        let template = {
+        const template = {
           do: "",
           undo: ""
         };
 
         if (this.platform === 'windows') {
-          template = { ...template, elevated: false };
+          template.elevated = false;
         }
 
         this.editForm["prep-cmd"].push(template);
@@ -618,6 +600,8 @@
       },
       save() {
         this.editForm["image-path"] = this.editForm["image-path"].toString().replace(/"/g, '');
+        delete this.editForm["launching"];
+        delete this.editForm["id"];
         fetch("/api/apps", {
           credentials: 'include',
           method: "POST",

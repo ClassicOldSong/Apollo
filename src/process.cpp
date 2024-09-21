@@ -211,13 +211,16 @@ namespace proc {
           VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
         }
 
-        auto device_uuid = uuid_util::uuid_t::parse(launch_session->unique_id);
+        auto device_uuid_str = _app.use_app_identity ? _app.uuid : launch_session->unique_id;
+        auto device_name = _app.use_app_identity ? _app.name : launch_session->device_name;
+
+        auto device_uuid = uuid_util::uuid_t::parse(device_uuid_str);
 
         memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
 
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
-          launch_session->unique_id.c_str(),
-          launch_session->device_name.c_str(),
+          device_uuid_str.c_str(),
+          device_name.c_str(),
           render_width,
           render_height,
           launch_session->fps ? launch_session->fps : 60,
@@ -794,6 +797,63 @@ namespace proc {
     return std::make_tuple(id_no_index, id_with_index);
   }
 
+  void
+  migrate_apps(pt::ptree* fileTree_p, pt::ptree* inputTree_p) {
+    std::string new_app_uuid;
+
+    if (inputTree_p) {
+      auto inputTree = *inputTree_p;
+      auto input_uuid = inputTree_p->get_optional<std::string>("uuid"s);
+      if (input_uuid && !input_uuid.value().empty()) {
+        new_app_uuid = input_uuid.value();
+      } else {
+        new_app_uuid = uuid_util::uuid_t::generate().string();
+        inputTree_p->erase("uuid");
+        inputTree_p->put("uuid", new_app_uuid);
+      }
+
+      if (inputTree_p->get_child("prep-cmd").empty()) {
+        inputTree_p->erase("prep-cmd");
+      }
+
+      if (inputTree_p->get_child("detached").empty()) {
+        inputTree_p->erase("detached");
+      }
+
+      inputTree_p->erase("launching");
+      inputTree_p->erase("index");
+    }
+
+    auto &apps_node = fileTree_p->get_child("apps"s);
+
+    pt::ptree newApps;
+    for (auto &kv : apps_node) {
+      // Check if we have apps that have not got an uuid assigned
+      auto app_uuid = kv.second.get_optional<std::string>("uuid"s);
+      if (!app_uuid || app_uuid.value().empty()) {
+        kv.second.erase("uuid");
+        kv.second.put("uuid", uuid_util::uuid_t::generate().string());
+        kv.second.erase("launching");
+        newApps.push_back(std::make_pair("", kv.second));
+      } else {
+        if (!new_app_uuid.empty() && app_uuid.value() == new_app_uuid) {
+          newApps.push_back(std::make_pair("", *inputTree_p));
+          new_app_uuid.clear();
+        } else {
+          newApps.push_back(std::make_pair("", kv.second));
+        }
+      }
+    }
+
+    // Finally add the new app
+    if (!new_app_uuid.empty()) {
+      newApps.push_back(std::make_pair("", *inputTree_p));
+    }
+
+    fileTree_p->erase("apps");
+    fileTree_p->push_back(std::make_pair("apps", newApps));
+  }
+
   std::optional<proc::proc_t>
   parse(const std::string &file_name) {
     pt::ptree tree;
@@ -816,6 +876,20 @@ namespace proc {
       for (auto &[_, app_node] : apps_node) {
         proc::ctx_t ctx;
 
+        auto app_uuid = app_node.get_optional<std::string>("uuid"s);
+
+        if (!app_uuid) {
+          // We need an upgrade to the app list
+          try {
+            migrate_apps(&tree, nullptr);
+            pt::write_json(file_name, tree);
+            return parse(file_name);
+          } catch (std::exception &e) {
+            BOOST_LOG(warning) << "Error happened wilie migrating the app list: "sv << e.what();
+            return std::nullopt;
+          }
+        }
+
         auto prep_nodes_opt = app_node.get_child_optional("prep-cmd"s);
         auto detached_nodes_opt = app_node.get_child_optional("detached"s);
         auto exclude_global_prep = app_node.get_optional<bool>("exclude-global-prep-cmd"s);
@@ -831,6 +905,9 @@ namespace proc {
         auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
         auto virtual_display_primary = app_node.get_optional<bool>("virtual-display-primary"s);
         auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
+        auto use_app_identity = app_node.get_optional<bool>("use-app-identity"s);
+
+        ctx.uuid = app_uuid.value();
 
         std::vector<proc::cmd_t> prep_cmds;
         if (!exclude_global_prep.value_or(false)) {
@@ -901,6 +978,7 @@ namespace proc {
         ctx.virtual_display = virtual_display.value_or(false);
         ctx.virtual_display_primary = virtual_display_primary.value_or(true);
         ctx.scale_factor = resolution_scale_factor.value_or(100);
+        ctx.use_app_identity = use_app_identity.value_or(false);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {
@@ -923,11 +1001,13 @@ namespace proc {
     #ifdef _WIN32
       if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         proc::ctx_t ctx;
+        // ctx.uuid = ""; // We're not using uuid for this special entry
         ctx.name = "Virtual Display";
         ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
         ctx.virtual_display = true;
         ctx.virtual_display_primary = true;
         ctx.scale_factor = 100;
+        ctx.use_app_identity = false;
 
         ctx.elevated = false;
         ctx.auto_detach = true;

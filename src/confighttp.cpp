@@ -395,38 +395,8 @@ namespace confighttp {
       pt::read_json(ss, inputTree);
       pt::read_json(config::stream.file_apps, fileTree);
 
-      if (inputTree.get_child("prep-cmd").empty()) {
-        inputTree.erase("prep-cmd");
-      }
+      proc::migrate_apps(&fileTree, &inputTree);
 
-      if (inputTree.get_child("detached").empty()) {
-        inputTree.erase("detached");
-      }
-
-      auto &apps_node = fileTree.get_child("apps"s);
-      int index = inputTree.get<int>("index");
-
-      inputTree.erase("index");
-
-      if (index == -1) {
-        apps_node.push_back(std::make_pair("", inputTree));
-      }
-      else {
-        // Unfortunately Boost PT does not allow to directly edit the array, copy should do the trick
-        pt::ptree newApps;
-        int i = 0;
-        for (const auto &kv : apps_node) {
-          if (i == index) {
-            newApps.push_back(std::make_pair("", inputTree));
-          }
-          else {
-            newApps.push_back(std::make_pair("", kv.second));
-          }
-          i++;
-        }
-        fileTree.erase("apps");
-        fileTree.push_back(std::make_pair("apps", newApps));
-      }
       pt::write_json(config::stream.file_apps, fileTree);
     }
     catch (std::exception &e) {
@@ -450,33 +420,38 @@ namespace confighttp {
     pt::ptree outputTree;
     auto g = util::fail_guard([&]() {
       std::ostringstream data;
-
       pt::write_json(data, outputTree);
       response->write(data.str());
     });
+
+    auto args = request->parse_query_string();
+    if (
+      args.find("uuid"s) == std::end(args)
+    ) {
+      outputTree.put("status", false);
+      outputTree.put("error", "Missing a required launch parameter");
+
+      return;
+    }
+
+    auto uuid = nvhttp::get_arg(args, "uuid");
+
     pt::ptree fileTree;
     try {
       pt::read_json(config::stream.file_apps, fileTree);
       auto &apps_node = fileTree.get_child("apps"s);
-      int index = stoi(request->path_match[1]);
 
-      if (index < 0) {
-        outputTree.put("status", "false");
-        outputTree.put("error", "Invalid Index");
-        return;
-      }
-      else {
-        // Unfortunately Boost PT does not allow to directly edit the array, copy should do the trick
-        pt::ptree newApps;
-        int i = 0;
-        for (const auto &kv : apps_node) {
-          if (i++ != index) {
-            newApps.push_back(std::make_pair("", kv.second));
-          }
+      // Unfortunately Boost PT does not allow to directly edit the array, copy should do the trick
+      pt::ptree newApps;
+      for (const auto &kv : apps_node) {
+        auto app_uuid = kv.second.get_optional<std::string>("uuid"s);
+        if (!app_uuid || app_uuid.value() != uuid) {
+          newApps.push_back(std::make_pair("", kv.second));
         }
-        fileTree.erase("apps");
-        fileTree.push_back(std::make_pair("apps", newApps));
       }
+      fileTree.erase("apps");
+      fileTree.push_back(std::make_pair("apps", newApps));
+
       pt::write_json(config::stream.file_apps, fileTree);
     }
     catch (std::exception &e) {
@@ -951,7 +926,7 @@ namespace confighttp {
 
     auto args = request->parse_query_string();
     if (
-      args.find("id"s) == std::end(args)
+      args.find("uuid"s) == std::end(args)
     ) {
       outputTree.put("status", false);
       outputTree.put("error", "Missing a required launch parameter");
@@ -959,41 +934,42 @@ namespace confighttp {
       return;
     }
 
-    auto idx_str = nvhttp::get_arg(args, "id");
-    auto idx = util::from_view(idx_str);
+    auto uuid = nvhttp::get_arg(args, "uuid");
 
     const auto& apps = proc::proc.get_apps();
 
-    if (idx >= apps.size()) {
-      BOOST_LOG(error) << "Couldn't find app with index ["sv << idx_str << ']';
-      outputTree.put("status", false);
-      outputTree.put("error", "Cannot find requested application");
-      return;
+    for (auto& app : apps) {
+      if (app.uuid == uuid) {
+        auto appid = util::from_view(app.id);
+
+        crypto::named_cert_t named_cert {
+          .name = "",
+          .uuid = http::unique_id,
+          .perm = crypto::PERM::_all,
+        };
+
+        BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
+
+        auto launch_session = nvhttp::make_launch_session(true, appid, args, &named_cert);
+        auto err = proc::proc.execute(appid, app, launch_session);
+        if (err) {
+          outputTree.put("status", false);
+          outputTree.put("error",
+            err == 503
+            ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
+            : "Failed to start the specified application");
+          return;
+        } else {
+          outputTree.put("status", true);
+        }
+
+        return;
+      }
     }
 
-    auto& app = apps[idx];
-    auto appid = util::from_view(app.id);
-
-    crypto::named_cert_t named_cert {
-      .name = "",
-      .uuid = http::unique_id,
-      .perm = crypto::PERM::_all,
-    };
-
-    BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
-
-    auto launch_session = nvhttp::make_launch_session(true, appid, args, &named_cert);
-    auto err = proc::proc.execute(appid, app, launch_session);
-    if (err) {
-      outputTree.put("status", false);
-      outputTree.put("error",
-        err == 503
-        ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
-        : "Failed to start the specified application");
-      return;
-    } else {
-      outputTree.put("status", true);
-    }
+    BOOST_LOG(error) << "Couldn't find app with uuid ["sv << uuid << ']';
+    outputTree.put("status", false);
+    outputTree.put("error", "Cannot find requested application");
   }
 
   void
@@ -1086,22 +1062,22 @@ namespace confighttp {
     server.resource["^/api/pin$"]["POST"] = savePin;
     server.resource["^/api/otp$"]["GET"] = getOTP;
     server.resource["^/api/apps$"]["GET"] = getApps;
-    server.resource["^/api/logs$"]["GET"] = getLogs;
     server.resource["^/api/apps$"]["POST"] = saveApp;
+    server.resource["^/api/apps/delete$"]["POST"] = deleteApp;
+    server.resource["^/api/apps/launch$"]["POST"] = launchApp;
+    server.resource["^/api/apps/close$"]["POST"] = closeApp;
+    server.resource["^/api/logs$"]["GET"] = getLogs;
     server.resource["^/api/config$"]["GET"] = getConfig;
     server.resource["^/api/config$"]["POST"] = saveConfig;
     server.resource["^/api/configLocale$"]["GET"] = getLocale;
     server.resource["^/api/restart$"]["POST"] = restart;
     server.resource["^/api/quit$"]["POST"] = quit;
     server.resource["^/api/password$"]["POST"] = savePassword;
-    server.resource["^/api/apps/([0-9]+)$"]["DELETE"] = deleteApp;
     server.resource["^/api/clients/unpair-all$"]["POST"] = unpairAll;
     server.resource["^/api/clients/list$"]["GET"] = listClients;
     server.resource["^/api/clients/update$"]["POST"] = updateClient;
     server.resource["^/api/clients/unpair$"]["POST"] = unpair;
     server.resource["^/api/clients/disconnect$"]["POST"] = disconnect;
-    server.resource["^/api/apps/launch$"]["POST"] = launchApp;
-    server.resource["^/api/apps/close$"]["POST"] = closeApp;
     server.resource["^/api/covers/upload$"]["POST"] = uploadCover;
     server.resource["^/images/apollo.ico$"]["GET"] = getFaviconImage;
     server.resource["^/images/logo-apollo-45.png$"]["GET"] = getSunshineLogoImage;

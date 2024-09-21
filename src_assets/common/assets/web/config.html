@@ -427,9 +427,11 @@
               }
             })
             .catch((e) => {
-              console.error(e)
-              location.reload();
-              return
+              console.error(e);
+              setTimeout(() => {
+                location.reload();
+              }, 1000);
+              return;
             });
           }
         });

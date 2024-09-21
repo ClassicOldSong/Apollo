@@ -189,15 +189,19 @@
           })
           .then((resp) => {
             if (resp.status !== 200) {
-              location.reload();
-              return
+              setTimeout(() => {
+                location.reload();
+              }, 1000);
+              return;
             }
           })
           .catch((e) => {
             this.serverRestarting = false
-            console.error(e)
-            location.reload();
-            return
+            console.error(e);
+            setTimeout(() => {
+              location.reload();
+            }, 1000);
+            return;
           });
         },
         quit() {
