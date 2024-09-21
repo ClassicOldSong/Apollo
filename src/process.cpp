@@ -161,8 +161,13 @@ namespace proc {
     // Ensure starting from a clean slate
     terminate();
 
+    // Save the original output name in case we modify it temporary later
+    std::string output_name_orig = config::video.output_name;
+
     // Executed when returning from function
     auto fg = util::fail_guard([&]() {
+      // Restore to user defined output name
+      config::video.output_name = output_name_orig;
       terminate();
     });
 
@@ -441,6 +446,9 @@ namespace proc {
   #endif
 
     fg.disable();
+
+    // Restore to user defined output name
+    config::video.output_name = output_name_orig;
 
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
     system_tray::update_tray_playing(_app.name);
