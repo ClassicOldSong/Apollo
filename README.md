@@ -17,6 +17,9 @@ Currently Virtual Display support is Windows only, Linux support is planned and 
 
 Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
 
+> [!NOTE]
+> The **FIRST** client paired with Apollo will be granted with FULL permissions, then other newly paired clients will only be granted with `View Streams` and `List Apps` permission. If you encounter `Permission Denied` error when trying to launch any app, go check the permission for that device and grant `Launch Apps` permission. The same applies to the situation when you find that you can't move mouse or type with keyboard on newly paired clients, grant the corresponding client `Mouse Input` and `Keyboard Input` permissions.
+
 ## About Virtual Display
 
 > [!WARNING]
