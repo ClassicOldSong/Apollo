@@ -252,14 +252,23 @@ namespace proc {
         // Set primary display if needed
         if (shouldActuallySetPrimary) {
           auto disp = shouldSetVDisplayPrimary ? vdisplayName : prevPrimaryDisplayName;
-          BOOST_LOG(info) << "Setting display " << disp << " primary!!!";
+          BOOST_LOG(info) << "Setting display " << disp << " primary";
 
-          VDISPLAY::setPrimaryDisplay(disp.c_str());
+          if (!VDISPLAY::setPrimaryDisplay(disp.c_str())) {
+            BOOST_LOG(info) << "Setting display " << disp << " primary failed! Are you using Windows 11 24H2?";
+          }
         }
 
         // Set virtual_display to true when everything went fine
         this->virtual_display = true;
         this->display_name = platf::to_utf8(vdisplayName);
+
+        if (config::video.headless_mode) {
+          // When using headless mode, we don't care which display user configured to use.
+          // So we always set output_name to the newly created virtual display as a workaround for
+          // empty name when probing graphics cards.
+          config::video.output_name = this->display_name;
+        }
       }
     }
 #endif
