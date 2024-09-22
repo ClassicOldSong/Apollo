@@ -802,7 +802,6 @@ namespace proc {
     std::string new_app_uuid;
 
     if (inputTree_p) {
-      auto inputTree = *inputTree_p;
       auto input_uuid = inputTree_p->get_optional<std::string>("uuid"s);
       if (input_uuid && !input_uuid.value().empty()) {
         new_app_uuid = input_uuid.value();
@@ -834,13 +833,13 @@ namespace proc {
         kv.second.erase("uuid");
         kv.second.put("uuid", uuid_util::uuid_t::generate().string());
         kv.second.erase("launching");
-        newApps.push_back(std::make_pair("", kv.second));
+        newApps.push_back(std::make_pair("", std::move(kv.second)));
       } else {
         if (!new_app_uuid.empty() && app_uuid.value() == new_app_uuid) {
           newApps.push_back(std::make_pair("", *inputTree_p));
           new_app_uuid.clear();
         } else {
-          newApps.push_back(std::make_pair("", kv.second));
+          newApps.push_back(std::make_pair("", std::move(kv.second)));
         }
       }
     }
@@ -881,8 +880,10 @@ namespace proc {
         if (!app_uuid) {
           // We need an upgrade to the app list
           try {
+            BOOST_LOG(info) << "Migrating app list...";
             migrate_apps(&tree, nullptr);
             pt::write_json(file_name, tree);
+            BOOST_LOG(info) << "Migration complete.";
             return parse(file_name);
           } catch (std::exception &e) {
             BOOST_LOG(warning) << "Error happened wilie migrating the app list: "sv << e.what();

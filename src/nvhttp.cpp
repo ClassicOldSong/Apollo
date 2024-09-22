@@ -957,25 +957,27 @@ namespace nvhttp {
 
     auto named_cert_p = get_verified_cert(request);
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
-      for (auto &proc : proc::proc.get_apps()) {
-        pt::ptree app;
+      for (auto &app : proc::proc.get_apps()) {
+        pt::ptree app_node;
 
-        app.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        app.put("AppTitle"s, proc.name);
-        app.put("ID", proc.id);
+        app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
+        app_node.put("AppTitle"s, app.name);
+        app_node.put("UUID", app.uuid);
+        app_node.put("ID", app.id);
 
-        apps.push_back(std::make_pair("App", std::move(app)));
+        apps.push_back(std::make_pair("App", std::move(app_node)));
       }
     } else {
       BOOST_LOG(debug) << "Permission ListApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
-      pt::ptree app;
+      pt::ptree app_node;
 
-      app.put("IsHdrSupported"s, 0);
-      app.put("AppTitle"s, "Permission Denied");
-      app.put("ID", "1145141919810");
+      app_node.put("IsHdrSupported"s, 0);
+      app_node.put("AppTitle"s, "Permission Denied");
+      app_node.put("UUID", "");
+      app_node.put("ID", "114514");
 
-      apps.push_back(std::make_pair("App", std::move(app)));
+      apps.push_back(std::make_pair("App", std::move(app_node)));
 
       return;
     }
