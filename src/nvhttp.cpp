@@ -838,6 +838,7 @@ namespace nvhttp {
     }
     else {
       tree.put("root.mac", "00:00:00:00:00:00");
+      tree.put("root.Permission", "0");
     }
 
     // Moonlight clients track LAN IPv6 addresses separately from LocalIP which is expected to
