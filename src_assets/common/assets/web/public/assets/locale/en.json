@@ -430,7 +430,7 @@
     "otp_msg": "OTP pairing is only available for the latest Artemis clients. Please use legacy pairing method for other clients.",
     "otp_pair_now": "PIN generated successfully, do you want to pair now?",
     "device_management": "Device Management",
-    "device_management_desc": "Manage your paired devices.",
+    "device_management_desc": "Manage your paired devices and their permissions.",
     "save_client_error": "Error while saving client: ",
     "unpair_all": "Unpair All",
     "unpair_all_success": "All devices unpaired.",
