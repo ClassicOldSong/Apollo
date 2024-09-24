@@ -4,8 +4,9 @@ Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https:
 
 Major features:
 
-- Built-in Virtual Display with HDR support
-- Permission management for clients
+- [x] Built-in Virtual Display with HDR support
+- [x] Permission management for clients
+- [ ] Clipboard sync
 
 ## Usage
 
@@ -30,7 +31,7 @@ Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
 
 Apollo uses SudoVDA for virtual display. It featurs auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you couldn't notice a new virtual display being added or removed when the stream starts/quits, then there might be a misconfiguration of the driver or you're still have other presisting virtual display connected.**
 
-The virtual display works just like any physically attached monitors with SudoVDA, Windows will remember the monitor position config natively, there's completely no need for a super complicated solution to "fix" resolutions for your monitors. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, Apollo assigns a fixed identity for each Artemis client, or use a dedicated identity each app if using other Moonlight clients.
+The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
 
 ## Configuration for dual GPU laptops
 
@@ -151,8 +152,6 @@ No real time chat support will ever be provided for Apollo and Artemis. Includin
 ## Disclaimer
 
 I got kicked from Moonlight and Sunshine's Discord server and banned from Sunshine's GitHub repo literally for helping people out.
-
-![image](https://github.com/user-attachments/assets/f01fc57f-5199-4495-9b96-68cfa017b7ff)
 
 This is what I got for finding a bug, opened an issue, getting no response, troubleshoot myself, fixed the issue myself, shared it by PR to the main repo hoping my efforts can help someone else during the maintenance gap.
 
