@@ -431,6 +431,7 @@
     "otp_pair_now": "PIN generated successfully, do you want to pair now?",
     "device_management": "Device Management",
     "device_management_desc": "Manage your paired devices and their permissions.",
+    "device_management_warning": "The first paired device will have full permissions by default. Other newly paired devices will have limited permissions set by default.",
     "save_client_error": "Error while saving client: ",
     "unpair_all": "Unpair All",
     "unpair_all_success": "All devices unpaired.",
