@@ -6,7 +6,7 @@ Major features:
 
 - [x] Built-in Virtual Display with HDR support
 - [x] Permission management for clients
-- [ ] Clipboard sync
+- [x] Clipboard sync
 
 ## Usage
 
