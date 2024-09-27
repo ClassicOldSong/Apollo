@@ -1,28 +1,65 @@
 #include "utils.h"
 
+std::wstring acpToUtf16(const std::string& origStr) {
+	auto acp = GetACP();
+
+	int utf16Len = MultiByteToWideChar(acp, 0, origStr.c_str(), origStr.size(), NULL, 0);
+	if (utf16Len == 0) {
+		return L"";
+	}
+
+	std::wstring utf16Str(utf16Len, L'\0');
+	MultiByteToWideChar(acp, 0, origStr.c_str(), origStr.size(), &utf16Str[0], utf16Len);
+
+	return utf16Str;
+}
+
+std::string utf16toAcp(const std::wstring& utf16Str) {
+	auto acp = GetACP();
+
+	int codepageLen = WideCharToMultiByte(acp, 0, utf16Str.c_str(), utf16Str.size(), NULL, 0, NULL, NULL);
+	if (codepageLen == 0) {
+		return "";
+	}
+
+	std::string codepageStr(codepageLen, '\0');
+	WideCharToMultiByte(acp, 0, utf16Str.c_str(), utf16Str.size(), &codepageStr[0], codepageLen, NULL, NULL);
+
+	return codepageStr;
+}
+
 std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str) {
 	if (GetACP() == CP_UTF8) {
 		return std::string(utf8Str);
 	}
-	// Step 1: Convert UTF-8 to UTF-16
-	int utf16Len = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, NULL, 0);
+
+	int utf16Len = MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), utf8Str.size(), NULL, 0);
 	if (utf16Len == 0) {
 		return std::string(utf8Str);
 	}
 
 	std::wstring utf16Str(utf16Len, L'\0');
-	MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), -1, &utf16Str[0], utf16Len);
+	MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), utf8Str.size(), &utf16Str[0], utf16Len);
 
-	// Step 2: Convert UTF-16 to the current Windows codepage
-	int codepageLen = WideCharToMultiByte(GetACP(), 0, utf16Str.c_str(), -1, NULL, 0, NULL, NULL);
-	if (codepageLen == 0) {
-		return std::string(utf8Str);
+	return utf16toAcp(utf16Str);
+}
+
+std::string convertCurrentCodepageToUtf8(const std::string& origStr) {
+	if (GetACP() == CP_UTF8) {
+		return std::string(origStr);
 	}
 
-	std::string codepageStr(codepageLen, '\0');
-	WideCharToMultiByte(GetACP(), 0, utf16Str.c_str(), -1, &codepageStr[0], codepageLen, NULL, NULL);
+	auto utf16Str = acpToUtf16(origStr);
 
-	return codepageStr;
+	int utf8Len = WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), utf16Str.size(), NULL, 0, NULL, NULL);
+	if (utf8Len == 0) {
+		return std::string(origStr);
+	}
+
+	std::string utf8Str(utf8Len, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, utf16Str.c_str(), utf16Str.size(), &utf8Str[0], utf8Len, NULL, NULL);
+
+	return utf8Str;
 }
 
 // Modified from https://github.com/FrogTheFrog/Sunshine/blob/b6f8573d35eff7c55da6965dfa317dc9722bd4ef/src/platform/windows/display_device/windows_utils.cpp

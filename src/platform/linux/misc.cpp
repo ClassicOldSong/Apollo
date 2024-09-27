@@ -1088,4 +1088,16 @@ get_local_ip_for_gateway() {
   create_high_precision_timer() {
     return std::make_unique<linux_high_precision_timer>();
   }
+
+  std::string
+  get_clipboard() {
+    // Placeholder
+    return "";
+  }
+
+  bool
+  set_clipboard(const std::string& content) {
+    // Placeholder
+    return false;
+  }
 }  // namespace platf

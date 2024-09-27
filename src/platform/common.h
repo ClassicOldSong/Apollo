@@ -895,4 +895,10 @@ namespace platf {
   std::unique_ptr<high_precision_timer>
   create_high_precision_timer();
 
+  std::string
+  get_clipboard();
+
+  bool
+  set_clipboard(const std::string& content);
+
 }  // namespace platf

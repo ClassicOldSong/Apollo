@@ -182,10 +182,7 @@ namespace confighttp {
     std::ostringstream data;
 
     pt::write_xml(data, tree);
-    response->write(data.str());
-
-    *response << "HTTP/1.1 404 NOT FOUND\r\n"
-              << data.str();
+    response->write(SimpleWeb::StatusCode::client_error_not_found, data.str());
   }
 
   void
