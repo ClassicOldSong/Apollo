@@ -11,7 +11,7 @@
 #include <optional>
 #include <unordered_map>
 
-#include <boost/process.hpp>
+#include <boost/process/v1.hpp>
 #include <boost/property_tree/ptree.hpp>
 
 #include "config.h"
@@ -88,7 +88,7 @@ namespace proc {
 
 
     proc_t(
-      boost::process::environment &&env,
+      boost::process::v1::environment &&env,
       std::vector<ctx_t> &&apps):
         _app_id(0),
         _env(std::move(env)),
@@ -120,7 +120,8 @@ namespace proc {
 
   private:
     int _app_id;
-    boost::process::environment _env;
+
+    boost::process::v1::environment _env;
 
     std::shared_ptr<rtsp_stream::launch_session_t> _launch_session;
 
@@ -131,8 +132,8 @@ namespace proc {
     // If no command associated with _app_id, yet it's still running
     bool placebo {};
 
-    boost::process::child _process;
-    boost::process::group _process_group;
+    boost::process::v1::child _process;
+    boost::process::v1::group _process_group;
 
     file_t _pipe;
     std::vector<cmd_t>::const_iterator _app_prep_it;
@@ -172,7 +173,7 @@ namespace proc {
    * @param exit_timeout The timeout to wait for the process group to gracefully exit.
    */
   void
-  terminate_process_group(boost::process::child &proc, boost::process::group &group, std::chrono::seconds exit_timeout);
+  terminate_process_group(boost::process::v1::child &proc, boost::process::v1::group &group, std::chrono::seconds exit_timeout);
 
   extern proc_t proc;
 }  // namespace proc
