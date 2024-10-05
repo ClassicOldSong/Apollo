@@ -191,7 +191,7 @@ namespace platf {
         }
       }
     }
-    BOOST_LOG(warning) << "Unable to find MAC address for "sv << address;
+    BOOST_LOG(debug) << "Unable to find MAC address for "sv << address << ", is this a virtual network adapter?";
     return "00:00:00:00:00:00"s;
   }
 
