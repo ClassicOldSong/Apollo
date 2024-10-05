@@ -1,5 +1,10 @@
 #include "utils.h"
 
+#include <SetupApi.h>
+
+#include "src/utility.h"
+#include "src/logging.h"
+
 std::wstring acpToUtf16(const std::string& origStr) {
 	auto acp = GetACP();
 

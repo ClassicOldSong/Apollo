@@ -1,13 +1,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include <windows.h>
-#include <SetupApi.h>
 #include <wtsapi32.h>
-
-#include "src/utility.h"
-#include "src/logging.h"
 
 std::wstring acpToUtf16(const std::string& origStr);
 std::string utf16toAcp(const std::wstring& utf16Str);

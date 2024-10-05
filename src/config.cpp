@@ -28,6 +28,7 @@
 
 #ifdef _WIN32
   #include <shellapi.h>
+  #include "platform/windows/utils.h"
 #endif
 
 #ifndef __APPLE__
@@ -979,7 +980,11 @@ namespace config {
     }
 
     for (auto &[name, val] : vars) {
+    #ifdef _WIN32
+      std::cout << "["sv << name << "] -- ["sv << convertUtf8ToCurrentCodepage(val) << ']' << std::endl;
+    #else
       std::cout << "["sv << name << "] -- ["sv << val << ']' << std::endl;
+    #endif
     }
 
     bool_f(vars, "headless_mode", video.headless_mode);
