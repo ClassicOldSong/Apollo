@@ -348,7 +348,7 @@ namespace proc {
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
                                               find_working_directory(cmd.do_cmd, _env) :
                                               boost::filesystem::path(_app.working_dir);
-      BOOST_LOG(info) << "Executing Do Cmd: ["sv << cmd.do_cmd << ']';
+      BOOST_LOG(info) << "Executing Do Cmd: ["sv << cmd.do_cmd << "] elevated: " << cmd.elevated;
       auto child = platf::run_command(cmd.elevated, true, cmd.do_cmd, working_dir, _env, _pipe.get(), ec, nullptr);
 
       if (ec) {
@@ -920,7 +920,8 @@ namespace proc {
             prep_cmds.emplace_back(
               std::move(do_cmd),
               std::move(undo_cmd),
-              std::move(prep_cmd.elevated));
+              prep_cmd.elevated
+            );
           }
         }
 

@@ -158,10 +158,10 @@ namespace config {
   }
 
   struct prep_cmd_t {
-    prep_cmd_t(std::string &&do_cmd, std::string &&undo_cmd, bool &&elevated):
-        do_cmd(std::move(do_cmd)), undo_cmd(std::move(undo_cmd)), elevated(std::move(elevated)) {}
-    explicit prep_cmd_t(std::string &&do_cmd, bool &&elevated):
-        do_cmd(std::move(do_cmd)), elevated(std::move(elevated)) {}
+    prep_cmd_t(std::string &&do_cmd, std::string &&undo_cmd, bool elevated):
+        do_cmd(std::move(do_cmd)), undo_cmd(std::move(undo_cmd)), elevated(elevated) {}
+    explicit prep_cmd_t(std::string &&do_cmd, bool elevated):
+        do_cmd(std::move(do_cmd)), elevated(elevated) {}
     std::string do_cmd;
     std::string undo_cmd;
     bool elevated;
