@@ -98,7 +98,7 @@ namespace bp = boost::process;
 
 static std::string ensureCrLf(const std::string& utf8Str);
 static std::wstring getClipboardData();
-static int setClipboardData(const std::string& acpStr);
+static int setClipboardData(const std::wstring& utf16Str);
 
 using namespace std::literals;
 namespace platf {
@@ -1955,14 +1955,14 @@ namespace platf {
 
   bool
   set_clipboard(const std::string& content) {
-    std::string cpContent = convertUtf8ToCurrentCodepage(ensureCrLf(content));
+    std::wstring cpContent = from_utf8(ensureCrLf(content));
     return !setClipboardData(cpContent);
   }
 }  // namespace platf
 
 static std::string ensureCrLf(const std::string& utf8Str) {
     std::string result;
-    result.reserve(utf8Str.size() + utf8Str.length() / 2); // Reserve extra space
+    result.reserve(utf8Str.size() + utf8Str.size() / 2); // Reserve extra space
 
     for (size_t i = 0; i < utf8Str.size(); ++i) {
         if (utf8Str[i] == '\n' && (i == 0 || utf8Str[i - 1] != '\r')) {
@@ -2002,7 +2002,7 @@ static std::wstring getClipboardData() {
   return ret;
 }
 
-static int setClipboardData(const std::string& acpStr) {
+static int setClipboardData(const std::wstring& utf16Str) {
   if (!OpenClipboard(nullptr)) {
     BOOST_LOG(warning) << "Failed to open clipboard.";
     return 1;
@@ -2015,7 +2015,7 @@ static int setClipboardData(const std::string& acpStr) {
   }
 
   // Allocate global memory for the clipboard text
-  HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, acpStr.size() + 1);
+  HGLOBAL hGlobal = GlobalAlloc(GMEM_MOVEABLE, utf16Str.size() * 2 + 2);
   if (hGlobal == nullptr) {
     BOOST_LOG(warning) << "Failed to allocate global memory.";
     CloseClipboard();
@@ -2031,11 +2031,11 @@ static int setClipboardData(const std::string& acpStr) {
     return 1;
   }
 
-  memcpy(pGlobal, acpStr.c_str(), acpStr.size() + 1);
+  memcpy(pGlobal, utf16Str.c_str(), utf16Str.size() * 2 + 2);
   GlobalUnlock(hGlobal);
 
   // Set the clipboard data
-  if (SetClipboardData(CF_TEXT, hGlobal) == nullptr) {
+  if (SetClipboardData(CF_UNICODETEXT, hGlobal) == nullptr) {
     BOOST_LOG(warning) << "Failed to set clipboard data.";
     GlobalFree(hGlobal);
     CloseClipboard();
