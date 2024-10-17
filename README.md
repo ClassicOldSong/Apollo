@@ -41,7 +41,14 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 
 ## About HDR
 
-Enabling HDR is **not recommended** at this moment, probably in the long term. The issue with HDR is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy.
+> [!NOTE]
+> This section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
+>
+> Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
+>
+> If you have had good experience with HDR privously, you can safly ignore this section.
+
+Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy.
 
 SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
 
