@@ -1848,7 +1848,7 @@ namespace platf {
     }
 
     // Get the output size required to store the string
-    auto output_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, string.data(), string.size(), nullptr, 0);
+    auto output_size = MultiByteToWideChar(CP_UTF8, 0, string.data(), string.size(), nullptr, 0);
     if (output_size == 0) {
       auto winerr = GetLastError();
       BOOST_LOG(error) << "Failed to get UTF-16 buffer size: "sv << winerr;
@@ -1857,7 +1857,7 @@ namespace platf {
 
     // Perform the conversion
     std::wstring output(output_size, L'\0');
-    output_size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, string.data(), string.size(), output.data(), output.size());
+    output_size = MultiByteToWideChar(CP_UTF8, 0, string.data(), string.size(), output.data(), output.size());
     if (output_size == 0) {
       auto winerr = GetLastError();
       BOOST_LOG(error) << "Failed to convert string to UTF-16: "sv << winerr;

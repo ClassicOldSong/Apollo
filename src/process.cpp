@@ -966,6 +966,7 @@ namespace proc {
           // when it contains spaces. Unlike POSIX, Windows forbids quotes in paths,
           // so we can safely strip them all out here to avoid confusing the user.
           boost::erase_all(ctx.working_dir, "\"");
+          ctx.working_dir += '\\';
 #endif
         }
 
