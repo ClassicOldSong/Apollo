@@ -4,7 +4,7 @@ import {createI18n} from "vue-i18n";
 import en from './public/assets/locale/en.json'
 
 export default async function() {
-    let r = await (await fetch("/api/configLocale", { credentials: 'include' })).json();
+    let r = await (await fetch("./api/configLocale", { credentials: 'include' })).json();
     let locale = r.locale ?? "en";
     document.querySelector('html').setAttribute('lang', locale);
     let messages = {
@@ -12,7 +12,7 @@ export default async function() {
     };
     try {
         if (locale !== 'en') {
-            let r = await (await fetch(`/assets/locale/${locale}.json`, { credentials: 'include' })).json();
+            let r = await (await fetch(`./assets/locale/${locale}.json`, { credentials: 'include' })).json();
             messages[locale] = r;
         }
     } catch (e) {

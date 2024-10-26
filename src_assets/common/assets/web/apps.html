@@ -436,7 +436,7 @@
     created() {
       this.loadApps();
 
-      fetch("/api/config", {
+      fetch("./api/config", {
         credentials: 'include'
       })
         .then(r => r.json())
@@ -444,7 +444,7 @@
     },
     methods: {
       loadApps() {
-        fetch("/api/apps", {
+        fetch("./api/apps", {
           credentials: 'include'
         })
           .then(r => r.json())
@@ -459,7 +459,7 @@
       launchApp(app) {
         if (confirm(this.$t('apps.launch_warning'))) {
           app.launching = true;
-          fetch("/api/apps/launch?uuid=" + app.uuid, {
+          fetch("./api/apps/launch?uuid=" + app.uuid, {
             credentials: 'include',
             method: "POST",
           })
@@ -483,7 +483,7 @@
           "Are you sure to delete " + app.name + "?"
         );
         if (resp) {
-          fetch("/api/apps/delete?uuid=" + app.uuid, {
+          fetch("./api/apps/delete?uuid=" + app.uuid, {
             credentials: 'include',
             method: "POST"
           }).then((r) => {
@@ -584,7 +584,7 @@
       },
       useCover(cover) {
         this.coverFinderBusy = true;
-        fetch("/api/covers/upload", {
+        fetch("./api/covers/upload", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify({
@@ -602,7 +602,7 @@
         this.editForm["image-path"] = this.editForm["image-path"].toString().replace(/"/g, '');
         delete this.editForm["launching"];
         delete this.editForm["id"];
-        fetch("/api/apps", {
+        fetch("./api/apps", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify(this.editForm),

@@ -330,7 +330,7 @@
         let name = document.querySelector("#name-input").value;
         document.querySelector("#status").innerHTML = "";
         let b = JSON.stringify({pin: pin, name: name});
-        fetch("/api/pin", {
+        fetch("./api/pin", {
           credentials: 'include',
           method: "POST",
           body: b
@@ -355,7 +355,7 @@
       requestOTP() {
         if (this.editingHost) return;
 
-        fetch(`/api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`, {
+        fetch(`./api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`, {
           credentials: 'include'
         })
         .then(resp => resp.json())
@@ -434,7 +434,7 @@
           name: client.editName,
           perm: client.editPerm & permissionMapping._all
         }
-        fetch("/api/clients/update", {
+        fetch("./api/clients/update", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify(editedClient)
@@ -470,7 +470,7 @@
         client.editPerm ^= permissionMapping[permission];
       },
       disconnectClient(uuid) {
-        fetch("/api/clients/disconnect", {
+        fetch("./api/clients/disconnect", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify({ uuid })
@@ -482,7 +482,7 @@
       },
       unpairAll() {
         this.unpairAllPressed = true;
-        fetch("/api/clients/unpair-all", {
+        fetch("./api/clients/unpair-all", {
           credentials: 'include',
           method: "POST"
         })
@@ -497,7 +497,7 @@
           });
       },
       unpairSingle(uuid) {
-        fetch("/api/clients/unpair", {
+        fetch("./api/clients/unpair", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify({ uuid })
@@ -510,7 +510,7 @@
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
         }
-        fetch("/api/clients/list", { credentials: 'include' })
+        fetch("./api/clients/list", { credentials: 'include' })
           .then((response) => response.json())
           .then((response) => {
             const clientList = document.querySelector("#client-list");

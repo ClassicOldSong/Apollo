@@ -154,7 +154,7 @@
       },
       methods: {
         refreshLogs() {
-          fetch("/api/logs", { credentials: 'include' })
+          fetch("./api/logs", { credentials: 'include' })
             .then((r) => r.text())
             .then((r) => {
               this.logs = r;
@@ -162,7 +162,7 @@
         },
         closeApp() {
           this.closeAppPressed = true;
-          fetch("/api/apps/close", {
+          fetch("./api/apps/close", {
             credentials: 'include',
             method: "POST"
           })
@@ -183,7 +183,7 @@
           setTimeout(() => {
             this.serverRestarting = false;
           }, 5000);
-          fetch("/api/restart", {
+          fetch("./api/restart", {
             credentials: 'include',
             method: "POST",
           })
@@ -207,7 +207,7 @@
         quit() {
           if (window.confirm(this.i18n.t('troubleshooting.quit_apollo_confirm'))) {
             this.serverQuitting = true;
-            fetch("/api/quit", {
+            fetch("./api/quit", {
               credentials: 'include',
               method: "POST",
             })

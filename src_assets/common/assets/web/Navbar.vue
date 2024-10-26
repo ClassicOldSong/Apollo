@@ -1,8 +1,8 @@
 <template>
   <nav class="navbar navbar-light navbar-expand-lg navbar-background header">
     <div class="container">
-      <a class="navbar-brand" href="/" title="Apollo">
-        <img src="/images/logo-apollo-45.png" height="45" alt="Apollo">
+      <a class="navbar-brand" href="./" title="Apollo">
+        <img src="./images/logo-apollo-45.png" height="45" alt="Apollo">
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
               aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
@@ -11,22 +11,22 @@
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
-            <a class="nav-link" href="/"><i class="fas fa-fw fa-home"></i> {{ $t('navbar.home') }}</a>
+            <a class="nav-link" href="./"><i class="fas fa-fw fa-home"></i> {{ $t('navbar.home') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/pin"><i class="fas fa-fw fa-unlock"></i> {{ $t('navbar.pin') }}</a>
+            <a class="nav-link" href="./pin"><i class="fas fa-fw fa-unlock"></i> {{ $t('navbar.pin') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/apps"><i class="fas fa-fw fa-stream"></i> {{ $t('navbar.applications') }}</a>
+            <a class="nav-link" href="./apps"><i class="fas fa-fw fa-stream"></i> {{ $t('navbar.applications') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/config"><i class="fas fa-fw fa-cog"></i> {{ $t('navbar.configuration') }}</a>
+            <a class="nav-link" href="./config"><i class="fas fa-fw fa-cog"></i> {{ $t('navbar.configuration') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/password"><i class="fas fa-fw fa-user-shield"></i> {{ $t('navbar.password') }}</a>
+            <a class="nav-link" href="./password"><i class="fas fa-fw fa-user-shield"></i> {{ $t('navbar.password') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/troubleshooting"><i class="fas fa-fw fa-info"></i> {{ $t('navbar.troubleshoot') }}</a>
+            <a class="nav-link" href="./troubleshooting"><i class="fas fa-fw fa-info"></i> {{ $t('navbar.troubleshoot') }}</a>
           </li>
           <li class="nav-item">
             <ThemeToggle/>

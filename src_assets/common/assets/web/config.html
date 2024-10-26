@@ -291,7 +291,7 @@
        }
     },
     created() {
-      fetch("/api/config", {
+      fetch("./api/config", {
         credentials: 'include'
       })
         .then((r) => r.json())
@@ -393,7 +393,7 @@
           });
         });
 
-        return fetch("/api/config", {
+        return fetch("./api/config", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify(config),
@@ -417,7 +417,7 @@
             setTimeout(() => {
               this.saved = this.restarted = false;
             }, 5000);
-            fetch("/api/restart", {
+            fetch("./api/restart", {
               method: "POST"
             })
             .then((resp) => {
