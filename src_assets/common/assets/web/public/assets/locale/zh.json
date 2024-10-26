@@ -260,6 +260,8 @@
     "notify_pre_releases_desc": "是否接收 Apollo 新预发布版本的通知",
     "nvenc_h264_cavlc": "在 H.264 中，偏向 CAVLC 而不是 CABAC",
     "nvenc_h264_cavlc_desc": "一种更简单的熵编码形式。相同质量的情况下，CAVLC 需要增加 10% 的比特率。只适用于非常老旧的解码设备。",
+    "nvenc_intra_refresh": "帧内刷新",
+    "nvenc_intra_refresh_desc": "启用帧内刷新以使部分客户端可以持续正常渲染 (e.g. Xbox Client)",
     "nvenc_latency_over_power": "倾向于较低的编码延迟而不是省电",
     "nvenc_latency_over_power_desc": "Apollo 在串流时请求最高的 GPU 核心频率，以降低编码延迟。 不建议禁用它，因为这会大大增加编码延迟。",
     "nvenc_opengl_vulkan_on_dxgi": "在 DXGI 基础上呈现 OpenGL/Vulkan",

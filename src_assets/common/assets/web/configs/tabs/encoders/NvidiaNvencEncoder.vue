@@ -114,6 +114,16 @@ const config = ref(props.config)
               </select>
               <div class="form-text">{{ $t('config.nvenc_h264_cavlc_desc') }}</div>
             </div>
+
+            <!-- NVENC Intra Refresh -->
+            <div>
+              <label for="nvenc_h264_cavlc" class="form-label">{{ $t('config.nvenc_intra_refresh') }}</label>
+              <select id="nvenc_h264_cavlc" class="form-select" v-model="config.nvenc_intra_refresh">
+                <option value="disabled">{{ $t('_common.disabled_def') }}</option>
+                <option value="enabled">{{ $t('_common.enabled') }}</option>
+              </select>
+              <div class="form-text">{{ $t('config.nvenc_intra_refresh_desc') }}</div>
+            </div>
           </div>
         </div>
       </div>

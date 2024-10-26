@@ -262,6 +262,8 @@
     "notify_pre_releases_desc": "Whether to be notified of new pre-release versions of Apollo",
     "nvenc_h264_cavlc": "Prefer CAVLC over CABAC in H.264",
     "nvenc_h264_cavlc_desc": "Simpler form of entropy coding. CAVLC needs around 10% more bitrate for same quality. Only relevant for really old decoding devices.",
+    "nvenc_intra_refresh": "Intra Refresh",
+    "nvenc_intra_refresh_desc": "Enable Intra Refresh for some clients to render correctly continuously (e.g. Xbox Client)",
     "nvenc_latency_over_power": "Prefer lower encoding latency over power savings",
     "nvenc_latency_over_power_desc": "Apollo requests maximum GPU clock speed while streaming to reduce encoding latency. Disabling it is not recommended since this can lead to significantly increased encoding latency.",
     "nvenc_opengl_vulkan_on_dxgi": "Present OpenGL/Vulkan on top of DXGI",

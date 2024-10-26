@@ -48,6 +48,9 @@ namespace nvenc {
 
     // Add filler data to encoded frames to stay at target bitrate, mainly for testing
     bool insert_filler_data = false;
+
+    // Intra refresh for clients that doesn't request keyframe correctly
+    bool intra_refresh = false;
   };
 
 }  // namespace nvenc
