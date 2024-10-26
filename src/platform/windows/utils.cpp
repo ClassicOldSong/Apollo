@@ -19,7 +19,7 @@ std::wstring acpToUtf16(const std::string& origStr) {
 	return utf16Str;
 }
 
-std::string utf16toAcp(const std::wstring& utf16Str) {
+std::string utf16ToAcp(const std::wstring& utf16Str) {
 	auto acp = GetACP();
 
 	int codepageLen = WideCharToMultiByte(acp, 0, utf16Str.c_str(), utf16Str.size(), NULL, 0, NULL, NULL);
@@ -33,7 +33,7 @@ std::string utf16toAcp(const std::wstring& utf16Str) {
 	return codepageStr;
 }
 
-std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str) {
+std::string utf8ToAcp(const std::string& utf8Str) {
 	if (GetACP() == CP_UTF8) {
 		return std::string(utf8Str);
 	}
@@ -46,10 +46,10 @@ std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str) {
 	std::wstring utf16Str(utf16Len, L'\0');
 	MultiByteToWideChar(CP_UTF8, 0, utf8Str.c_str(), utf8Str.size(), &utf16Str[0], utf16Len);
 
-	return utf16toAcp(utf16Str);
+	return utf16ToAcp(utf16Str);
 }
 
-std::string convertCurrentCodepageToUtf8(const std::string& origStr) {
+std::string acpToUtf8(const std::string& origStr) {
 	if (GetACP() == CP_UTF8) {
 		return std::string(origStr);
 	}

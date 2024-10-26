@@ -226,7 +226,7 @@ namespace system_tray {
 
   #ifdef _WIN32
     std::string tmp_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
-    static const std::string title_str = convertUtf8ToCurrentCodepage(tmp_str);
+    static const std::string title_str = utf8ToAcp(tmp_str);
   #else
     static const std::string title_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
   #endif
@@ -268,8 +268,8 @@ namespace system_tray {
     snprintf(msg, std::size(msg), "%s launched.", app_name.c_str());
     snprintf(force_close_msg, std::size(force_close_msg), "Force close [%s]", app_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
-    strncpy(force_close_msg, convertUtf8ToCurrentCodepage(force_close_msg).c_str(), std::size(force_close_msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
+    strncpy(force_close_msg, utf8ToAcp(force_close_msg).c_str(), std::size(force_close_msg) - 1);
   #endif
     tray.notification_text = msg;
     tray.notification_icon = TRAY_ICON_PLAYING;
@@ -293,7 +293,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Streaming paused for %s", app_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON_PAUSING;
     tray.notification_title = "Stream Paused";
@@ -318,7 +318,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Streaming stopped for %s", app_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON;
     tray.notification_icon = TRAY_ICON;
@@ -344,7 +344,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Application %s exited too fast with code %d. Click here to terminate the stream.", app_name.c_str(), exit_code);
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.icon = TRAY_ICON;
     tray.notification_icon = TRAY_ICON;
@@ -395,7 +395,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "Device %s paired Succesfully. Please make sure you have access to the device.", device_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.notification_title = "Device Paired Succesfully";
     tray.notification_text = msg;
@@ -419,7 +419,7 @@ namespace system_tray {
     char msg[256];
     snprintf(msg, std::size(msg), "%s has connected to the session.", client_name.c_str());
   #ifdef _WIN32
-    strncpy(msg, convertUtf8ToCurrentCodepage(msg).c_str(), std::size(msg) - 1);
+    strncpy(msg, utf8ToAcp(msg).c_str(), std::size(msg) - 1);
   #endif
     tray.notification_title = "Client Connected";
     tray.notification_text = msg;

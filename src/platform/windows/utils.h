@@ -7,9 +7,9 @@
 #include <wtsapi32.h>
 
 std::wstring acpToUtf16(const std::string& origStr);
-std::string utf16toAcp(const std::wstring& utf16Str);
-std::string convertUtf8ToCurrentCodepage(const std::string& utf8Str);
-std::string convertCurrentCodepageToUtf8(const std::string& currentStr);
+std::string utf16ToAcp(const std::wstring& utf16Str);
+std::string utf8ToAcp(const std::string& utf8Str);
+std::string acpToUtf8(const std::string& currentStr);
 
 std::string get_error_string(LONG error_code);
 

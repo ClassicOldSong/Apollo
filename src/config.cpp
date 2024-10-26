@@ -984,7 +984,7 @@ namespace config {
 
     for (auto &[name, val] : vars) {
     #ifdef _WIN32
-      std::cout << "["sv << name << "] -- ["sv << convertUtf8ToCurrentCodepage(val) << ']' << std::endl;
+      std::cout << "["sv << name << "] -- ["sv << utf8ToAcp(val) << ']' << std::endl;
     #else
       std::cout << "["sv << name << "] -- ["sv << val << ']' << std::endl;
     #endif
