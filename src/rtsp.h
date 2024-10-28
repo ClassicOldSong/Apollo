@@ -63,6 +63,10 @@ namespace rtsp_stream {
   void
   launch_session_clear(uint32_t launch_session_id);
 
+  /**
+   * @brief Get the number of active sessions.
+   * @return Count of active sessions.
+   */
   int
   session_count();
 
@@ -71,6 +75,12 @@ namespace rtsp_stream {
 
   std::list<std::string>
   get_all_session_uuids();
+
+  /**
+   * @brief Terminates all running streaming sessions.
+   */
+  void
+  terminate_sessions();
 
   void
   rtpThread();
