@@ -514,6 +514,7 @@ namespace video {
         { "forced-idr"s, 1 },
         { "zerolatency"s, 1 },
         { "surfaces"s, 1 },
+        { "filler_data"s, false },
         { "preset"s, &config::video.nv_legacy.preset },
         { "tune"s, NV_ENC_TUNING_INFO_ULTRA_LOW_LATENCY },
         { "rc"s, NV_ENC_PARAMS_RC_CBR },
