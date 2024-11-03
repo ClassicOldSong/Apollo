@@ -44,46 +44,48 @@
 </body>
 
 <script type="module">
-  import { createApp } from "vue"
+  import { createApp, ref } from "vue"
   import { initApp } from './init'
 
   let app = createApp({
     setup() {
+      const error = ref('');
+      const success = ref(false);
+      const loading = ref(false);
+      const savePassword = ref(false);
+
+      const data = {
+        error,
+        success,
+        loading,
+        savePassword,
+        passwordData: {
+          username: '',
+          password: ''
+        }
+      }
+
       const savedPasswordStr = localStorage.getItem('login')
       if (savedPasswordStr) {
         try {
           const { username, password } = JSON.parse(savedPasswordStr);
-          return  {
-            error: null,
-            success: false,
-            loading: false,
-            savePassword: true,
-            passwordData: {
-              username,
-              password
-            }
+          savePassword.value = true;
+          data.passwordData = {
+            username,
+            password
           }
         } catch (e) {
           console.error('Reading saved password failed!', e);
         }
       }
 
-      return {
-        error: null,
-        success: false,
-        loading: false,
-        savePassword: false,
-        passwordData: {
-          username: "",
-          password: ""
-        },
-      }
+      return data
     },
     methods: {
       save() {
         this.error = null;
         this.loading = true;
-        fetch("/api/login", {
+        fetch("./api/login", {
           method: "POST",
           body: JSON.stringify(this.passwordData),
         }).then((res) => {
