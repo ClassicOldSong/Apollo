@@ -353,6 +353,8 @@
     "touchpad_as_ds4_desc": "如果禁用，则在选择游戏手柄类型时不会考虑触摸板的存在。",
     "upnp": "UPnP",
     "upnp_desc": "为公网串流自动配置端口转发",
+    "vaapi_strict_rc_buffer": "在AMD GPU上严格强制执行H.264/HEVC帧比特率限制",
+    "vaapi_strict_rc_buffer_desc": "启用此选项可以在场景更改时避免在网络上放置帧，但在移动时可能会降低视频质量。",
     "virtual_sink": "虚拟音频输出设备",
     "virtual_sink_desc": "当客户端禁止PC播放音频时使用的音频输出设备。\n如未指定，则将自动选择。\n我们强烈建议将此字段留空，以便使用自动设备选择！",
     "virtual_sink_placeholder": "Steam Streaming Speakers",

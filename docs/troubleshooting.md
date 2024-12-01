@@ -165,14 +165,6 @@ high as long as the encoder is used.
 ### Gamescope compatibility
 Some users have reported stuttering issues when streaming games running within Gamescope.
 
-### Occasional flickering in KDE
-
-The `blur` plugin causes flickering during streaming for some people. Disable it from the
-KDE System Settings or from the commandline:
-```bash
-qdbus org.kde.KWin /Effects unloadEffect blur
-```
-
 ## macOS
 
 ### Dynamic session lookup failed
@@ -200,9 +192,9 @@ permissions on the disk.
 
 <div class="section_buttons">
 
-| Previous                                    |                    Next |
-|:--------------------------------------------|------------------------:|
-| [Performance Tuning](performance_tuning.md) | [Building](building.md) |
+| Previous      |                    Next |
+|:--------------|------------------------:|
+| [API](api.md) | [Building](building.md) |
 
 </div>
 

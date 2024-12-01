@@ -418,7 +418,7 @@ namespace platf {
      * @note Implementations may set or modify codec options prior to codec initialization.
      */
     virtual void
-    init_codec_options(AVCodecContext *ctx, AVDictionary *options) {};
+    init_codec_options(AVCodecContext *ctx, AVDictionary **options) {};
 
     /**
      * @brief Prepare to derive a context.
@@ -860,6 +860,13 @@ namespace platf {
 
   [[nodiscard]] std::unique_ptr<deinit_t>
   init();
+
+  /**
+   * @brief Returns the current computer name in UTF-8.
+   * @return Computer name or a placeholder upon failure.
+   */
+  std::string
+  get_host_name();
 
   /**
    * @brief Gets the supported gamepads for this platform backend.

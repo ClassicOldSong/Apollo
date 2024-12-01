@@ -23,6 +23,7 @@
 #include "src/platform/common.h"
 
 #include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/host_name.hpp>
 #include <boost/process/v1.hpp>
 
 using namespace std::literals;
@@ -41,6 +42,16 @@ namespace platf {
   extern "C" bool
   CGRequestScreenCaptureAccess(void) __attribute__((weak_import));
 #endif
+
+  namespace {
+    auto screen_capture_allowed = std::atomic<bool> { false };
+  }  // namespace
+
+  // Return whether screen capture is allowed for this process.
+  bool
+  is_screen_capture_allowed() {
+    return screen_capture_allowed;
+  }
 
   std::unique_ptr<deinit_t>
   init() {
@@ -68,6 +79,8 @@ namespace platf {
       return nullptr;
     }
 #pragma clang diagnostic pop
+    // Record that we determined that we have the screen capture permission.
+    screen_capture_allowed = true;
     return std::make_unique<deinit_t>();
   }
 
@@ -176,22 +189,24 @@ namespace platf {
 
   bp::child
   run_command(bool elevated, bool interactive, const std::string &cmd, boost::filesystem::path &working_dir, const bp::environment &env, FILE *file, std::error_code &ec, bp::group *group) {
+    // clang-format off
     if (!group) {
       if (!file) {
-        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_out > bp::null, bp::std_err > bp::null, ec);
+        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_in < bp::null, bp::std_out > bp::null, bp::std_err > bp::null, bp::limit_handles, ec);
       }
       else {
-        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_out > file, bp::std_err > file, ec);
+        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_in < bp::null, bp::std_out > file, bp::std_err > file, bp::limit_handles, ec);
       }
     }
     else {
       if (!file) {
-        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_out > bp::null, bp::std_err > bp::null, ec, *group);
+        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_in < bp::null, bp::std_out > bp::null, bp::std_err > bp::null, bp::limit_handles, ec, *group);
       }
       else {
-        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_out > file, bp::std_err > file, ec, *group);
+        return bp::child(cmd, env, bp::start_dir(working_dir), bp::std_in < bp::null, bp::std_out > file, bp::std_err > file, bp::limit_handles, ec, *group);
       }
     }
+    // clang-format on
   }
 
   /**
@@ -528,6 +543,17 @@ namespace platf {
     }
 
     return std::make_unique<qos_t>(sockfd, reset_options);
+  }
+
+  std::string
+  get_host_name() {
+    try {
+      return boost::asio::ip::host_name();
+    }
+    catch (boost::system::system_error &err) {
+      BOOST_LOG(error) << "Failed to get hostname: "sv << err.what();
+      return "Sunshine"s;
+    }
   }
 
   class macos_high_precision_timer: public high_precision_timer {

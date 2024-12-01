@@ -341,6 +341,11 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Get the list of available applications.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   getApps(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -354,6 +359,11 @@ namespace confighttp {
     response->write(content, headers);
   }
 
+  /**
+   * @brief Get the logs from the log file.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   getLogs(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -367,6 +377,37 @@ namespace confighttp {
     response->write(SimpleWeb::StatusCode::success_ok, content, headers);
   }
 
+  /**
+   * @brief Save an application. If the application already exists, it will be updated, otherwise it will be added.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "name": "<Application Name>",
+   *   "output": "<Log Output Path>",
+   *   "cmd": "<Command to run the application>",
+   *   "index": -1,
+   *   "exclude-global-prep-cmd": false,
+   *   "elevated": false,
+   *   "auto-detach": true,
+   *   "wait-all": true,
+   *   "exit-timeout": 5,
+   *   "prep-cmd": [
+   *     {
+   *       "do": "<Command to prepare>",
+   *       "undo": "<Command to undo preparation>",
+   *       "elevated": false
+   *     }
+   *   ],
+   *   "detached": [
+   *     "<Detached commands>"
+   *   ],
+   *   "image-path": "<Full path to the application image. Must be a png file.>",
+   *   "uuid": "C3445C24-871A-FD23-0708-615C121B5B78"
+   * }
+   * @endcode
+   */
   void
   saveApp(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -408,6 +449,11 @@ namespace confighttp {
     proc::refresh(config::stream.file_apps);
   }
 
+  /**
+   * @brief Delete an application.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   deleteApp(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -462,6 +508,18 @@ namespace confighttp {
     proc::refresh(config::stream.file_apps);
   }
 
+  /**
+   * @brief Upload a cover image.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "key": "igdb_<game_id>",
+   *   "url": "https://images.igdb.com/igdb/image/upload/t_cover_big_2x/<slug>.png",
+   * }
+   * @endcode
+   */
   void
   uploadCover(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -522,6 +580,11 @@ namespace confighttp {
     outputTree.put("path", path);
   }
 
+  /**
+   * @brief Get the configuration settings.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   getConfig(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -550,6 +613,11 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Get the locale setting. This endpoint does not require authentication.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   getLocale(resp_https_t response, req_https_t request) {
     // we need to return the locale whether authenticated or not
@@ -568,6 +636,19 @@ namespace confighttp {
     outputTree.put("locale", config::sunshine.locale);
   }
 
+  /**
+   * @brief Save the configuration settings.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "key": "value"
+   * }
+   * @endcode
+   *
+   * @attention{It is recommended to ONLY save the config settings that differ from the default behavior.}
+   */
   void
   saveConfig(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -604,6 +685,11 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Restart Sunshine.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   restart(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -643,6 +729,21 @@ namespace confighttp {
     write_resp.detach();
   }
 
+  /**
+   * @brief Update existing credentials.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "currentUsername": "Current Username",
+   *   "currentPassword": "Current Password",
+   *   "newUsername": "New Username",
+   *   "newPassword": "New Password",
+   *   "confirmNewPassword": "Confirm New Password"
+   * }
+   * @endcode
+   */
   void
   savePassword(resp_https_t response, req_https_t request) {
     if (!config::sunshine.username.empty() && !authenticate(response, request)) return;
@@ -748,6 +849,18 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Send a pin code to the host. The pin is generated from the Moonlight client during the pairing process.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *   "pin": "<pin>",
+   *   "name": "Friendly Client Name"
+   * }
+   * @endcode
+   */
   void
   savePin(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -828,24 +941,6 @@ namespace confighttp {
   }
 
   void
-  unpairAll(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) return;
-
-    print_req(request);
-
-    pt::ptree outputTree;
-
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-    nvhttp::erase_all_clients();
-    proc::proc.terminate();
-    outputTree.put("status", true);
-  }
-
-  void
   updateClient(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
 
@@ -877,6 +972,40 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Unpair all clients.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
+  void
+  unpairAll(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    pt::ptree outputTree;
+
+    auto g = util::fail_guard([&]() {
+      std::ostringstream data;
+      pt::write_json(data, outputTree);
+      response->write(data.str());
+    });
+    nvhttp::erase_all_clients();
+    proc::proc.terminate();
+    outputTree.put("status", true);
+  }
+
+  /**
+   * @brief Unpair a client.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * The body for the post request should be JSON serialized in the following format:
+   * @code{.json}
+   * {
+   *  "uuid": "<uuid>"
+   * }
+   * @endcode
+   */
   void
   unpair(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -998,6 +1127,11 @@ namespace confighttp {
     }
   }
 
+  /**
+   * @brief Get the list of paired clients.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   listClients(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -1020,6 +1154,11 @@ namespace confighttp {
     outputTree.put("status", true);
   }
 
+  /**
+   * @brief Close the currently running application.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
   void
   closeApp(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
