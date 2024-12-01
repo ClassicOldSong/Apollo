@@ -83,6 +83,8 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
     This will clear your monitor configuration cache.
 
     Then you're good to go!
+- **I would like to capture sound from only one app.**
+  - Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
 
 ## System Requirements
 
@@ -98,7 +100,7 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
 | CPU           | AMD: Ryzen 3 or higher |
 |               | Intel: Core i3 or higher |
 | RAM           | 4GB or more |
-| OS            | Windows: 10+ (Windows Server does not support virtual gamepads) |
+| OS            | Windows: 10+ (Windows Server requires [manual installation](https://github.com/nefarius/ViGEmBus/issues/153) for gamepad support) |
 |               | macOS: 12+ |
 |               | Linux/Debian: 11 (bullseye) |
 |               | Linux/Fedora: 39+ |
