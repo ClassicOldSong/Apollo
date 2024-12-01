@@ -420,6 +420,7 @@
     "device_name": "设备名称",
     "pair_failure": "配对失败：请检查 PIN 码是否正确输入",
     "pair_success": "成功！请检查 Moonlight 以继续",
+    "pair_success_check_perm": "配对成功！请在下方手动授予客户端必要的权限。",
     "pin_pairing": "PIN 码配对",
     "send": "发送",
     "warning_msg": "请确保您可以掌控您正在配对的客户端。该软件可以完全控制您的计算机，请务必小心！",

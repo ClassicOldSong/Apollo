@@ -345,6 +345,8 @@
               document.querySelector("#name-input").value = "";
 
               setTimeout(() => this.refreshClients(), 1000);
+
+              alert(this.i18n.t('pin.pair_success_check_perm'));
             } else {
               document.querySelector(
                 "#status"
