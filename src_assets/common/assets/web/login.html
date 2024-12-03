@@ -15,7 +15,7 @@
             {{ $t('welcome.greeting') }}
           </h1>
         </header>
-        <form @submit.prevent="save" class="mt-4">
+        <form @submit.prevent="login" class="mt-4">
           <div class="mb-2">
             <label for="usernameInput" class="form-label">{{ $t('_common.username') }}</label>
             <input type="text" class="form-control" id="usernameInput" autocomplete="username"
@@ -82,9 +82,12 @@
       return data
     },
     methods: {
-      save() {
+      login() {
         this.error = null;
         this.loading = true;
+        if (!this.savePassword) {
+          localStorage.removeItem('login')
+        }
         fetch("./api/login", {
           method: "POST",
           body: JSON.stringify(this.passwordData),
@@ -92,7 +95,9 @@
           this.loading = false;
           if (res.status === 200) {
             this.success = true;
-            localStorage.setItem('login', JSON.stringify(this.passwordData));
+            if (this.savePassword) {
+              localStorage.setItem('login', JSON.stringify(this.passwordData));
+            }
             const url = new URL(window.location);
             const redirectUrl = url.searchParams.get('redir');
             const hash = url.hash;
