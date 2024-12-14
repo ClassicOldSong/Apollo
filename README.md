@@ -12,11 +12,11 @@ Major features:
 
 Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestream.readthedocs.io/) for now.
 
-Currently Virtual Display support is Windows only, Linux support is planned and will implement in the future.
+Currently Virtual Display support is Windows only, Linux support is planned and will be implemented in the future.
 
 ## About Permission System
 
-Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
+Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
 
 > [!NOTE]
 > The **FIRST** client paired with Apollo will be granted with FULL permissions, then other newly paired clients will only be granted with `View Streams` and `List Apps` permission. If you encounter `Permission Denied` error when trying to launch any app, go check the permission for that device and grant `Launch Apps` permission. The same applies to the situation when you find that you can't move mouse or type with keyboard on newly paired clients, grant the corresponding client `Mouse Input` and `Keyboard Input` permissions.
@@ -29,7 +29,7 @@ Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
 > [!NOTE]
 > **TL;DR** Just treat your Artemis/Moonlight client like a dedicated PnP monitor with Apollo.
 
-Apollo uses SudoVDA for virtual display. It featurs auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you couldn't notice a new virtual display being added or removed when the stream starts/quits, then there might be a misconfiguration of the driver or you're still have other presisting virtual display connected.**
+Apollo uses SudoVDA for virtual display. It features auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you do not see a new virtual display added or removed when the stream starts or stops, there may be a driver misconfiguration, or another persistent virtual display might still be active.**
 
 The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
 
@@ -46,11 +46,11 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 >
 > Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
 >
-> If you have had good experience with HDR privously, you can safly ignore this section.
+> If you have had good experience with HDR previously, you can safely ignore this section.
 
-Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatibe standards, and massive variance between device configurations and capabilities. Game supports for HDR are still choppy.
+Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatible standards, and massive variance between device configurations and capabilities. Game support for HDR is still choppy.
 
-SDR actually provides much more stable color accuracy, and are wiedly supported throught most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
+SDR actually provides much more stable color accuracy, and are widely supported throughout most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
 
 ## How to run multiple instances of Apollo for multiple virtual displays
 
@@ -70,7 +70,7 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
   - Check out [To play HDR content when running on battery](https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6)
   - [Archive](https://web.archive.org/web/20240828044038/https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6) to the above link in case M$ remove it unexpectedly someday
 - **Resolution can't match client side anymore**
-  - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotatition if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
+  - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotation if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
   - If you happen messed up with your monitor config:
     1. Disconnect ALL Artemis/Moonlight sessions
     2. Quit Apollo
@@ -84,7 +84,7 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
 
     Then you're good to go!
 - **I would like to capture sound from only one app.**
-  - Checkout [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
+  - Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
 
 ## System Requirements
 
@@ -166,7 +166,7 @@ This is what I got for finding a bug, opened an issue, getting no response, trou
 
 Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android) will no longer be compatible with OG Sunshine and OG Moonlight eventually, but they'll work even better with much more carefully designed features.
 
-The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ablilty but I got kicked out just for helping others.
+The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ability but I got kicked out just for helping others.
 
 **PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
 
