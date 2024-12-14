@@ -152,7 +152,7 @@ const validateFallbackMode = (event) => {
     <div class="alert" :class="[vdisplay === '0' ? 'alert-success' : 'alert-warning']" v-if="platform === 'windows'">
       <i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}
     </div>
-    <div class="form-text" v-if="vdisplay !== '0'">Please ensure SudoVDA driver is installed to the latest version and enabled properly.</div>
+    <div class="form-text" v-if="platform === 'windows' && vdisplay !== '0'">Please ensure SudoVDA driver is installed to the latest version and enabled properly.</div>
 
   </div>
 </template>
