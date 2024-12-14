@@ -22,6 +22,10 @@
 	path = third-party/inputtino
 	url = https://github.com/games-on-whales/inputtino.git
 	branch = stable
+[submodule "third-party/libdisplaydevice"]
+	path = third-party/libdisplaydevice
+	url = https://github.com/LizardByte/libdisplaydevice.git
+	branch = master
 [submodule "third-party/nanors"]
 	path = third-party/nanors
 	url = https://github.com/sleepybishop/nanors.git
