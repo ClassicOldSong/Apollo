@@ -970,7 +970,11 @@ namespace video {
   int active_hevc_mode;
   int active_av1_mode;
   bool last_encoder_probe_supported_ref_frames_invalidation = false;
-  std::array<bool, 3> last_encoder_probe_supported_yuv444_for_codec = {};
+  std::array<bool, 3> last_encoder_probe_supported_yuv444_for_codec = {
+    true,
+    true,
+    true
+  };
 
   void
   reset_display(std::shared_ptr<platf::display_t> &disp, const platf::mem_type_e &type, const std::string &display_name, const config_t &config) {

@@ -22,6 +22,7 @@
 #include "logging.h"
 #include "nvhttp.h"
 #include "rtsp.h"
+#include "video.h"
 #include "utility.h"
 
 #include "platform/common.h"
@@ -1231,6 +1232,9 @@ namespace config {
         std::cout << "Warning: Unrecognized configurable option ["sv << var << ']' << std::endl;
       }
     }
+
+    ::video::active_hevc_mode = video.hevc_mode;
+    ::video::active_av1_mode = video.av1_mode;
   }
 
   int
