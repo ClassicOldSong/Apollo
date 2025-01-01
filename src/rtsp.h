@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <memory>
+#include <list>
 
 #include "crypto.h"
 #include "thread_safe.h"
