@@ -23,6 +23,7 @@
 
 #include "config.h"
 #include "crypto.h"
+#include "display_device.h"
 #include "logging.h"
 #include "platform/common.h"
 #include "httpcommon.h"
@@ -559,15 +560,17 @@ namespace proc {
     }
 #endif
 
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
     bool has_run = _app_id > 0;
 
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
-    }
 #endif
+
+      display_device::revert_configuration();
+    }
 
     _app_id = -1;
     display_name.clear();

@@ -37,7 +37,6 @@
       <general
         v-if="currentTab === 'general'"
         :config="config"
-        :global-prep-cmd="global_prep_cmd"
         :server-cmd="server_cmd"
         :platform="platform">
       </general>
@@ -136,7 +135,6 @@
         config: null,
         currentTab: "general",
         vdisplayStatus: "1",
-        global_prep_cmd: [],
         server_cmd: [],
         tabs: [ // TODO: Move the options to each Component instead, encapsulate.
           {
@@ -186,6 +184,15 @@
               "headless_mode": "disabled",
               "fallback_mode": "",
               "set_vdisplay_primary": "enabled",
+              "dd_configuration_option": "verify_only",
+              "dd_resolution_option": "auto",
+              "dd_manual_resolution": "",
+              "dd_refresh_rate_option": "auto",
+              "dd_manual_refresh_rate": "",
+              "dd_hdr_option": "auto",
+              "dd_config_revert_delay": 3000,
+              "dd_mode_remapping": {"mixed": [], "resolution_only": [], "refresh_rate_only": []},
+              "dd_wa_hdr_toggle": "disabled",
               "min_fps_factor": 1,
             },
           },
@@ -335,11 +342,20 @@
 
           // TODO: let each tab's Component handle it's own data instead of doing it here
 
+          // Parse the special options before population if available
+          const specialOptions = ["dd_mode_remapping", "global_prep_cmd"]
+          for (const optionKey of specialOptions) {
+            if (this.config.hasOwnProperty(optionKey)) {
+              this.config[optionKey] = JSON.parse(this.config[optionKey]);
+            }
+          }
+
           // Populate default values from tabs options
           this.tabs.forEach(tab => {
             Object.keys(tab.options).forEach(optionKey => {
               if (this.config[optionKey] === undefined) {
-                this.config[optionKey] = tab.options[optionKey];
+                // Make sure to copy by value
+                this.config[optionKey] = JSON.parse(JSON.stringify(tab.options[optionKey]));
               }
             });
           });
@@ -364,25 +380,26 @@
         } else {
           fallbackDisplayModeCache = this.config.fallback_mode;
         }
+        let config = JSON.parse(JSON.stringify(this.config));
+        config.global_prep_cmd = JSON.stringify(config.global_prep_cmd);
+        config.dd_mode_remapping = JSON.stringify(config.dd_mode_remapping);
+        return config;
       },
       save() {
         this.saved = false;
         this.restarted = false;
-        this.serialize();
 
         // create a temp copy of this.config to use for the post request
-        let config = JSON.parse(JSON.stringify(this.config))
+        let config = this.serialize();
 
         // delete default values from this.config
         this.tabs.forEach(tab => {
           Object.keys(tab.options).forEach(optionKey => {
             let delete_value = false
 
-            if (["global_prep_cmd"].includes(optionKey)) {
-              let config_value, default_value
-
-              config_value = JSON.parse(config[optionKey])
-              default_value = JSON.parse(tab.options[optionKey])
+            if (["global_prep_cmd", "dd_mode_remapping"].includes(optionKey)) {
+              const config_value = config[optionKey]
+              const default_value = JSON.stringify(tab.options[optionKey])
 
               if (config_value === default_value) {
                 delete_value = true

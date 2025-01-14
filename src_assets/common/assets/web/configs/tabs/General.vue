@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import Checkbox from '../../Checkbox.vue'
 
 const props = defineProps({
   platform: String,
@@ -49,6 +50,7 @@ onMounted(() => {
     <div class="mb-3">
       <label for="locale" class="form-label">{{ $t('config.locale') }}</label>
       <select id="locale" class="form-select" v-model="config.locale">
+        <option value="bg">Български (Bulgarian)</option>
         <option value="de">Deutsch (German)</option>
         <option value="en">English</option>
         <option value="en_GB">English, UK</option>
@@ -57,10 +59,14 @@ onMounted(() => {
         <option value="fr">Français (French)</option>
         <option value="it">Italiano (Italian)</option>
         <option value="ja">日本語 (Japanese)</option>
+        <option value="ko">한국어 (Korean)</option>
+        <option value="pl">Polski (Polish)</option>
         <option value="pt">Português (Portuguese)</option>
+        <option value="pt_BR">Português, Brasileiro (Portuguese, Brazilian)</option>
         <option value="ru">Русский (Russian)</option>
         <option value="sv">svenska (Swedish)</option>
         <option value="tr">Türkçe (Turkish)</option>
+        <option value="uk">Українська (Ukranian)</option>
         <option value="zh">简体中文 (Chinese Simplified)</option>
       </select>
       <div class="form-text">{{ $t('config.locale_desc') }}</div>
@@ -93,7 +99,7 @@ onMounted(() => {
     <div id="global_prep_cmd" class="mb-3 d-flex flex-column">
       <label class="form-label">{{ $t('config.global_prep_cmd') }}</label>
       <div class="form-text">{{ $t('config.global_prep_cmd_desc') }}</div>
-      <table class="table" v-if="globalPrepCmd.length > 0">
+      <table class="table" v-if="config.global_prep_cmd.length > 0">
         <thead>
         <tr>
           <th scope="col"><i class="fas fa-play"></i> {{ $t('_common.do_cmd') }}</th>
@@ -105,19 +111,19 @@ onMounted(() => {
         </tr>
         </thead>
         <tbody>
-        <tr v-for="(c, i) in globalPrepCmd">
+        <tr v-for="(c, i) in config.global_prep_cmd">
           <td>
             <input type="text" class="form-control monospace" v-model="c.do" />
           </td>
           <td>
             <input type="text" class="form-control monospace" v-model="c.undo" />
           </td>
-          <td v-if="platform === 'windows'">
-            <div class="form-check">
-              <input type="checkbox" class="form-check-input" :id="'prep-cmd-admin-' + i" v-model="c.elevated"
-                     true-value="true" false-value="false" />
-              <label :for="'prep-cmd-admin-' + i" class="form-check-label">{{ $t('_common.elevated') }}</label>
-            </div>
+          <td v-if="platform === 'windows'" class="align-middle">
+            <Checkbox :id="'prep-cmd-admin-' + i"
+                      label="_common.elevated"
+                      desc=""
+                      v-model="c.elevated"
+            ></Checkbox>
           </td>
           <td>
             <button class="btn btn-danger me-2" @click="removeCmd(globalPrepCmd, i)">
@@ -199,11 +205,12 @@ onMounted(() => {
     </div>
 
     <!-- Notify Pre-Releases -->
-    <div class="mb-3 form-check">
-      <input type="checkbox" class="form-check-input" id="notify_pre_releases" v-model="config.notify_pre_releases" true-value="enabled" false-value="disabled"/>
-      <label for="notify_pre_releases" class="form-check-label">{{ $t('config.notify_pre_releases') }}</label>
-      <div class="form-text">{{ $t('config.notify_pre_releases_desc') }}</div>
-    </div>
+    <Checkbox class="mb-3"
+              id="notify_pre_releases"
+              locale-prefix="config"
+              v-model="config.notify_pre_releases"
+              default="false"
+    ></Checkbox>
   </div>
 </template>
 

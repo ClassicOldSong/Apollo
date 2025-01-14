@@ -11,7 +11,6 @@ install(TARGETS dxgi-info RUNTIME DESTINATION "tools" COMPONENT dxgi)
 install(TARGETS audio-info RUNTIME DESTINATION "tools" COMPONENT audio)
 
 # Mandatory tools
-install(TARGETS ddprobe RUNTIME DESTINATION "tools" COMPONENT application)
 install(TARGETS sunshinesvc RUNTIME DESTINATION "tools" COMPONENT application)
 
 # Drivers
@@ -68,7 +67,7 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "${CPACK_PACKAGE_NAME}")
 SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
         IfSilent +2 0
-        # ExecShell 'open' 'https://sunshinestream.readthedocs.io/'
+        # ExecShell 'open' 'https://docs.lizardbyte.dev/projects/sunshine'
         nsExec::ExecToLog 'icacls \\\"$INSTDIR\\\" /reset'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\install.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\migrate-config.bat\\\"'
@@ -126,7 +125,7 @@ set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL "ON")
 # set(CPACK_NSIS_CONTACT "${CMAKE_PROJECT_HOMEPAGE_URL}/support")
 
 # set(CPACK_NSIS_MENU_LINKS
-#         "https://sunshinestream.readthedocs.io" "Sunshine documentation"
+#         "https://docs.lizardbyte.dev/projects/sunshine" "Sunshine documentation"
 #         "https://app.lizardbyte.dev" "LizardByte Web Site"
 #         "https://app.lizardbyte.dev/support" "LizardByte Support")
 set(CPACK_NSIS_MANIFEST_DPI_AWARE true)

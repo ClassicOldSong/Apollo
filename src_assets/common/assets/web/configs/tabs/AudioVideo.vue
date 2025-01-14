@@ -6,6 +6,7 @@ import AdapterNameSelector from './audiovideo/AdapterNameSelector.vue'
 import DisplayOutputSelector from './audiovideo/DisplayOutputSelector.vue'
 import DisplayDeviceOptions from "./audiovideo/DisplayDeviceOptions.vue";
 import DisplayModesSettings from "./audiovideo/DisplayModesSettings.vue";
+import Checkbox from "../../Checkbox.vue";
 
 const $t = inject('i18n').t;
 
@@ -76,11 +77,12 @@ const validateFallbackMode = (event) => {
           <div class="form-text pre-wrap">{{ $t('config.virtual_sink_desc') }}</div>
         </div>
         <!-- Install Steam Audio Drivers -->
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="install_steam_audio_drivers" v-model="config.install_steam_audio_drivers" true-value="enabled" false-value="disabled"/>
-          <label for="install_steam_audio_drivers" class="form-check-label">{{ $t('config.install_steam_audio_drivers') }}</label>
-          <div class="form-text pre-wrap">{{ $t('config.install_steam_audio_drivers_desc') }}</div>
-        </div>
+        <Checkbox class="mb-3"
+                  id="install_steam_audio_drivers"
+                  locale-prefix="config"
+                  v-model="config.install_steam_audio_drivers"
+                  default="true"
+        ></Checkbox>
 
         <div class="mb-3 form-check">
           <input type="checkbox" class="form-check-input" id="keep_sink_default" v-model="config.keep_sink_default" true-value="enabled" false-value="disabled"/>
@@ -107,11 +109,15 @@ const validateFallbackMode = (event) => {
       :config="config"
     />
 
+    <DisplayDeviceOptions
+      :platform="platform"
+      :config="config"
+    />
+
     <!-- Display Modes -->
     <DisplayModesSettings
         :platform="platform"
         :config="config"
-        :min_fps_factor="min_fps_factor"
     />
 
     <!-- Fallback Display Mode -->
