@@ -65,7 +65,7 @@ Enabling HDR is **generally not recommended** with **ANY streaming solutions** a
 
 SDR actually provides much more stable color accuracy, and are widely supported throughout most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
 
-<details>
+</details>
 
 ## How to run multiple instances of Apollo for multiple virtual displays
 
