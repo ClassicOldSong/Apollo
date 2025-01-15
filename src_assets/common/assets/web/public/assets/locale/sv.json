@@ -70,7 +70,7 @@
     "global_prep_desc": "Aktivera/Inaktivera exekvering av globala prep kommandon för denna applikation.",
     "global_prep_name": "Globala prep kommandon",
     "image": "Bild",
-    "image_desc": "Applikationens ikon/bild/sökväg som kommer att skickas till klienten. Bilden måste vara en PNG-fil. Om den inte är inställd, kommer Sunshine att skicka standardrutans bild.",
+    "image_desc": "Applikationens ikon/bild/sökväg som kommer att skickas till klienten. Bilden måste vara en PNG-fil. Om den inte är inställd, kommer Apollo att skicka standardrutans bild.",
     "loading": "Laddar...",
     "name": "Namn",
     "output_desc": "Filen där kommandots utdata lagras, om den inte är angiven, så ignoreras utdata",
@@ -79,7 +79,7 @@
     "wait_all": "Fortsätt strömma tills alla app-processer avslutas",
     "wait_all_desc": "Detta fortsätter strömningen tills alla processer som startats av appen har avslutats. När den avmarkeras kommer strömningen att sluta när den initiala app-processen avslutas, även om andra app-processer fortfarande är igång.",
     "working_dir": "Arbetskatalog",
-    "working_dir_desc": "Den arbetskatalog som ska skickas till processen. Till exempel använder vissa program arbetskatalogen för att söka efter konfigurationsfiler. Om inte anges, kommer Sunshine standard till den överordnade katalogen i kommandot"
+    "working_dir_desc": "Den arbetskatalog som ska skickas till processen. Till exempel använder vissa program arbetskatalogen för att söka efter konfigurationsfiler. Om inte anges, kommer Apollo standard till den överordnade katalogen i kommandot"
   },
   "config": {
     "adapter_name": "Adapter namn",
@@ -187,7 +187,7 @@
     "dd_resolution_option_manual": "Använd manuellt inmatad upplösning",
     "dd_resolution_option_manual_desc": "Ange upplösning som ska användas",
     "dd_resolution_option_ogs_desc": "Alternativet \"Optimera spelinställningar\" måste vara aktiverat på Moonlight klienten för att detta ska fungera.",
-    "dd_wa_hdr_toggle_desc": "När du använder en virtuell visningsenhet som för strömning kan den visa felaktig HDR-färg. Med det här alternativet aktiverat, kommer Sunshine att försöka mildra problemet.",
+    "dd_wa_hdr_toggle_desc": "När du använder en virtuell visningsenhet som för strömning kan den visa felaktig HDR-färg. Med det här alternativet aktiverat, kommer Apollo att försöka mildra problemet.",
     "dd_wa_hdr_toggle": "Aktivera högkontrastlösning för HDR",
     "ds4_back_as_touchpad_click": "Karta bakåt/välj att Touchpad Klicka",
     "ds4_back_as_touchpad_click_desc": "När DS4-emulering tvingas, kartlägg Tillbaka/välj att Touchpad Klicka",
@@ -231,7 +231,7 @@
     "key_repeat_frequency": "Nyckel Upprepa Frekvens",
     "key_repeat_frequency_desc": "Hur ofta nycklar upprepa varje sekund. Detta konfigurerbara alternativ stöder decimaler.",
     "key_rightalt_to_key_win": "Karta Höger Alt nyckel till Windows-tangenten",
-    "key_rightalt_to_key_win_desc": "Det kan vara möjligt att du inte kan skicka Windows-tangenten från Moonlight direkt. I dessa fall kan det vara användbart att göra Sunshine tror att rätt Alt nyckel är Windows-tangenten",
+    "key_rightalt_to_key_win_desc": "Det kan vara möjligt att du inte kan skicka Windows-tangenten från Moonlight direkt. I dessa fall kan det vara användbart att göra Apollo tror att rätt Alt nyckel är Windows-tangenten",
     "keyboard": "Aktivera tangentbordsinmatning",
     "keyboard_desc": "Tillåter gäster att styra värdsystemet med tangentbordet",
     "lan_encryption_mode": "LAN-krypteringsläge",
@@ -420,7 +420,7 @@
   },
   "troubleshooting": {
     "dd_reset": "Återställ ihållande visningsenhetsinställningar",
-    "dd_reset_desc": "Om Sunshine har fastnat försöker återställa de ändrade inställningarna för visningsenheten, kan du återställa inställningarna och fortsätta att återställa visningsläget manuellt.",
+    "dd_reset_desc": "Om Apollo har fastnat försöker återställa de ändrade inställningarna för visningsenheten, kan du återställa inställningarna och fortsätta att återställa visningsläget manuellt.",
     "dd_reset_error": "Fel vid återställning av uthållighet!",
     "dd_reset_success": "Lyckad återställning av uthållighet!",
     "force_close": "Tvinga stängning",
