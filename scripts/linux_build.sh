@@ -300,10 +300,14 @@ function run_install() {
     add_debain_deps
   elif [ "$distro" == "ubuntu" ]; then
     add_ubuntu_deps
-  elif [ "$distro" == "fedora" ]; then
+  elif [ "$distro" == "fedora" ] && [ "$version" == "41" ]; then
+    add_fedora_deps
+    ${sudo_cmd} dnf group install "development-tools" -y
+  elif [ "$distro" == "fedora" ] && [ "$version" <= "40" ]; then
     add_fedora_deps
     ${sudo_cmd} dnf group install "Development Tools" -y
   fi
+
 
   # Install the dependencies
   $package_install_command "${dependencies[@]}"
@@ -454,6 +458,15 @@ elif grep -q "PLATFORM_ID=\"platform:f40\"" /etc/os-release; then
   package_install_command="${sudo_cmd} dnf install -y"
   cuda_version=
   cuda_build=
+  gcc_version="13"
+  nvm_node=0
+elif grep -q "PLATFORM_ID=\"platform:f41\"" /etc/os-release; then
+  distro="fedora"
+  version="41"
+  package_update_command="${sudo_cmd} dnf update -y"
+  package_install_command="${sudo_cmd} dnf install -y"
+  cuda_version=
+  cuda_build=  
   gcc_version="13"
   nvm_node=0
 elif grep -q "Ubuntu 22.04" /etc/os-release; then
