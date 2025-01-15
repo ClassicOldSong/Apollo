@@ -77,14 +77,17 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
   - Ensure the SudoVDA driver is installed
 - **Shows the same screen as main screen**
   - If you're using an external display for the first time, Windows might configure it as "Mirror mode" by default. Press <kbd>Meta + P</kbd> (or known as <kbd>Win + P</kbd>) and select "Extended", then **exit the app** (not only the stream) and start the app again. You only need to do this once.
+- **Apps still launch on physical display.**
+  - Go to Audil/Video tab, in `Advanced display device options` section, set `Device configuration` to `Activate the display automatically and make it a primary display`. Also make sure the app has set preferred display to `None` or `Auto`.
 - **Primary display changed to the virtual display after connection. I don't want that.**
-  - Go to Apps and add one entry without any commands. Tick `Always use Virtual Display`, then untick `Set Virtual Display as Default`.
+  - Go to Audil/Video tab, in `Advanced display device option`s section, set `Devce configuration` to `Verify that display is enabled` or `Activate the display automatically`. Then go to Windows display settings and set your desired display to primary.
 - **I want to turn off the physical monitor when streaming**
   - The first time you stream with virtual display, go to Windows settings and disable the physical monitor. The next time you start streaming it will turn off automatically.
+  - Or, go to Audil/Video tab, in `Advanced display device option`s section, set `Devce configuration` to `Deactivate other displays and activate only the specified display`.
 - **HDR isn't enabled when using battery**
   - Check out [To play HDR content when running on battery](https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6)
   - [Archive](https://web.archive.org/web/20240828044038/https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6) to the above link in case M$ remove it unexpectedly someday
-- **Resolution can't match client side anymore**
+- **Resolution can't match client side request anymore**
   - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotation if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
   - If you happen messed up with your monitor config:
     1. Disconnect ALL Artemis/Moonlight sessions
