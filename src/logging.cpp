@@ -4,6 +4,7 @@
  */
 // standard includes
 #include <fstream>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 
@@ -106,15 +107,26 @@ namespace logging {
       deinit();
     }
 
+    // Check if the log file exists and handle backup
+    std::string backup_log_file = log_file + ".backup";
+    if (std::filesystem::exists(log_file)) {
+      // If the backup file exists, remove it
+      if (std::filesystem::exists(backup_log_file)) {
+        std::filesystem::remove(backup_log_file);
+      }
+      // Rename the current log file to the backup name
+      std::filesystem::rename(log_file, backup_log_file);
+    }
+
     setup_av_logging(min_log_level);
     setup_libdisplaydevice_logging(min_log_level);
 
     sink = boost::make_shared<text_sink>();
 
-#ifndef SUNSHINE_TESTS
+  #ifndef SUNSHINE_TESTS
     boost::shared_ptr<std::ostream> stream { &std::cout, boost::null_deleter() };
     sink->locked_backend()->add_stream(stream);
-#endif
+  #endif
     sink->locked_backend()->add_stream(boost::make_shared<std::ofstream>(log_file));
     sink->set_filter(severity >= min_log_level);
     sink->set_formatter(&formatter);
@@ -126,6 +138,7 @@ namespace logging {
     bl::core::get()->add_sink(sink);
     return std::make_unique<deinit_t>();
   }
+
 
   void
   setup_av_logging(int min_log_level) {
