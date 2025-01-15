@@ -125,21 +125,15 @@ const validateFallbackMode = (event) => {
     <!-- Fallback Display Mode -->
     <div class="mb-3">
       <label for="fallback_mode" class="form-label">{{ $t('config.fallback_mode') }}</label>
-      <input 
-        type="text" 
-        class="form-control" 
-        id="fallback_mode" 
-        v-model="config.fallback_mode" 
+      <input
+        type="text"
+        class="form-control"
+        id="fallback_mode"
+        v-model="config.fallback_mode"
         placeholder="1920x1080x60"
         @input="validateFallbackMode"
       />
       <div class="form-text">{{ $t('config.fallback_mode_desc') }}</div>
-    </div>
-
-    <div class="mb-3 form-check" v-if="platform === 'windows'">
-      <input type="checkbox" class="form-check-input" id="follow_client_hdr" v-model="config.follow_client_hdr" true-value="enabled" false-value="disabled"/>
-      <label for="follow_client_hdr" class="form-check-label">{{ $t('config.follow_client_hdr') }}</label>
-      <div class="form-text pre-wrap">{{ $t('config.follow_client_hdr_desc') }}</div>
     </div>
 
     <!-- Headless Mode -->
@@ -147,13 +141,6 @@ const validateFallbackMode = (event) => {
       <input type="checkbox" class="form-check-input" id="headless_mode" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
       <label for="headless_mode" class="form-check-label">{{ $t('config.headless_mode') }}</label>
       <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
-    </div>
-
-    <!-- Set VDisplay Primary -->
-    <div class="mb-3 form-check" v-if="platform === 'windows'">
-      <input type="checkbox" class="form-check-input" id="set_vdisplay_primary" v-model="config.set_vdisplay_primary" true-value="enabled" false-value="disabled"/>
-      <label for="set_vdisplay_primary" class="form-check-label">{{ $t('config.set_vdisplay_primary') }}</label>
-      <div class="form-text">{{ $t('config.set_vdisplay_primary_desc') }}</div>
     </div>
 
     <!-- SudoVDA Driver Status -->

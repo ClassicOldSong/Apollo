@@ -277,16 +277,9 @@
                   id="virtualDisplay"
                   label="apps.virtual_display"
                   desc="apps.virtual_display_desc"
-                  v-model="editForm['exclude-global-prep-cmd']"
+                  v-model="editForm['virtual-display']"
                   default="false"
         ></Checkbox>
-        <!-- set virtual display to primary -->
-        <div class="mb-3 form-check" v-if="platform === 'windows' && editForm['virtual-display'] == 'true'">
-          <label for="virtualDisplayPrimary" class="form-check-label">{{ $t('apps.virtual_display_primary') }}</label>
-          <input type="checkbox" class="form-check-input" id="virtualDisplayPrimary" v-model="editForm['virtual-display-primary']"
-          true-value="true" false-value="false" />
-          <div class="form-text">{{ $t('apps.virtual_display_primary_desc') }}</div>
-        </div>
         <!-- use app identity -->
         <div class="mb-3 form-check">
           <label for="useAppIdentity" class="form-check-label">{{ $t('apps.use_app_identity') }}</label>
@@ -414,7 +407,6 @@
     "prep-cmd": [],
     detached: [],
     "image-path": "",
-    "virtual-display-primary": true,
     "scale-factor": "100",
     "use-app-identity": false
   }

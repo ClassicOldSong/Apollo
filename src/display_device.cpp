@@ -738,6 +738,24 @@ namespace display_device {
     return DD_DATA.sm_instance->execute([&output_name](auto &settings_iface) { return settings_iface.getDisplayName(output_name); });
   }
 
+  std::string
+  map_display_name(const std::string &display_name) {
+    std::lock_guard lock { DD_DATA.mutex };
+    if (!DD_DATA.sm_instance) {
+      return {};
+    }
+
+    const auto available_devices { DD_DATA.sm_instance->execute([](auto &settings_iface) { return settings_iface.enumAvailableDevices(); }) };
+
+    for (auto &i : available_devices) {
+      if (i.m_display_name == display_name) {
+        return i.m_device_id;
+      }
+    }
+
+    return {};
+  }
+
   void
   configure_display(const config::video_t &video_config, const rtsp_stream::launch_session_t &session) {
     const auto result { parse_configuration(video_config, session) };

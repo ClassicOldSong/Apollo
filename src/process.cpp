@@ -163,9 +163,6 @@ namespace proc {
     // Ensure starting from a clean slate
     terminate();
 
-    // Save the original output name in case we modify it temporary later
-    std::string output_name_orig = config::video.output_name;
-
     _app = app;
     _app_id = app_id;
     _launch_session = launch_session;
@@ -191,17 +188,19 @@ namespace proc {
       render_height &= ~1;
     }
 
+    launch_session->width = render_width;
+    launch_session->height = render_height;
+
 #ifdef _WIN32
     bool create_virtual_display = config::video.headless_mode || launch_session->virtual_display || _app.virtual_display;
 
+    this->initial_display = config::video.output_name;
     // Executed when returning from function
     auto fg = util::fail_guard([&]() {
       // Restore to user defined output name
-      config::video.output_name = output_name_orig;
+      config::video.output_name = this->initial_display;
       terminate();
-      if (!create_virtual_display) {
-        display_device::revert_configuration();
-      }
+      display_device::revert_configuration();
     });
 
     if (create_virtual_display) {
@@ -211,8 +210,6 @@ namespace proc {
       }
 
       if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
-        std::wstring prevPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
-
         // Try set the render adapter matching the capture adapter if user has specified one
         if (!config::video.adapter_name.empty()) {
           VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
@@ -236,69 +233,26 @@ namespace proc {
 
         BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
 
-        std::wstring currentPrimaryDisplayName = VDISPLAY::getPrimaryDisplay();
-
         // Don't change display settings when no params are given
         if (launch_session->width && launch_session->height && launch_session->fps) {
           // Apply display settings
           VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
         }
-
-        bool shouldActuallySetPrimary = false;
-
-        // Determine if we need to set the virtual display as primary
-        // Client request overrides local config
-        bool shouldSetVDisplayPrimary = launch_session->virtual_display;
-        if (!shouldSetVDisplayPrimary) {
-          // App config overrides global config
-          if (_app.virtual_display) {
-            shouldSetVDisplayPrimary = _app.virtual_display_primary;
-          } else {
-            shouldSetVDisplayPrimary = config::video.set_vdisplay_primary;
-          }
-        }
-
-        if (shouldSetVDisplayPrimary) {
-          shouldActuallySetPrimary = (currentPrimaryDisplayName != vdisplayName);
-        } else {
-          shouldActuallySetPrimary = (currentPrimaryDisplayName != prevPrimaryDisplayName);
-        }
-
-        // Set primary display if needed
-        if (shouldActuallySetPrimary) {
-          auto disp = shouldSetVDisplayPrimary ? vdisplayName : prevPrimaryDisplayName;
-          BOOST_LOG(info) << "Setting display " << disp << " primary";
-
-          if (!VDISPLAY::setPrimaryDisplay(disp.c_str())) {
-            BOOST_LOG(info) << "Setting display " << disp << " primary failed! Are you using Windows 11 24H2?";
-          }
-        }
-
         // Set virtual_display to true when everything went fine
         this->virtual_display = true;
         this->display_name = platf::to_utf8(vdisplayName);
 
-        if (config::video.headless_mode) {
-          // When using headless mode, we don't care which display user configured to use.
-          // So we always set output_name to the newly created virtual display as a workaround for
-          // empty name when probing graphics cards.
-          config::video.output_name = this->display_name;
-        }
+        // When using virtual display, we don't care which display user configured to use.
+        // So we always set output_name to the newly created virtual display as a workaround for
+        // empty name when probing graphics cards.
+
+        config::video.output_name = display_device::map_display_name(this->display_name);
       }
-    } else {
-      display_device::configure_display(config::video, *launch_session);
     }
-#else
-    // Executed when returning from function
-    auto fg = util::fail_guard([&]() {
-      // Restore to user defined output name
-      config::video.output_name = output_name_orig;
-      terminate();
-      display_device::revert_configuration();
-    });
+#endif
 
     display_device::configure_display(config::video, *launch_session);
-#endif
+
 
     // Probe encoders again before streaming to ensure our chosen
     // encoder matches the active GPU (which could have changed
@@ -420,59 +374,7 @@ namespace proc {
 
     _app_launch_time = std::chrono::steady_clock::now();
 
-  #ifdef _WIN32
-    auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
-      // Windows doesn't seem to be able to set HDR correctly when a display is just connected / changed resolution,
-      // so we have tooggle HDR for the virtual display manually after a delay.
-      auto retryInterval = 200ms;
-      while (is_changing_settings_going_to_fail()) {
-        if (retryInterval > 2s) {
-          BOOST_LOG(warning) << "Restoring HDR settings failed due to retry timeout!";
-          return;
-        }
-        std::this_thread::sleep_for(retryInterval);
-        retryInterval *= 2;
-      }
-
-      // We should have got the actual streaming display by now
-      std::string currentDisplay = this->display_name;
-      if (currentDisplay.empty()) {
-        BOOST_LOG(warning) << "Not getting current display in time! HDR will not be toggled.";
-      } else {
-        auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
-
-        this->initial_display = currentDisplay;
-        this->initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
-
-        if (config::video.follow_client_hdr) {
-          if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
-            return;
-          }
-
-          if (enable_hdr) {
-            if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
-              BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
-            } else {
-              BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
-            }
-          }
-        } else if (this->initial_hdr) {
-          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
-            BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
-          } else {
-            BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
-          }
-        }
-      }
-    });
-
-    resetHDRThread.detach();
-  #endif
-
     fg.disable();
-
-    // Restore to user defined output name
-    config::video.output_name = output_name_orig;
 
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
     system_tray::update_tray_playing(_app.name);
@@ -561,35 +463,38 @@ namespace proc {
 
     _pipe.reset();
 
-#ifdef _WIN32
-    if (config::video.follow_client_hdr && !this->initial_display.empty()) {
-      if (VDISPLAY::setDisplayHDRByName(platf::from_utf8(this->initial_display).c_str(), this->initial_hdr)) {
-        BOOST_LOG(info) << "HDR restored successfully for display " << this->initial_display;
-      } else {
-        BOOST_LOG(info) << "HDR restore failed for display " << this->initial_display;
-      };
-    }
+    bool has_run = _app_id > 0;
 
-    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display) {
+#ifdef _WIN32
+    bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display;
+    if (used_virtual_display) {
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
         BOOST_LOG(info) << "Virtual Display removed successfully";
       } else {
         BOOST_LOG(info) << "Virtual Display remove failed";
       }
     }
-#endif
-
-    bool has_run = _app_id > 0;
 
     // Only show the Stopped notification if we actually have an app to stop
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+      if (used_virtual_display) {
+        display_device::reset_persistence();
+      } else {
+        display_device::revert_configuration();
+      }
+#else
+    if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+      display_device::revert_configuration();
+#endif
+
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
 #endif
-
-      display_device::revert_configuration();
     }
+
+    // Restore output name to its original value
+    config::video.output_name = initial_display;
 
     _app_id = -1;
     display_name.clear();
@@ -937,7 +842,6 @@ namespace proc {
         auto wait_all = app_node.get_optional<bool>("wait-all"s);
         auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
         auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
-        auto virtual_display_primary = app_node.get_optional<bool>("virtual-display-primary"s);
         auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
         auto use_app_identity = app_node.get_optional<bool>("use-app-identity"s);
 
@@ -1012,7 +916,6 @@ namespace proc {
         ctx.wait_all = wait_all.value_or(true);
         ctx.exit_timeout = std::chrono::seconds { exit_timeout.value_or(5) };
         ctx.virtual_display = virtual_display.value_or(false);
-        ctx.virtual_display_primary = virtual_display_primary.value_or(true);
         ctx.scale_factor = resolution_scale_factor.value_or(100);
         ctx.use_app_identity = use_app_identity.value_or(false);
 
@@ -1041,7 +944,6 @@ namespace proc {
         ctx.name = "Virtual Display";
         ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
         ctx.virtual_display = true;
-        ctx.virtual_display_primary = true;
         ctx.scale_factor = 100;
         ctx.use_app_identity = false;
 

@@ -48,6 +48,9 @@ namespace display_device {
   [[nodiscard]] std::string
   map_output_name(const std::string &output_name);
 
+  [[nodiscard]] std::string
+  map_display_name(const std::string &display_name);
+
   /**
    * @brief Configure the display device based on the user configuration and the session information.
    * @note This is a convenience method for calling similar method of a different signature.
@@ -119,7 +122,7 @@ namespace display_device {
    * const auto result = reset_persistence();
    * @examples_end
    */
-  [[nodiscard]] bool
+  bool
   reset_persistence();
 
   /**

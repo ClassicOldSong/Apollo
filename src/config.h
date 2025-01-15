@@ -16,8 +16,6 @@
 namespace config {
   struct video_t {
     bool headless_mode;
-    bool follow_client_hdr;
-    bool set_vdisplay_primary;
     // ffmpeg params
     int qp;  // higher == more compression and less quality
 
