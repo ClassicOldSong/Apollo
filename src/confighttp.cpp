@@ -583,20 +583,11 @@ namespace confighttp {
 
     print_req(request);
 
-    pt::ptree outputTree;
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
     auto args = request->parse_query_string();
     if (
       args.find("uuid"s) == std::end(args)
     ) {
-      outputTree.put("status", false);
-      outputTree.put("error", "Missing a required launch parameter");
-
+      bad_request(response, request, "Missing a required parameter to delete app");
       return;
     }
 
@@ -619,6 +610,10 @@ namespace confighttp {
       fileTree.push_back(std::make_pair("apps", newApps));
 
       pt::write_json(config::stream.file_apps, fileTree);
+
+      pt::ptree outputTree;
+      outputTree.put("status", true);
+      send_response(response, outputTree);
     }
     catch (std::exception &e) {
       BOOST_LOG(warning) << "DeleteApp: "sv << e.what();
@@ -1019,12 +1014,6 @@ namespace confighttp {
 
     pt::ptree outputTree;
 
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
     try {
       auto args = request->parse_query_string();
       auto it = args.find("passphrase");
@@ -1049,12 +1038,11 @@ namespace confighttp {
       outputTree.put("name", config::nvhttp.sunshine_name);
       outputTree.put("status", true);
       outputTree.put("message", "OTP created, effective within 3 minutes.");
+      send_response(response, outputTree);
     }
     catch (std::exception &e) {
       BOOST_LOG(warning) << "OTP creation failed: "sv << e.what();
-      outputTree.put("status", false);
-      outputTree.put("message", e.what());
-      return;
+      bad_request(response, request, e.what());
     }
   }
 
@@ -1069,24 +1057,17 @@ namespace confighttp {
 
     pt::ptree inputTree, outputTree;
 
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
     try {
       pt::read_json(ss, inputTree);
       std::string uuid = inputTree.get<std::string>("uuid");
       std::string name = inputTree.get<std::string>("name");
       auto perm = (crypto::PERM)inputTree.get<uint32_t>("perm") & crypto::PERM::_all;
       outputTree.put("status", nvhttp::update_device_info(uuid, name, perm));
+      send_response(response, outputTree);
     }
     catch (std::exception &e) {
       BOOST_LOG(warning) << "Update Client: "sv << e.what();
-      outputTree.put("status", false);
-      outputTree.put("error", e.what());
-      return;
+      bad_request(response, request, e.what());
     }
   }
 
@@ -1155,19 +1136,11 @@ namespace confighttp {
 
     pt::ptree outputTree;
 
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
     auto args = request->parse_query_string();
     if (
       args.find("uuid"s) == std::end(args)
     ) {
-      outputTree.put("status", false);
-      outputTree.put("error", "Missing a required launch parameter");
-
+      bad_request(response, request, "Missing a required launch parameter");
       return;
     }
 
@@ -1190,14 +1163,12 @@ namespace confighttp {
         auto launch_session = nvhttp::make_launch_session(true, appid, args, &named_cert);
         auto err = proc::proc.execute(appid, app, launch_session);
         if (err) {
-          outputTree.put("status", false);
-          outputTree.put("error",
-            err == 503
+          bad_request(response, request, err == 503
             ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
             : "Failed to start the specified application");
-          return;
         } else {
           outputTree.put("status", true);
+          send_response(response, outputTree);
         }
 
         return;
@@ -1205,8 +1176,7 @@ namespace confighttp {
     }
 
     BOOST_LOG(error) << "Couldn't find app with uuid ["sv << uuid << ']';
-    outputTree.put("status", false);
-    outputTree.put("error", "Cannot find requested application");
+    bad_request(response, request, "Cannot find requested application");
   }
 
   void
@@ -1220,12 +1190,6 @@ namespace confighttp {
 
     pt::ptree inputTree, outputTree;
 
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
     try {
       pt::read_json(ss, inputTree);
       std::string uuid = inputTree.get<std::string>("uuid");
@@ -1233,9 +1197,9 @@ namespace confighttp {
     }
     catch (std::exception &e) {
       BOOST_LOG(warning) << "Disconnect: "sv << e.what();
-      outputTree.put("status", false);
-      outputTree.put("error", e.what());
+      bad_request(response, request, e.what());
     }
+    send_response(response, outputTree);
   }
 
   /**

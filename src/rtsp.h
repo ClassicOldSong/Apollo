@@ -11,6 +11,10 @@
 #include "crypto.h"
 #include "thread_safe.h"
 
+#ifdef _WIN32
+  #include <windows.h>
+#endif
+
 // Resolve circular dependencies
 namespace stream {
   struct session_t;

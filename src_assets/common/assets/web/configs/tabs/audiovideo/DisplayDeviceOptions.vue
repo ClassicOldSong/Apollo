@@ -55,7 +55,7 @@ function addRemappingEntry() {
           <h2 class="accordion-header">
             <button class="accordion-button" type="button" data-bs-toggle="collapse"
                     data-bs-target="#panelsStayOpen-collapseOne">
-              {{ $t('config.dd_options_header') }}
+              {{ $t('config.dd_options_header') }} {{ $t('dd_options_header_vdd_na') }}
             </button>
           </h2>
           <div id="panelsStayOpen-collapseOne" class="accordion-collapse collapse show"

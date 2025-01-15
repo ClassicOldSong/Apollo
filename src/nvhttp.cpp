@@ -986,17 +986,12 @@ namespace nvhttp {
     print_req<SunshineHTTPS>(request);
 
     pt::ptree tree;
-    bool revert_display_configuration { false };
     auto g = util::fail_guard([&]() {
       std::ostringstream data;
 
       pt::write_xml(data, tree);
       response->write(data.str());
       response->close_connection_after_response = true;
-
-      if (revert_display_configuration) {
-        display_device::revert_configuration();
-      }
     });
 
     auto named_cert_p = get_verified_cert(request);
@@ -1084,9 +1079,6 @@ namespace nvhttp {
     tree.put("root.gamesession", 1);
 
     rtsp_stream::launch_session_raise(launch_session);
-
-    // Stream was started successfully, we will revert the config when the app or session terminates
-    revert_display_configuration = false;
   }
 
   void

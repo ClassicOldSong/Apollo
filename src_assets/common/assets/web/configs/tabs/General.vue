@@ -99,7 +99,7 @@ onMounted(() => {
     <div id="global_prep_cmd" class="mb-3 d-flex flex-column">
       <label class="form-label">{{ $t('config.global_prep_cmd') }}</label>
       <div class="form-text">{{ $t('config.global_prep_cmd_desc') }}</div>
-      <table class="table" v-if="config.global_prep_cmd.length > 0">
+      <table class="table" v-if="globalPrepCmd.length > 0">
         <thead>
         <tr>
           <th scope="col"><i class="fas fa-play"></i> {{ $t('_common.do_cmd') }}</th>
@@ -111,7 +111,7 @@ onMounted(() => {
         </tr>
         </thead>
         <tbody>
-        <tr v-for="(c, i) in config.global_prep_cmd">
+        <tr v-for="(c, i) in globalPrepCmd">
           <td>
             <input type="text" class="form-control monospace" v-model="c.do" />
           </td>
@@ -191,18 +191,20 @@ onMounted(() => {
     </div>
 
     <!-- Enable Pairing -->
-    <div class="mb-3 form-check">
-      <input type="checkbox" class="form-check-input" id="enable_pairing" v-model="config.enable_pairing" true-value="enabled" false-value="disabled"/>
-      <label for="enable_pairing" class="form-check-label">{{ $t('config.enable_pairing') }}</label>
-      <div class="form-text">{{ $t('config.enable_pairing_desc') }}</div>
-    </div>
+    <Checkbox class="mb-3"
+              id="enable_pairing"
+              locale-prefix="config"
+              v-model="config.enable_pairing"
+              default="true"
+    ></Checkbox>
 
     <!-- Hide Tray Controls -->
-    <div class="mb-3 form-check">
-      <input type="checkbox" class="form-check-input" id="hide_tray_controls" v-model="config.hide_tray_controls" true-value="enabled" false-value="disabled"/>
-      <label for="hide_tray_controls" class="form-check-label">{{ $t('config.hide_tray_controls') }}</label>
-      <div class="form-text">{{ $t('config.hide_tray_controls_desc') }}</div>
-    </div>
+    <Checkbox class="mb-3"
+              id="hide_tray_controls"
+              locale-prefix="config"
+              v-model="config.hide_tray_controls"
+              default="false"
+    ></Checkbox>
 
     <!-- Notify Pre-Releases -->
     <Checkbox class="mb-3"

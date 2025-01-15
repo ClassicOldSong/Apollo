@@ -166,13 +166,6 @@ namespace proc {
     // Save the original output name in case we modify it temporary later
     std::string output_name_orig = config::video.output_name;
 
-    // Executed when returning from function
-    auto fg = util::fail_guard([&]() {
-      // Restore to user defined output name
-      config::video.output_name = output_name_orig;
-      terminate();
-    });
-
     _app = app;
     _app_id = app_id;
     _launch_session = launch_session;
@@ -199,7 +192,19 @@ namespace proc {
     }
 
 #ifdef _WIN32
-    if (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display) {
+    bool create_virtual_display = config::video.headless_mode || launch_session->virtual_display || _app.virtual_display;
+
+    // Executed when returning from function
+    auto fg = util::fail_guard([&]() {
+      // Restore to user defined output name
+      config::video.output_name = output_name_orig;
+      terminate();
+      if (!create_virtual_display) {
+        display_device::revert_configuration();
+      }
+    });
+
+    if (create_virtual_display) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
         initVDisplayDriver();
@@ -280,7 +285,19 @@ namespace proc {
           config::video.output_name = this->display_name;
         }
       }
+    } else {
+      display_device::configure_display(config::video, *launch_session);
     }
+#else
+    // Executed when returning from function
+    auto fg = util::fail_guard([&]() {
+      // Restore to user defined output name
+      config::video.output_name = output_name_orig;
+      terminate();
+      display_device::revert_configuration();
+    });
+
+    display_device::configure_display(config::video, *launch_session);
 #endif
 
     // Probe encoders again before streaming to ensure our chosen
@@ -419,7 +436,9 @@ namespace proc {
 
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
-      if (!currentDisplay.empty()) {
+      if (currentDisplay.empty()) {
+        BOOST_LOG(warning) << "Not getting current display in time! HDR will not be toggled.";
+      } else {
         auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
 
         this->initial_display = currentDisplay;

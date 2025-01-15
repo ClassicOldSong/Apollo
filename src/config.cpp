@@ -486,8 +486,7 @@ namespace config {
       {},  // mode_remapping
       {}  // wa
     },  // display_device
-
-    1  // min_fps_factor
+    1,  // min_fps_factor
     "1920x1080x60",  // fallback_mode
   };
 

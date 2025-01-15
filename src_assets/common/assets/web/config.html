@@ -37,6 +37,7 @@
       <general
         v-if="currentTab === 'general'"
         :config="config"
+        :global-prep-cmd="global_prep_cmd"
         :server-cmd="server_cmd"
         :platform="platform">
       </general>
@@ -135,6 +136,7 @@
         config: null,
         currentTab: "general",
         vdisplayStatus: "1",
+        global_prep_cmd: [],
         server_cmd: [],
         tabs: [ // TODO: Move the options to each Component instead, encapsulate.
           {
@@ -144,8 +146,8 @@
               "locale": "en",
               "sunshine_name": "",
               "min_log_level": 2,
-              "global_prep_cmd": "[]",
-              "server_cmd": "[]",
+              "global_prep_cmd": [],
+              "server_cmd": [],
               "notify_pre_releases": "disabled",
             },
           },
@@ -362,7 +364,7 @@
 
           this.config.global_prep_cmd = this.config.global_prep_cmd || [];
           this.config.server_cmd = this.config.server_cmd || [];
-          this.global_prep_cmd = JSON.parse(this.config.global_prep_cmd);
+          this.global_prep_cmd = this.config.global_prep_cmd;
           this.server_cmd = JSON.parse(this.config.server_cmd);
         });
     },
@@ -371,9 +373,6 @@
         this.$forceUpdate()
       },
       serialize() {
-        this.config.global_prep_cmd = JSON.stringify(this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo));
-        this.config.server_cmd = JSON.stringify(this.server_cmd.filter(cmd => cmd.name && cmd.cmd));
-
         // Validate fallback mode
         if (this.config.fallback_mode && !this.config.fallback_mode.match(/^\d+x\d+x\d+$/)) {
           this.config.fallback_mode = fallbackDisplayModeCache;
@@ -381,8 +380,9 @@
           fallbackDisplayModeCache = this.config.fallback_mode;
         }
         let config = JSON.parse(JSON.stringify(this.config));
-        config.global_prep_cmd = JSON.stringify(config.global_prep_cmd);
+        config.global_prep_cmd = JSON.stringify(this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo));
         config.dd_mode_remapping = JSON.stringify(config.dd_mode_remapping);
+        config.server_cmd = JSON.stringify(this.server_cmd.filter(cmd => cmd.name && cmd.cmd));
         return config;
       },
       save() {

@@ -84,17 +84,19 @@ const validateFallbackMode = (event) => {
                   default="true"
         ></Checkbox>
 
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="keep_sink_default" v-model="config.keep_sink_default" true-value="enabled" false-value="disabled"/>
-          <label for="keep_sink_default" class="form-check-label">{{ $t('config.keep_sink_default') }}</label>
-          <div class="form-text pre-wrap">{{ $t('config.keep_sink_default_desc') }}</div>
-        </div>
+        <Checkbox class="mb-3"
+                  id="keep_sink_default"
+                  locale-prefix="config"
+                  v-model="config.keep_sink_default"
+                  default="true"
+        ></Checkbox>
 
-        <div class="mb-3 form-check">
-          <input type="checkbox" class="form-check-input" id="auto_capture_sink" v-model="config.auto_capture_sink" true-value="enabled" false-value="disabled"/>
-          <label for="auto_capture_sink" class="form-check-label">{{ $t('config.auto_capture_sink') }}</label>
-          <div class="form-text pre-wrap">{{ $t('config.auto_capture_sink_desc') }}</div>
-        </div>
+        <Checkbox class="mb-3"
+                  id="auto_capture_sink"
+                  locale-prefix="config"
+                  v-model="config.auto_capture_sink"
+                  default="true"
+        ></Checkbox>
       </template>
     </PlatformLayout>
 

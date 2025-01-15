@@ -273,12 +273,13 @@
                   default="true"
         ></Checkbox>
         <!-- use virtual display -->
-        <div class="mb-3 form-check" v-if="platform === 'windows'">
-          <label for="virtualDisplay" class="form-check-label">{{ $t('apps.virtual_display') }}</label>
-          <input type="checkbox" class="form-check-input" id="virtualDisplay" v-model="editForm['virtual-display']"
-          true-value="true" false-value="false" />
-          <div class="form-text">{{ $t('apps.virtual_display_desc') }}</div>
-        </div>
+        <Checkbox class="mb-3"
+                  id="virtualDisplay"
+                  label="apps.virtual_display"
+                  desc="apps.virtual_display_desc"
+                  v-model="editForm['exclude-global-prep-cmd']"
+                  default="false"
+        ></Checkbox>
         <!-- set virtual display to primary -->
         <div class="mb-3 form-check" v-if="platform === 'windows' && editForm['virtual-display'] == 'true'">
           <label for="virtualDisplayPrimary" class="form-check-label">{{ $t('apps.virtual_display_primary') }}</label>
@@ -399,7 +400,6 @@
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
   import Checkbox from './Checkbox.vue'
-  import PlatformLayout from './PlatformLayout.vue'
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
   const newApp = {
