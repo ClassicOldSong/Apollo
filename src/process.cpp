@@ -374,6 +374,54 @@ namespace proc {
 
     _app_launch_time = std::chrono::steady_clock::now();
 
+  #ifdef _WIN32
+    auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
+      // Windows doesn't seem to be able to set HDR correctly when a display is just connected / changed resolution,
+      // so we have tooggle HDR for the virtual display manually after a delay.
+      auto retryInterval = 200ms;
+      while (is_changing_settings_going_to_fail()) {
+        if (retryInterval > 2s) {
+          BOOST_LOG(warning) << "Restoring HDR settings failed due to retry timeout!";
+          return;
+        }
+        std::this_thread::sleep_for(retryInterval);
+        retryInterval *= 2;
+      }
+
+      // We should have got the actual streaming display by now
+      std::string currentDisplay = this->display_name;
+      if (currentDisplay.empty()) {
+        BOOST_LOG(warning) << "Not getting current display in time! HDR will not be toggled.";
+      } else {
+        auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
+
+        this->initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
+
+        if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
+          if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
+            return;
+          }
+
+          if (enable_hdr) {
+            if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+              BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
+            } else {
+              BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
+            }
+          }
+        } else if (this->initial_hdr) {
+          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+            BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
+          } else {
+            BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
+          }
+        }
+      }
+    });
+
+    resetHDRThread.detach();
+  #endif
+
     fg.disable();
 
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
