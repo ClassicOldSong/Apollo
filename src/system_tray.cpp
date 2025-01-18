@@ -41,6 +41,7 @@
   // local includes
   #include "config.h"
   #include "confighttp.h"
+  #include "display_device.h"
   #include "logging.h"
   #include "platform/common.h"
   #include "process.h"
@@ -64,6 +65,13 @@ namespace system_tray {
   tray_force_stop_cb(struct tray_menu *item) {
     BOOST_LOG(info) << "Force stop from system tray"sv;
     proc::proc.terminate();
+  }
+
+  void
+  tray_reset_display_device_config_cb(struct tray_menu *item) {
+    BOOST_LOG(info) << "Resetting display device config from system tray"sv;
+
+    std::ignore = display_device::reset_persistence();
   }
 
   void
@@ -109,6 +117,10 @@ namespace system_tray {
         //       { .text = nullptr } } },
         // { .text = "-" },
         { .text = TRAY_MSG_NO_APP_RUNNING, .cb = tray_force_stop_cb },
+  // Currently display device settings are only supported on Windows
+  #ifdef _WIN32
+        { .text = "Reset Display Device Config", .cb = tray_reset_display_device_config_cb },
+  #endif
         { .text = "Restart", .cb = tray_restart_cb },
         { .text = "Quit", .cb = tray_quit_cb },
         { .text = nullptr } },

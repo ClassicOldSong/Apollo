@@ -12,7 +12,6 @@
 
 // lib includes
 #include <Simple-Web-Server/server_http.hpp>
-#include <Simple-Web-Server/server_https.hpp>
 #include <boost/asio/ssl/context.hpp>
 #include <boost/asio/ssl/context_base.hpp>
 #include <boost/property_tree/json_parser.hpp>
@@ -21,7 +20,6 @@
 
 // local includes
 #include "config.h"
-#include "crypto.h"
 #include "display_device.h"
 #include "file_handler.h"
 #include "globals.h"
@@ -62,18 +60,6 @@ namespace nvhttp {
   static std::string otp_passphrase;
   static std::string otp_device_name;
   static std::chrono::time_point<std::chrono::steady_clock> otp_creation_time;
-
-  class SunshineHTTPS: public SimpleWeb::HTTPS {
-  public:
-    SunshineHTTPS(boost::asio::io_context &io_context, boost::asio::ssl::context &ctx):
-        SimpleWeb::HTTPS(io_context, ctx) {}
-
-    virtual ~SunshineHTTPS() {
-      // Gracefully shutdown the TLS connection
-      SimpleWeb::error_code ec;
-      shutdown(ec);
-    }
-  };
 
   class SunshineHTTPSServer: public SimpleWeb::ServerBase<SunshineHTTPS> {
   public:
@@ -153,28 +139,6 @@ namespace nvhttp {
     std::string servercert;
     std::string pkey;
   } conf_intern;
-
-  struct pair_session_t {
-    struct {
-      std::string uniqueID;
-      std::string cert;
-      std::string name;
-    } client;
-
-    std::unique_ptr<crypto::aes_t> cipher_key;
-    std::vector<uint8_t> clienthash;
-
-    std::string serversecret;
-    std::string serverchallenge;
-
-    struct {
-      util::Either<
-        std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Response>,
-        std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>>
-        response;
-      std::string salt;
-    } async_insert_pin;
-  };
 
   // uniqueID, session
   std::unordered_map<std::string, pair_session_t> map_id_sess;
@@ -334,7 +298,6 @@ namespace nvhttp {
     client_t &client = client_root;
     client.named_devices.push_back(named_cert_p);
 
-
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
     system_tray::update_tray_paired(named_cert_p->name);
 #endif
@@ -407,11 +370,28 @@ namespace nvhttp {
   }
 
   void
+  remove_session(const pair_session_t &sess) {
+    map_id_sess.erase(sess.client.uniqueID);
+  }
+
+  void
+  fail_pair(pair_session_t &sess, pt::ptree &tree, const std::string status_msg) {
+    tree.put("root.paired", 0);
+    tree.put("root.<xmlattr>.status_code", 400);
+    tree.put("root.<xmlattr>.status_message", status_msg);
+    remove_session(sess);  // Security measure, delete the session when something went wrong and force a re-pair
+  }
+
+  void
   getservercert(pair_session_t &sess, pt::ptree &tree, const std::string &pin) {
+    if (sess.last_phase != PAIR_PHASE::NONE) {
+      fail_pair(sess, tree, "Out of order call to getservercert");
+      return;
+    }
+    sess.last_phase = PAIR_PHASE::GETSERVERCERT;
+
     if (sess.async_insert_pin.salt.size() < 32) {
-      tree.put("root.paired", 0);
-      tree.put("root.<xmlattr>.status_code", 400);
-      tree.put("root.<xmlattr>.status_message", "Salt too short");
+      fail_pair(sess, tree, "Salt too short");
       return;
     }
 
@@ -428,30 +408,17 @@ namespace nvhttp {
   }
 
   void
-  serverchallengeresp(pair_session_t &sess, pt::ptree &tree, const args_t &args) {
-    auto encrypted_response = util::from_hex_vec(get_arg(args, "serverchallengeresp"), true);
+  clientchallenge(pair_session_t &sess, pt::ptree &tree, const std::string &challenge) {
+    if (sess.last_phase != PAIR_PHASE::GETSERVERCERT) {
+      fail_pair(sess, tree, "Out of order call to clientchallenge");
+      return;
+    }
+    sess.last_phase = PAIR_PHASE::CLIENTCHALLENGE;
 
-    std::vector<uint8_t> decrypted;
-    crypto::cipher::ecb_t cipher(*sess.cipher_key, false);
-
-    cipher.decrypt(encrypted_response, decrypted);
-
-    sess.clienthash = std::move(decrypted);
-
-    auto serversecret = sess.serversecret;
-    auto sign = crypto::sign256(crypto::pkey(conf_intern.pkey), serversecret);
-
-    serversecret.insert(std::end(serversecret), std::begin(sign), std::end(sign));
-
-    tree.put("root.pairingsecret", util::hex_vec(serversecret, true));
-    tree.put("root.paired", 1);
-    tree.put("root.<xmlattr>.status_code", 200);
-  }
-
-  void
-  clientchallenge(pair_session_t &sess, pt::ptree &tree, const args_t &args) {
-    auto challenge = util::from_hex_vec(get_arg(args, "clientchallenge"), true);
-
+    if (!sess.cipher_key) {
+      fail_pair(sess, tree, "Cipher key not set");
+      return;
+    }
     crypto::cipher::ecb_t cipher(*sess.cipher_key, false);
 
     std::vector<uint8_t> decrypted;
@@ -485,21 +452,58 @@ namespace nvhttp {
   }
 
   void
-  clientpairingsecret(pair_session_t &sess, pt::ptree &tree, const args_t &args) {
-    auto &client = sess.client;
+  serverchallengeresp(pair_session_t &sess, pt::ptree &tree, const std::string &encrypted_response) {
+    if (sess.last_phase != PAIR_PHASE::CLIENTCHALLENGE) {
+      fail_pair(sess, tree, "Out of order call to serverchallengeresp");
+      return;
+    }
+    sess.last_phase = PAIR_PHASE::SERVERCHALLENGERESP;
 
-    auto pairingsecret = util::from_hex_vec(get_arg(args, "clientpairingsecret"), true);
-    if (pairingsecret.size() <= 16) {
-      tree.put("root.paired", 0);
-      tree.put("root.<xmlattr>.status_code", 400);
-      tree.put("root.<xmlattr>.status_message", "Clientpairingsecret too short");
+    if (!sess.cipher_key || sess.serversecret.empty()) {
+      fail_pair(sess, tree, "Cipher key or serversecret not set");
       return;
     }
 
-    std::string_view secret { pairingsecret.data(), 16 };
-    std::string_view sign { pairingsecret.data() + secret.size(), pairingsecret.size() - secret.size() };
+    std::vector<uint8_t> decrypted;
+    crypto::cipher::ecb_t cipher(*sess.cipher_key, false);
+
+    cipher.decrypt(encrypted_response, decrypted);
+
+    sess.clienthash = std::move(decrypted);
+
+    auto serversecret = sess.serversecret;
+    auto sign = crypto::sign256(crypto::pkey(conf_intern.pkey), serversecret);
+
+    serversecret.insert(std::end(serversecret), std::begin(sign), std::end(sign));
+
+    tree.put("root.pairingsecret", util::hex_vec(serversecret, true));
+    tree.put("root.paired", 1);
+    tree.put("root.<xmlattr>.status_code", 200);
+  }
+
+  void
+  clientpairingsecret(pair_session_t &sess, pt::ptree &tree, const std::string &client_pairing_secret) {
+    if (sess.last_phase != PAIR_PHASE::SERVERCHALLENGERESP) {
+      fail_pair(sess, tree, "Out of order call to clientpairingsecret");
+      return;
+    }
+    sess.last_phase = PAIR_PHASE::CLIENTPAIRINGSECRET;
+
+    auto &client = sess.client;
+
+    if (client_pairing_secret.size() <= 16) {
+      fail_pair(sess, tree, "Client pairing secret too short");
+      return;
+    }
+
+    std::string_view secret { client_pairing_secret.data(), 16 };
+    std::string_view sign { client_pairing_secret.data() + secret.size(), client_pairing_secret.size() - secret.size() };
 
     auto x509 = crypto::x509(client.cert);
+    if (!x509) {
+      fail_pair(sess, tree, "Invalid client certificate");
+      return;
+    }
     auto x509_sign = crypto::signature(x509);
 
     std::string data;
@@ -512,7 +516,9 @@ namespace nvhttp {
     auto hash = crypto::hash(data);
 
     // if hash not correct, probably MITM
-    if (!std::memcmp(hash.data(), sess.clienthash.data(), hash.size()) && crypto::verify256(crypto::x509(client.cert), secret, sign)) {
+    bool same_hash = hash.size() == sess.clienthash.size() && std::equal(hash.begin(), hash.end(), sess.clienthash.begin());
+    auto verify = crypto::verify256(crypto::x509(client.cert), secret, sign);
+    if (same_hash && verify) {
       tree.put("root.paired", 1);
 
       auto named_cert_p = std::make_shared<crypto::named_cert_t>();
@@ -536,10 +542,10 @@ namespace nvhttp {
       add_authorized_client(named_cert_p);
     }
     else {
-      map_id_sess.erase(client.uniqueID);
       tree.put("root.paired", 0);
     }
 
+    remove_session(sess);
     tree.put("root.<xmlattr>.status_code", 200);
   }
 
@@ -628,7 +634,6 @@ namespace nvhttp {
     }
 
     auto uniqID { get_arg(args, "uniqueid") };
-    auto sess_it = map_id_sess.find(uniqID);
 
     args_t::const_iterator it;
     if (it = args.find("phrase"); it != std::end(args)) {
@@ -702,16 +707,29 @@ namespace nvhttp {
       else if (it->second == "pairchallenge"sv) {
         tree.put("root.paired", 1);
         tree.put("root.<xmlattr>.status_code", 200);
+        return;
       }
     }
-    else if (it = args.find("clientchallenge"); it != std::end(args)) {
-      clientchallenge(sess_it->second, tree, args);
+
+    auto sess_it = map_id_sess.find(uniqID);
+    if (sess_it == std::end(map_id_sess)) {
+      tree.put("root.<xmlattr>.status_code", 400);
+      tree.put("root.<xmlattr>.status_message", "Invalid uniqueid");
+
+      return;
+    }
+
+    if (it = args.find("clientchallenge"); it != std::end(args)) {
+      auto challenge = util::from_hex_vec(it->second, true);
+      clientchallenge(sess_it->second, tree, challenge);
     }
     else if (it = args.find("serverchallengeresp"); it != std::end(args)) {
-      serverchallengeresp(sess_it->second, tree, args);
+      auto encrypted_response = util::from_hex_vec(it->second, true);
+      serverchallengeresp(sess_it->second, tree, encrypted_response);
     }
     else if (it = args.find("clientpairingsecret"); it != std::end(args)) {
-      clientpairingsecret(sess_it->second, tree, args);
+      auto pairingsecret = util::from_hex_vec(it->second, true);
+      clientpairingsecret(sess_it->second, tree, pairingsecret);
     }
     else {
       tree.put("root.<xmlattr>.status_code", 404);
@@ -1353,6 +1371,12 @@ namespace nvhttp {
   }
 
   void
+  setup(const std::string &pkey, const std::string &cert) {
+    conf_intern.pkey = pkey;
+    conf_intern.servercert = cert;
+  }
+
+  void
   start() {
     auto shutdown_event = mail::man->event<bool>(mail::shutdown);
 
@@ -1366,8 +1390,9 @@ namespace nvhttp {
       load_state();
     }
 
-    conf_intern.pkey = file_handler::read_file(config::nvhttp.pkey.c_str());
-    conf_intern.servercert = file_handler::read_file(config::nvhttp.cert.c_str());
+    auto pkey = file_handler::read_file(config::nvhttp.pkey.c_str());
+    auto cert = file_handler::read_file(config::nvhttp.cert.c_str());
+    setup(pkey, cert);
 
     // resume doesn't always get the parameter "localAudioPlayMode"
     // launch will store it in host_audio
