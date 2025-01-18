@@ -1,16 +1,16 @@
 # Apollo
 
-Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
+Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, native client resolution, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
 
 Major features:
 
-- [x] Built-in Virtual Display with HDR support
+- [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
 - [x] Permission management for clients
 - [x] Clipboard sync
 
 ## Usage
 
-Refer to LizardByte's documentation hosted on [Read the Docs](https://sushinestream.readthedocs.io/) for now.
+Refer to LizardByte's documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine) for now.
 
 Currently Virtual Display support is Windows only, Linux support is planned and will be implemented in the future.
 
