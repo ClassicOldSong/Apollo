@@ -194,7 +194,7 @@ namespace confighttp {
     }
 
     auto authCookie = getCookieValue(cookies->second, "auth");
-    if (authCookie.empty() || authCookie != sessionCookie) {
+    if (authCookie.empty() || util::hex(crypto::hash(authCookie + config::sunshine.salt)).to_string() != sessionCookie) {
       return false;
     }
 
@@ -949,11 +949,12 @@ namespace confighttp {
         return;
       }
 
-      sessionCookie = crypto::rand_alphabet(64);
+      std::string sessionCookieRaw = crypto::rand_alphabet(64);
+      sessionCookie = util::hex(crypto::hash(sessionCookieRaw + config::sunshine.salt)).to_string();
       cookie_creation_time = std::chrono::steady_clock::now();
 
       const SimpleWeb::CaseInsensitiveMultimap headers {
-        { "Set-Cookie", "auth=" + sessionCookie + "; Secure; Max-Age=2592000; Path=/" }
+        { "Set-Cookie", "auth=" + sessionCookieRaw + "; Secure; Max-Age=2592000; Path=/" }
       };
 
       response->write(headers);
