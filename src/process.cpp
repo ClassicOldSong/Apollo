@@ -231,28 +231,42 @@ namespace proc {
           launch_session->display_guid
         );
 
-        BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
+        if (!vdisplayName.empty()) {
+          BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
 
-        // Don't change display settings when no params are given
-        if (launch_session->width && launch_session->height && launch_session->fps) {
-          // Apply display settings
-          VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
+          // Don't change display settings when no params are given
+          if (launch_session->width && launch_session->height && launch_session->fps) {
+            // Apply display settings
+            VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, launch_session->fps);
+          }
+          // Set virtual_display to true when everything went fine
+          this->virtual_display = true;
+          this->display_name = platf::to_utf8(vdisplayName);
+
+          // When using virtual display, we don't care which display user configured to use.
+          // So we always set output_name to the newly created virtual display as a workaround for
+          // empty name when probing graphics cards.
+
+          config::video.output_name = display_device::map_display_name(this->display_name);
+        } else {
+          BOOST_LOG(warning) << "Virtual Display creation failed!";
         }
-        // Set virtual_display to true when everything went fine
-        this->virtual_display = true;
-        this->display_name = platf::to_utf8(vdisplayName);
-
-        // When using virtual display, we don't care which display user configured to use.
-        // So we always set output_name to the newly created virtual display as a workaround for
-        // empty name when probing graphics cards.
-
-        config::video.output_name = display_device::map_display_name(this->display_name);
       }
     }
-#endif
 
     display_device::configure_display(config::video, *launch_session);
 
+    // We should not preserve display state when using virtual display.
+    // It is already handled by Windows properly.
+    if (this->virtual_display) {
+      display_device::reset_persistence();
+    }
+
+#else
+
+    display_device::configure_display(config::video, *launch_session);
+
+#endif
 
     // Probe encoders again before streaming to ensure our chosen
     // encoder matches the active GPU (which could have changed
@@ -543,7 +557,7 @@ namespace proc {
 
     // Load the configured output_name first
     // to prevent the value being write to empty when the initial terminate happens
-    if (proc.initial_display.empty()) {
+    if (!has_run && proc.initial_display.empty()) {
       proc.initial_display = config::video.output_name;
     } else {
       // Restore output name to its original value
