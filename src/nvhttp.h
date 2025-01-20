@@ -181,7 +181,7 @@ namespace nvhttp {
    * the client secret has been signed by Moonlight
    */
   void
-  clientpairingsecret(pair_session_t &sess, std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
+  clientpairingsecret(pair_session_t &sess, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
 
   /**
    * @brief Compare the user supplied pin to the Moonlight pin.
