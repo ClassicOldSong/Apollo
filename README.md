@@ -84,6 +84,10 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
 - **I want to turn off the physical monitor when streaming**
   - The first time you stream with virtual display, go to Windows settings and disable the physical monitor. The next time you start streaming it will turn off automatically.
   - Or, go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Deactivate other displays and activate only the specified display`.
+- **Client says Host doesn't support HDR/444 but it actually does**
+  - This only happens when you enabled `Headless Mode`. The initial capability probing is skipped during startup and is performed on the first connection.
+
+    If you don't mind, quit and enter the stream again should fix the problem, or just go to `Advanced` tab and set the advertised capability to `Always advertise` based on the actual capability of your GPU in use.
 - **HDR isn't enabled when using battery**
   - Check out [To play HDR content when running on battery](https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6)
   - [Archive](https://web.archive.org/web/20240828044038/https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6) to the above link in case M$ remove it unexpectedly someday
