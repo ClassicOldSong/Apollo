@@ -541,8 +541,14 @@ namespace proc {
 #endif
     }
 
-    // Restore output name to its original value
-    config::video.output_name = initial_display;
+    // Load the configured output_name first
+    // to prevent the value being write to empty when the initial terminate happens
+    if (proc.initial_display.empty()) {
+      proc.initial_display = config::video.output_name;
+    } else {
+      // Restore output name to its original value
+      config::video.output_name = initial_display;
+    }
 
     _app_id = -1;
     display_name.clear();

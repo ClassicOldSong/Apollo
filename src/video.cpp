@@ -1027,7 +1027,7 @@ namespace video {
     current_display_index = 0;
 
     if (current_display_name.empty()) {
-      current_display_name = config::video.output_name;
+      current_display_name = display_device::map_output_name(config::video.output_name);
     }
 
     // If we had a name previously, let's try to find it in the new list
