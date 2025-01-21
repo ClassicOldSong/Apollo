@@ -41,8 +41,10 @@ If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enabl
 
 ## About HDR
 
+HDR starts supporting from Windows 11 23H2 and generally supported on 24H2. Some systems might not have HDR toggle on 23H2 and you just need to upgrade to 24H2. Any system lower than 23H2/Windows 10 will not have HDR option available.
+
 > [!NOTE]
-> This section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
+> The below section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
 >
 > Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
 >
