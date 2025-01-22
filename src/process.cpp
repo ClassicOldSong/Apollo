@@ -1017,6 +1017,7 @@ namespace proc {
         ctx.virtual_display = true;
         ctx.scale_factor = 100;
         ctx.use_app_identity = false;
+        ctx.allow_client_commands = false;
 
         ctx.elevated = false;
         ctx.auto_detach = true;
