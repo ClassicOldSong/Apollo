@@ -721,7 +721,13 @@ namespace display_device {
   init(const std::filesystem::path &persistence_filepath, const config::video_t &video_config) {
     std::lock_guard lock { DD_DATA.mutex };
     // We can support re-init without any issues, however we should make sure to clean up first!
-    revert_configuration_unlocked(revert_option_e::try_once);
+    if (video_config.dd.configuration_option == config::video_t::dd_t::config_option_e::disabled) {
+      if (!persistence_filepath.empty() && std::filesystem::exists(persistence_filepath)) {
+        std::filesystem::remove(persistence_filepath);
+      }
+    } else {
+      revert_configuration_unlocked(revert_option_e::try_once);
+    }
     DD_DATA.config_revert_delay = video_config.dd.config_revert_delay;
     DD_DATA.sm_instance = nullptr;
 
