@@ -23,13 +23,17 @@ const serverCmdTemplate = {
   cmd: ""
 }
 
-function addCmd(cmdArr, template) {
+function addCmd(cmdArr, template, idx) {
   const _tpl = Object.assign({}, template);
 
   if (props.platform === 'windows') {
     _tpl.elevated = false;
   }
-  cmdArr.push(_tpl);
+  if (idx < 0) {
+    cmdArr.push(_tpl);
+  } else {
+    cmdArr.splice(idx + 1, 0, _tpl);
+  }
 }
 
 function removeCmd(cmdArr, index) {
@@ -129,14 +133,14 @@ onMounted(() => {
             <button class="btn btn-danger me-2" @click="removeCmd(globalPrepCmd, i)">
               <i class="fas fa-trash"></i>
             </button>
-            <button class="btn btn-success" @click="addCmd(globalPrepCmd, prepCmdTemplate)">
+            <button class="btn btn-success" @click="addCmd(globalPrepCmd, prepCmdTemplate, i)">
               <i class="fas fa-plus"></i>
             </button>
           </td>
         </tr>
         </tbody>
       </table>
-      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(globalPrepCmd, prepCmdTemplate)">
+      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(globalPrepCmd, prepCmdTemplate, -1)">
         &plus; {{ $t('config.add') }}
       </button>
     </div>
@@ -178,14 +182,14 @@ onMounted(() => {
             <button class="btn btn-danger me-2" @click="removeCmd(serverCmd, i)">
               <i class="fas fa-trash"></i>
             </button>
-            <button class="btn btn-success" @click="addCmd(serverCmd, serverCmdTemplate)">
+            <button class="btn btn-success" @click="addCmd(serverCmd, serverCmdTemplate, i)">
               <i class="fas fa-plus"></i>
             </button>
           </td>
         </tr>
         </tbody>
       </table>
-      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(serverCmd, serverCmdTemplate)">
+      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(serverCmd, serverCmdTemplate, -1)">
         &plus; {{ $t('config.add') }}
       </button>
     </div>

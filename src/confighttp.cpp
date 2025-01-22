@@ -1223,6 +1223,9 @@ namespace confighttp {
     pt::ptree outputTree;
     outputTree.put("status", false);
     outputTree.add_child("named_certs", named_certs);
+  #ifdef _WIN32
+    outputTree.put("platform", "windows");
+  #endif
     outputTree.put("status", true);
     send_response(response, outputTree);
   }

@@ -104,6 +104,48 @@
                 </button>
               </div>
             </div>
+
+            <!-- connect/disconnect commands -->
+            <div class="mb-3 mt-2 d-flex flex-column" v-for="cmdType in ['do', 'undo']">
+              <label class="mb-0 orm-label">{{ $t(`config.client_${cmdType}_cmd`) }}</label>
+              <div class="form-text">{{ $t(`config.client_${cmdType}_cmd_desc`) }} <a href="https://github.com/ClassicOldSong/Apollo/wiki/Client-Commands" target="_blank">{{ $t('_common.learn_more') }}</a></div>
+              <table class="mt-2 table" v-if="client[`edit_${cmdType}`].length > 0">
+                <thead>
+                  <tr>
+                    <th style="width: 80%"><i class="fas fa-terminal"></i> {{ $t('_common.cmd_val') }}</th>
+                    <th style="min-width: 10em; max-width: 12em;" v-if="platform === 'windows'">
+                      <i class="fas fa-shield-alt"></i> {{ $t('_common.run_as') }}
+                    </th>
+                    <th style="min-width: 110px;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                <tr v-for="(c, i) in client[`edit_${cmdType}`]">
+                  <td>
+                    <input type="text" class="form-control monospace" v-model="c.cmd" />
+                  </td>
+                  <td v-if="platform === 'windows'">
+                    <div class="form-check">
+                      <input type="checkbox" class="form-check-input" :id="`client-${cmdType}-cmd-admin-${i}`" v-model="c.elevated"
+                             true-value="true" false-value="false" />
+                      <label :for="`client-${cmdType}-cmd-admin-${i}`" class="form-check-label">{{ $t('_common.elevated') }}</label>
+                    </div>
+                  </td>
+                  <td>
+                    <button class="btn btn-danger me-2" @click="removeCmd(client[`edit_${cmdType}`], i)">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="btn btn-success" @click="addCmd(client[`edit_${cmdType}`], i)">
+                      <i class="fas fa-plus"></i>
+                    </button>
+                  </td>
+                </tr>
+                </tbody>
+              </table>
+              <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(client[`edit_${cmdType}`], -1)">
+                &plus; {{ $t('config.add') }}
+              </button>
+            </div>
           </div>
           <div v-else class="list-group-item d-flex align-items-center">
             <div class="p-2 flex-grow-1 d-flex align-items-center">
@@ -272,6 +314,7 @@
 
   const data = () => {
     return {
+      platform: '',
       editingHost: false,
       currentTab: location.hash || '#OTP',
       otp: '',
@@ -288,6 +331,11 @@
       unpairAllPressed: false,
       unpairAllStatus: null
     }
+  }
+
+  const cmdTpl = {
+    cmd: '',
+    elevated: 'false'
   }
 
   let app = createApp({
@@ -413,6 +461,17 @@
       clickedApplyBanner() {
         this.showApplyMessage = false;
       },
+      addCmd(arr, idx) {
+        const newCmd = Object.assign({}, cmdTpl);
+        if (idx < 0) {
+          arr.push(newCmd);
+        } else {
+          arr.splice(idx + 1, 0, newCmd);
+        }
+      },
+      removeCmd(arr, idx) {
+        arr.splice(idx, 1);
+      },
       editClient(client) {
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
@@ -421,6 +480,10 @@
         client.editing = true;
         client.editPerm = client.perm;
         client.editName = client.name;
+        client.edit_do = JSON.parse(JSON.stringify(client.do || []));
+        client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
+
+        console.log(client.do, client.undo)
       },
       cancelEdit(client) {
         client.editing = false;
@@ -434,7 +497,27 @@
         const editedClient = {
           uuid: client.uuid,
           name: client.editName,
-          perm: client.editPerm & permissionMapping._all
+          perm: client.editPerm & permissionMapping._all,
+          do: client.edit_do.reduce((filtered, {cmd: _cmd, elevated}) => {
+            const cmd = _cmd.trim()
+            if (cmd) {
+              filtered.push({
+                cmd,
+                elevated
+              })
+            }
+            return filtered
+          }, []),
+          undo: client.edit_undo.reduce((filtered, {cmd: _cmd, elevated}) => {
+            const cmd = _cmd.trim()
+            if (cmd) {
+              filtered.push({
+                cmd,
+                elevated
+              })
+            }
+            return filtered
+          }, [])
         }
         fetch("./api/clients/update", {
           credentials: 'include',
@@ -515,9 +598,9 @@
         fetch("./api/clients/list", { credentials: 'include' })
           .then((response) => response.json())
           .then((response) => {
-            const clientList = document.querySelector("#client-list");
             if (response.status === 'true' && response.named_certs && response.named_certs.length) {
-              this.clients = response.named_certs.map(({name, uuid, perm, connected}) => {
+              this.platform = response.platform
+              this.clients = response.named_certs.map(({name, uuid, perm, connected, do: _do, undo}) => {
                 const permInt = parseInt(perm, 10);
                 return {
                   name,
@@ -525,8 +608,8 @@
                   perm: permInt,
                   connected: connected === 'true',
                   editing: false,
-                  editPerm: permInt,
-                  editName: name
+                  do: _do,
+                  undo
                 }
               })
               currentEditingClient = null;
