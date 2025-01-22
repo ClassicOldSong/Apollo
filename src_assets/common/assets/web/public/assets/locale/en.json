@@ -32,6 +32,8 @@
     "actions": "Actions",
     "add_cmds": "Add Commands",
     "add_new": "Add New",
+    "allow_client_commands": "Allow client prepare commands",
+    "allow_client_commands_desc": "Whether to execute client prepare commands when running this app.",
     "app_name": "Application Name",
     "app_name_desc": "Application Name, as shown on Moonlight",
     "applications_desc": "Applications are refreshed only when Client is restarted",

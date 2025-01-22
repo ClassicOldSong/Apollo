@@ -1148,6 +1148,11 @@ namespace nvhttp {
         return;
       }
 
+      if (!app_iter->allow_client_commands) {
+        launch_session->client_do_cmds.clear();
+        launch_session->client_undo_cmds.clear();
+      }
+
       auto err = proc::proc.execute(appid, *app_iter, launch_session);
       if (err) {
         tree.put("root.<xmlattr>.status_code", err);
@@ -1223,6 +1228,11 @@ namespace nvhttp {
       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     }
     auto launch_session = make_launch_session(host_audio, 0, args, named_cert_p);
+
+    if (!proc::proc.allow_client_commands) {
+      launch_session->client_do_cmds.clear();
+      launch_session->client_undo_cmds.clear();
+    }
 
     if (no_active_sessions && !proc::proc.virtual_display) {
       // We want to prepare display only if there are no active sessions

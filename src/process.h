@@ -73,6 +73,7 @@ namespace proc {
     bool virtual_display;
     bool virtual_display_primary;
     bool use_app_identity;
+    bool allow_client_commands;
     int  scale_factor;
     std::chrono::seconds exit_timeout;
   };
@@ -84,7 +85,7 @@ namespace proc {
     std::string display_name;
     std::string initial_display;
     bool virtual_display;
-    bool initial_hdr;
+    bool allow_client_commands;
 
 
     proc_t(

@@ -150,6 +150,14 @@
             v-model="editForm['image-path']" />
           <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
         </div>
+        <!-- allow client commands -->
+        <Checkbox class="mb-3"
+                  id="clientCommands"
+                  label="apps.allow_client_commands"
+                  desc="apps.allow_client_commands_desc"
+                  v-model="editForm['allow-client-commands']"
+                  default="true"
+        ></Checkbox>
         <!-- prep-cmd -->
         <Checkbox class="mb-3"
                   id="excludeGlobalPrep"
@@ -409,7 +417,8 @@
     detached: [],
     "image-path": "",
     "scale-factor": "100",
-    "use-app-identity": false
+    "use-app-identity": false,
+    "allow-client-commands": true,
   }
 
   const app = createApp({

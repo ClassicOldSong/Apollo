@@ -166,6 +166,7 @@ namespace proc {
     _app = app;
     _app_id = app_id;
     _launch_session = launch_session;
+    allow_client_commands = app.allow_client_commands;
 
     uint32_t client_width = launch_session->width ? launch_session->width : 1920;
     uint32_t client_height = launch_session->height ? launch_session->height : 1080;
@@ -409,7 +410,7 @@ namespace proc {
       } else {
         auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
 
-        this->initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
+        bool initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
 
         if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
           if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
@@ -423,7 +424,7 @@ namespace proc {
               BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
             }
           }
-        } else if (this->initial_hdr) {
+        } else if (initial_hdr) {
           if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
             BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
           } else {
@@ -566,10 +567,10 @@ namespace proc {
 
     _app_id = -1;
     display_name.clear();
-    initial_hdr = false;
     initial_display.clear();
     _launch_session.reset();
     virtual_display = false;
+    allow_client_commands = false;
   }
 
   const std::vector<ctx_t> &
@@ -912,6 +913,7 @@ namespace proc {
         auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
         auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
         auto use_app_identity = app_node.get_optional<bool>("use-app-identity"s);
+        auto allow_client_commands = app_node.get_optional<bool>("allow-client-commands");
 
         ctx.uuid = app_uuid.value();
 
@@ -986,6 +988,7 @@ namespace proc {
         ctx.virtual_display = virtual_display.value_or(false);
         ctx.scale_factor = resolution_scale_factor.value_or(100);
         ctx.use_app_identity = use_app_identity.value_or(false);
+        ctx.allow_client_commands = allow_client_commands.value_or(true);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {
