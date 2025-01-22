@@ -14,7 +14,7 @@
             <a class="nav-link" href="./"><i class="fas fa-fw fa-home"></i> {{ $t('navbar.home') }}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="./pin"><i class="fas fa-fw fa-unlock"></i> {{ $t('navbar.pin') }}</a>
+            <a class="nav-link" href="./pairing"><i class="fas fa-fw fa-unlock"></i> {{ $t('navbar.pairing') }}</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="./apps"><i class="fas fa-fw fa-stream"></i> {{ $t('navbar.applications') }}</a>
