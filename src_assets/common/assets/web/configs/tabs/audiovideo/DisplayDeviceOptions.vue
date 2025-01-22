@@ -62,7 +62,7 @@ function addRemappingEntry() {
                aria-labelledby="panelsStayOpen-headingOne">
             <div class="accordion-body">
               <div class="alert alert-info" v-if="platform === 'windows'">
-                <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('config.dd_resolution_option_vdisplay_desc') }}
+                <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('config.dd_resolution_option_vdisplay_desc') }} {{ $t('config.dd_resolution_option_multi_instance_desc') }}
               </div>
 
               <!-- Configuration option -->

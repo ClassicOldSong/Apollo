@@ -213,6 +213,7 @@
     "dd_resolution_option_manual_desc": "Enter the resolution to be used",
     "dd_resolution_option_ogs_desc": "\"Optimize game settings\" option must be enabled on the Moonlight client for this to work.",
     "dd_resolution_option_vdisplay_desc": "When using virtual display, only built-in resolution and client requested resolution/refresh rate will work.",
+    "dd_resolution_option_multi_instance_desc": "When using multiple instance of Apollo, make sure you have disabled this option in all instances, or it'll end up messing things up.",
     "dd_wa_hdr_toggle_desc": "When using virtual display device as for streaming, it might display incorrect HDR color. With this option enabled, Apollo will try to mitigate this issue.",
     "dd_wa_hdr_toggle": "Enable high-contrast workaround for HDR",
     "ds4_back_as_touchpad_click": "Map Back/Select to Touchpad Click",
