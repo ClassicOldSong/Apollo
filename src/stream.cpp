@@ -409,6 +409,9 @@ namespace stream {
     std::string device_uuid;
     crypto::PERM permission;
 
+    std::list<crypto::command_entry_t> do_cmds;
+    std::list<crypto::command_entry_t> undo_cmds;
+
     safe::mail_raw_t::event_t<bool> shutdown_event;
     safe::signal_t controlEnd;
 
@@ -2076,6 +2079,25 @@ namespace stream {
       BOOST_LOG(debug) << "Resetting Input..."sv;
       input::reset(session.input);
 
+      if (!session.undo_cmds.empty()) {
+        auto exec_thread = std::thread([cmd_list = session.undo_cmds]{
+          for (auto &cmd : cmd_list) {
+            std::error_code ec;
+            auto env = proc::proc.get_env();
+            boost::filesystem::path working_dir = proc::find_working_directory(cmd.cmd, env);
+            auto child = platf::run_command(cmd.elevated, true, cmd.cmd, working_dir, env, nullptr, ec, nullptr);
+            BOOST_LOG(info) << "Spawning client undo command ["sv << cmd.cmd << "] in ["sv << working_dir << ']';
+            if (ec) {
+              BOOST_LOG(warning) << "Couldn't spawn ["sv << cmd.cmd << "]: System: "sv << ec.message();
+            } else {
+              child.detach();
+            }
+          }
+        });
+
+        exec_thread.detach();
+      }
+
       // If this is the last session, invoke the platform callbacks
       if (--running_sessions == 0) {
         if (proc::proc.running()) {
@@ -2130,6 +2152,25 @@ namespace stream {
         platf::streaming_will_start();
       }
 
+      if (!session.do_cmds.empty()) {
+        auto exec_thread = std::thread([cmd_list = session.do_cmds]{
+          for (auto &cmd : cmd_list) {
+            std::error_code ec;
+            auto env = proc::proc.get_env();
+            boost::filesystem::path working_dir = proc::find_working_directory(cmd.cmd, env);
+            auto child = platf::run_command(cmd.elevated, true, cmd.cmd, working_dir, env, nullptr, ec, nullptr);
+            BOOST_LOG(info) << "Spawning client do command ["sv << cmd.cmd << "] in ["sv << working_dir << ']';
+            if (ec) {
+              BOOST_LOG(warning) << "Couldn't spawn ["sv << cmd.cmd << "]: System: "sv << ec.message();
+            } else {
+              child.detach();
+            }
+          }
+        });
+
+        exec_thread.detach();
+      }
+
       return 0;
     }
 
@@ -2144,6 +2185,9 @@ namespace stream {
       session->device_name = launch_session.device_name;
       session->device_uuid = launch_session.unique_id;
       session->permission = launch_session.perm;
+
+      session->do_cmds = std::move(launch_session.client_do_cmds);
+      session->undo_cmds = std::move(launch_session.client_undo_cmds);
 
       session->config = config;
 

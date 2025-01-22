@@ -5,10 +5,13 @@
 #pragma once
 
 #include <array>
+#include <list>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/x509.h>
+
+#include <boost/property_tree/ptree.hpp>
 
 #include "utility.h"
 
@@ -78,10 +81,25 @@ namespace crypto {
     return static_cast<uint32_t>(p) == 0;
   }
 
+  struct command_entry_t {
+    std::string cmd;
+    bool elevated;
+
+    // Serialize method
+    static inline boost::property_tree::ptree serialize(const command_entry_t& entry) {
+      boost::property_tree::ptree node;
+      node.put("cmd", entry.cmd);
+      node.put("elevated", entry.elevated);
+      return node;
+    }
+  };
+
   struct named_cert_t {
     std::string name;
     std::string uuid;
     std::string cert;
+    std::list<command_entry_t> do_cmds;
+    std::list<command_entry_t> undo_cmds;
     PERM        perm;
   };
 

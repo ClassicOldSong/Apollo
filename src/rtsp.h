@@ -53,6 +53,9 @@ namespace rtsp_stream {
     std::string rtsp_url_scheme;
     uint32_t rtsp_iv_counter;
 
+    std::list<crypto::command_entry_t> client_do_cmds;
+    std::list<crypto::command_entry_t> client_undo_cmds;
+
   #ifdef _WIN32
     GUID display_guid{};
   #endif

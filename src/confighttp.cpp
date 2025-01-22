@@ -1062,8 +1062,10 @@ namespace confighttp {
       pt::read_json(ss, inputTree);
       std::string uuid = inputTree.get<std::string>("uuid");
       std::string name = inputTree.get<std::string>("name");
+      auto do_cmds = nvhttp::extract_command_entries(inputTree, "do");
+      auto undo_cmds = nvhttp::extract_command_entries(inputTree, "undo");
       auto perm = (crypto::PERM)inputTree.get<uint32_t>("perm") & crypto::PERM::_all;
-      outputTree.put("status", nvhttp::update_device_info(uuid, name, perm));
+      outputTree.put("status", nvhttp::update_device_info(uuid, name, do_cmds, undo_cmds, perm));
       send_response(response, outputTree);
     }
     catch (std::exception &e) {

@@ -168,6 +168,34 @@ namespace nvhttp {
     return it->second;
   }
 
+  // Helper function to extract command entries
+  cmd_list_t
+  extract_command_entries(const pt::ptree& pt, const std::string& key) {
+    cmd_list_t commands;
+
+    // Check if the specified key exists
+    auto it = pt.find(key);
+    if (it != pt.not_found()) {
+      // Traverse the array and extract entries
+      for (const auto& item : pt.get_child(key)) {
+        try {
+          // Extract "cmd" and "elevated" fields
+          std::string cmd = item.second.get<std::string>("cmd");
+          bool elevated = item.second.get<bool>("elevated");
+
+          // Add to the list of commands
+          commands.push_back({cmd, elevated});
+        } catch (const std::exception& e) {
+          BOOST_LOG(warning) << "Error parsing entry: " << e.what();
+        }
+      }
+    } else {
+      BOOST_LOG(debug) << "Key \"" << key << "\" not found in the JSON.";
+    }
+
+    return commands;
+  }
+
   void
   save_state() {
     pt::ptree root;
@@ -209,6 +237,25 @@ namespace nvhttp {
         named_cert_node.put("cert"s, named_cert_p->cert);
         named_cert_node.put("uuid"s, named_cert_p->uuid);
         named_cert_node.put("perm"s, (uint32_t)named_cert_p->perm);
+
+        // Add "do" commands
+        if (!named_cert_p->do_cmds.empty()) {
+          pt::ptree do_cmds_node;
+          for (const auto& cmd : named_cert_p->do_cmds) {
+            do_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+          }
+          named_cert_node.add_child("do", do_cmds_node);
+        }
+
+        // Add "undo" commands
+        if (!named_cert_p->undo_cmds.empty()) {
+          pt::ptree undo_cmds_node;
+          for (const auto& cmd : named_cert_p->undo_cmds) {
+            undo_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+          }
+          named_cert_node.add_child("undo", undo_cmds_node);
+        }
+
         named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
       }
     }
@@ -235,9 +282,8 @@ namespace nvhttp {
     try {
       pt::read_json(config::nvhttp.file_state, tree);
     }
-    catch (std::exception &e) {
+    catch (std::exception& e) {
       BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state << ": "sv << e.what();
-
       return;
     }
 
@@ -257,11 +303,11 @@ namespace nvhttp {
     // Import from old format
     if (root.get_child_optional("devices")) {
       auto device_nodes = root.get_child("devices");
-      for (auto &[_, device_node] : device_nodes) {
+      for (auto& [_, device_node] : device_nodes) {
         auto uniqID = device_node.get<std::string>("uniqueid");
 
         if (device_node.count("certs")) {
-          for (auto &[_, el] : device_node.get_child("certs")) {
+          for (auto& [_, el] : device_node.get_child("certs")) {
             auto named_cert_p = std::make_shared<crypto::named_cert_t>();
             named_cert_p->name = ""s;
             named_cert_p->cert = el.get_value<std::string>();
@@ -274,19 +320,24 @@ namespace nvhttp {
     }
 
     if (root.count("named_devices")) {
-      for (auto &[_, el] : root.get_child("named_devices")) {
+      for (auto& [_, el] : root.get_child("named_devices")) {
         auto named_cert_p = std::make_shared<crypto::named_cert_t>();
         named_cert_p->name = el.get<std::string>("name");
         named_cert_p->cert = el.get<std::string>("cert");
         named_cert_p->uuid = el.get<std::string>("uuid");
         named_cert_p->perm = (PERM)el.get("perm", (uint32_t)PERM::_all) & PERM::_all;
+
+        // Load commands
+        named_cert_p->do_cmds = extract_command_entries(el, "do");
+        named_cert_p->undo_cmds = extract_command_entries(el, "undo");
+
         client.named_devices.emplace_back(named_cert_p);
       }
     }
 
     // Empty certificate chain and import certs from file
     cert_chain.clear();
-    for (auto &named_cert : client.named_devices) {
+    for (auto& named_cert : client.named_devices) {
       cert_chain.add(named_cert);
     }
 
@@ -365,6 +416,9 @@ namespace nvhttp {
     launch_session->enable_hdr = util::from_view(get_arg(args, "hdrMode", "0"));
     launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0"));
     launch_session->scale_factor = util::from_view(get_arg(args, "scaleFactor", "100"));
+
+    launch_session->client_do_cmds = named_cert_p->do_cmds;
+    launch_session->client_undo_cmds = named_cert_p->undo_cmds;
 
     return launch_session;
   }
@@ -931,6 +985,24 @@ namespace nvhttp {
       named_cert_node.put("name"s, named_cert_p->name);
       named_cert_node.put("uuid"s, named_cert_p->uuid);
       named_cert_node.put("perm", (uint32_t)named_cert_p->perm);
+
+      // Add "do" commands
+      if (!named_cert_p->do_cmds.empty()) {
+        pt::ptree do_cmds_node;
+        for (const auto& cmd : named_cert_p->do_cmds) {
+          do_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+        }
+        named_cert_node.add_child("do", do_cmds_node);
+      }
+
+      // Add "undo" commands
+      if (!named_cert_p->undo_cmds.empty()) {
+        pt::ptree undo_cmds_node;
+        for (const auto& cmd : named_cert_p->undo_cmds) {
+          undo_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+        }
+        named_cert_node.add_child("undo", undo_cmds_node);
+      }
 
       if (connected_uuids.empty()) {
         named_cert_node.put("connected"s, false);
@@ -1563,7 +1635,13 @@ namespace nvhttp {
     return false;
   }
 
-  bool update_device_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm) {
+  bool update_device_info(
+    const std::string& uuid,
+    const std::string& name,
+    const cmd_list_t& do_cmds,
+    const cmd_list_t& undo_cmds,
+    const crypto::PERM newPerm
+  ) {
     find_and_udpate_session_info(uuid, name, newPerm);
 
     client_t &client = client_root;
@@ -1573,6 +1651,8 @@ namespace nvhttp {
       if (named_cert_p->uuid == uuid) {
         named_cert_p->name = name;
         named_cert_p->perm = newPerm;
+        named_cert_p->do_cmds = do_cmds;
+        named_cert_p->undo_cmds = undo_cmds;
         save_state();
         return true;
       }

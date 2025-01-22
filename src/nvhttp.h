@@ -8,6 +8,7 @@
 // standard includes
 #include <string>
 #include <chrono>
+#include <list>
 
 // lib includes
 #include <Simple-Web-Server/server_https.hpp>
@@ -26,6 +27,7 @@ using namespace std::chrono_literals;
 namespace nvhttp {
 
   using args_t = SimpleWeb::CaseInsensitiveMultimap;
+  using cmd_list_t = std::list<crypto::command_entry_t>;
 
   /**
    * @brief The protocol version.
@@ -62,6 +64,10 @@ namespace nvhttp {
 
   std::string
   get_arg(const args_t &args, const char *name, const char *default_value = nullptr);
+
+  // Helper function to extract command entries
+  cmd_list_t
+  extract_command_entries(const boost::property_tree::ptree& pt, const std::string& key);
 
   std::shared_ptr<rtsp_stream::launch_session_t>
   make_launch_session(bool host_audio, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p);
@@ -262,9 +268,19 @@ namespace nvhttp {
   /**
    * @brief      Update device info
    *
-   * @param[in]  uuid     The uuid string
-   * @param[in]  name     New name
-   * @param[in]  newPerm  New permission
+   * @param[in]  uuid       The uuid string
+   * @param[in]  name       New name
+   * @param[in]  do_cmds    The do commands
+   * @param[in]  undo_cmds  The undo commands
+   * @param[in]  newPerm    New permission
+   *
+   * @return     Whether the update is successful
    */
-  bool update_device_info(const std::string& uuid, const std::string& name, const crypto::PERM newPerm);
+  bool update_device_info(
+    const std::string& uuid,
+    const std::string& name,
+    const cmd_list_t& do_cmds,
+    const cmd_list_t& undo_cmds,
+    const crypto::PERM newPerm
+  );
 }  // namespace nvhttp
