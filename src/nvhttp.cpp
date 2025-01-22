@@ -1152,10 +1152,10 @@ namespace nvhttp {
     }
     auto launch_session = make_launch_session(host_audio, 0, args, named_cert_p);
 
-    if (no_active_sessions) {
-      // We want to prepare display only if there are no active sessions at
-      // the moment. This should be done before probing encoders as it could
-      // change the active displays.
+    if (no_active_sessions && !proc::proc.virtual_display) {
+      // We want to prepare display only if there are no active sessions
+      // and the current session isn't virtual display at the moment.
+      // This should be done before probing encoders as it could change the active displays.
       display_device::configure_display(config::video, *launch_session);
 
       // Probe encoders again before streaming to ensure our chosen
