@@ -563,7 +563,7 @@
               }).filter(item => item));
         }
 
-        searchCovers(this.editForm["name"].toString())
+        searchCovers(this.editForm["name"].toString().trim())
           .then(list => this.coverCandidates = list)
           .finally(() => this.coverSearching = false);
       },
@@ -595,7 +595,8 @@
           .finally(() => this.coverFinderBusy = false);
       },
       save() {
-        this.editForm["image-path"] = this.editForm["image-path"].toString().replace(/"/g, '');
+        this.editForm.name = this.editForm.name.trim();
+        this.editForm["image-path"] = this.editForm["image-path"].toString().trim().replace(/"/g, '');
         delete this.editForm["launching"];
         delete this.editForm["id"];
         fetch("./api/apps", {
