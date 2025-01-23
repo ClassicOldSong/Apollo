@@ -216,10 +216,30 @@ namespace proc {
           VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
         }
 
-        auto device_uuid_str = _app.use_app_identity ? _app.uuid : launch_session->unique_id;
-        auto device_name = _app.use_app_identity ? _app.name : launch_session->device_name;
+        std::string device_name;
+        std::string device_uuid_str;
+        uuid_util::uuid_t device_uuid;
 
-        auto device_uuid = uuid_util::uuid_t::parse(device_uuid_str);
+        if (_app.use_app_identity) {
+          device_name = _app.name;
+          if (_app.per_client_app_identity) {
+            device_uuid = uuid_util::uuid_t::parse(launch_session->unique_id);
+            auto app_uuid = uuid_util::uuid_t::parse(_app.uuid);
+
+            // Use XOR to mix the two UUIDs
+            device_uuid.b64[0] ^= app_uuid.b64[0];
+            device_uuid.b64[1] ^= app_uuid.b64[1];
+
+            device_uuid_str = device_uuid.string();
+          } else {
+            device_uuid_str = _app.uuid;
+            device_uuid = uuid_util::uuid_t::parse(_app.uuid);
+          }
+        } else {
+          device_name = launch_session->device_name;
+          device_uuid_str = launch_session->unique_id;
+          device_uuid = uuid_util::uuid_t::parse(launch_session->unique_id);
+        }
 
         memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
 
@@ -913,6 +933,7 @@ namespace proc {
         auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
         auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
         auto use_app_identity = app_node.get_optional<bool>("use-app-identity"s);
+        auto per_client_app_identity = app_node.get_optional<bool>("per-client-app-identity");
         auto allow_client_commands = app_node.get_optional<bool>("allow-client-commands");
 
         ctx.uuid = app_uuid.value();
@@ -988,6 +1009,7 @@ namespace proc {
         ctx.virtual_display = virtual_display.value_or(false);
         ctx.scale_factor = resolution_scale_factor.value_or(100);
         ctx.use_app_identity = use_app_identity.value_or(false);
+        ctx.per_client_app_identity = per_client_app_identity.value_or(false);
         ctx.allow_client_commands = allow_client_commands.value_or(true);
 
         auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
@@ -1017,6 +1039,7 @@ namespace proc {
         ctx.virtual_display = true;
         ctx.scale_factor = 100;
         ctx.use_app_identity = false;
+        ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
 
         ctx.elevated = false;

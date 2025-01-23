@@ -290,12 +290,24 @@
                   default="false"
         ></Checkbox>
         <!-- use app identity -->
-        <div class="mb-3 form-check">
-          <label for="useAppIdentity" class="form-check-label">{{ $t('apps.use_app_identity') }}</label>
-          <input type="checkbox" class="form-check-input" id="useAppIdentity" v-model="editForm['use-app-identity']"
-            true-value="true" false-value="false" />
-          <div class="form-text">{{ $t('apps.use_app_identity_desc') }}</div>
-        </div>
+        <Checkbox class="mb-3"
+                  id="useAppIdentity"
+                  label="apps.use_app_identity"
+                  desc="apps.use_app_identity_desc"
+                  v-model="editForm['use-app-identity']"
+                  true-value="true"
+                  false-value="false"
+        ></Checkbox>
+        <!-- use app identity -->
+        <Checkbox class="mb-3"
+                  v-if="editForm['use-app-identity'] === 'true'"
+                  id="perClientAppIdentity"
+                  label="apps.per_client_app_identity"
+                  desc="apps.per_client_app_identity_desc"
+                  v-model="editForm['per-client-app-identity']"
+                  true-value="true"
+                  false-value="false"
+        ></Checkbox>
         <!-- resolution scale factor -->
         <div class="mb-3" v-if="platform === 'windows'">
           <label for="resolutionScaleFactor" class="form-label">{{ $t('apps.resolution_scale_factor') }}: {{editForm['scale-factor']}}%</label>
@@ -418,6 +430,7 @@
     "image-path": "",
     "scale-factor": "100",
     "use-app-identity": false,
+    "per-client-app-identity": false,
     "allow-client-commands": true,
   }
 
