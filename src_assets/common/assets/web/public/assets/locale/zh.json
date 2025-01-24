@@ -216,7 +216,7 @@
     "dd_resolution_option_manual_desc": "输入要使用的分辨率",
     "dd_resolution_option_ogs_desc": "“优化游戏设置”选项必须在 Moonlight 客户端启用才能正常工作。",
     "dd_resolution_option_vdisplay_desc": "当使用虚拟显示器时，只有内置或客户端请求的分辨率/帧率组合可用。",
-    "dd_resolution_option_multi_instance_desc": "当同时启动多个 Apollo 实例时，请确保每个实例都已禁用此选项，否则显示器组合可能会被搞乱。",
+    "dd_resolution_option_multi_instance_desc": "当同时启动多个 Apollo 实例时，请确保每个实例都已禁用此选项，否则显示器组合可能会被搞乱。当你不希望物理显示器的分辨率被改变或只需要串流虚拟显示器时，依旧推荐完全禁用此选项。",
     "dd_wa_hdr_toggle_desc": "当使用虚拟显示设备作为串流时，它可能会显示不正确的 HDR 颜色。启用此选项，Apollo 将尝试缓解这个问题。",
     "dd_wa_hdr_toggle": "为 HDR 启用高对比度",
     "ds4_back_as_touchpad_click": "映射回/选择触摸板点击",
