@@ -434,6 +434,7 @@ namespace nvhttp {
     tree.put("root.<xmlattr>.status_code", 400);
     tree.put("root.<xmlattr>.status_message", status_msg);
     remove_session(sess);  // Security measure, delete the session when something went wrong and force a re-pair
+    BOOST_LOG(warning) << "Pair attempt failed due to " << status_msg;
   }
 
   void
