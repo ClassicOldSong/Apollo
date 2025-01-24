@@ -186,7 +186,7 @@
     "dd_config_label": "设备配置",
     "dd_config_revert_delay": "配置恢复延迟",
     "dd_config_revert_delay_desc": "在恢复配置前等待更多的以毫秒为单位的延迟，当应用程序已关闭或上次会话终止。 主要目的是在应用程序之间快速切换时提供更顺利的转换。",
-    "dd_config_verify_only": "验证显示是否已启用 (默认)",
+    "dd_config_verify_only": "验证显示是否已启用",
     "dd_hdr_option": "HDR",
     "dd_hdr_option_auto": "按客户端请求开启/关闭HDR 模式 (默认)",
     "dd_hdr_option_disabled": "不要更改 HDR 设置",

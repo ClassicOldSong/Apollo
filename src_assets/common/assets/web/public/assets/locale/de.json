@@ -158,7 +158,7 @@
     "dd_config_label": "Gerätekonfiguration",
     "dd_config_revert_delay": "Zurücksetzungsverzögerung konfigurieren",
     "dd_config_revert_delay_desc": "Zusätzliche Verzögerung in Millisekunden, um zu warten, bevor die Konfiguration rückgängig gemacht wird, wenn die App geschlossen oder die letzte Sitzung beendet wurde. Hauptziel ist es, einen reibungsloseren Übergang beim schnellen Wechsel zwischen Apps zu ermöglichen.",
-    "dd_config_verify_only": "Überprüfen Sie, ob das Display aktiviert ist (Standard)",
+    "dd_config_verify_only": "Überprüfen Sie, ob das Display aktiviert ist",
     "dd_hdr_option": "HDR",
     "dd_hdr_option_auto": "Ein-/Ausschalten des HDR-Modus, wie vom Client gewünscht (Standard)",
     "dd_hdr_option_disabled": "HDR-Einstellungen nicht ändern",

@@ -158,7 +158,7 @@
     "dd_config_label": "Configuration de l'appareil",
     "dd_config_revert_delay": "Délai d'annulation de la configuration",
     "dd_config_revert_delay_desc": "Délai supplémentaire en millisecondes à attendre avant de revenir à la configuration lorsque l'application a été fermée ou que la dernière session s'est terminée. L'objectif principal est de fournir une transition plus souple lors d'un basculement rapide entre les applications.",
-    "dd_config_verify_only": "Vérifiez que l'affichage est activé (par défaut)",
+    "dd_config_verify_only": "Vérifiez que l'affichage est activé",
     "dd_hdr_option": "HDR",
     "dd_hdr_option_auto": "Activer/désactiver le mode HDR tel que demandé par le client (par défaut)",
     "dd_hdr_option_disabled": "Ne pas modifier les paramètres HDR",
