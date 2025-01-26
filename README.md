@@ -7,6 +7,7 @@ Major features:
 - [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
 - [x] Permission management for clients
 - [x] Clipboard sync
+- [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
 
 ## Usage
 
