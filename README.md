@@ -80,9 +80,12 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
 - **Shows the same screen as main screen**
   - If you're using an external display for the first time, Windows might configure it as "Mirror mode" by default. Press <kbd>Meta + P</kbd> (or known as <kbd>Win + P</kbd>) and select "Extended", then **exit the app** (not only the stream) and start the app again. You only need to do this once.
 - **Apps still launch on physical display.**
-  - Go to `Audio/Video` tab, in `Advanced display device options` section, set `Device configuration` to `Activate the display automatically and make it a primary display`. Also make sure the app has set preferred display to `None` or `Auto`.
+  - If you don't need to set resolution on your physical display, you can disable the whole advanced config. Then exit Apollo, check if there's a file named "display_device.state", if so remove it, then start Apollo again.
+
+    Then when you stream just disable the physical display in Windows settings. It'll then be managed by Windows.
+  - Or you can go to `Audio/Video` tab, in `Advanced display device options` section, set `Device configuration` to `Activate the display automatically and make it a primary display`. Also make sure the app has set preferred display to `None` or `Auto`. This method is not recommended though, as it may fail due to misterious reasons and are sure can mess up your configs.
 - **Primary display changed to the virtual display after connection. I don't want that.**
-  - Go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Verify that display is enabled` or `Activate the display automatically`. Then go to Windows display settings and set your desired display to primary.
+  - Go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Disabled` or `Verify that display is enabled` or `Activate the display automatically`. Then go to Windows display settings and set your desired display to primary.
 - **I want to turn off the physical monitor when streaming**
   - The first time you stream with virtual display, go to Windows settings and disable the physical monitor. The next time you start streaming it will turn off automatically.
   - Or, go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Deactivate other displays and activate only the specified display`.
