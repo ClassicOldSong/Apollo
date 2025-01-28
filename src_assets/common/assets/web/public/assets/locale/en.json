@@ -86,7 +86,7 @@
     "name": "Name",
     "output_desc": "The file where the output of the command is stored, if it is not specified, the output is ignored",
     "output_name": "Output",
-    "per_client_app_identrty": "Per Client App Identity",
+    "per_client_app_identity": "Per Client App Identity",
     "per_client_app_identity_desc": "Separate the app's identity per-client. Useful when you want different virtual display configurations on this specific app for different clients",
     "run_as_desc": "This can be necessary for some applications that require administrator permissions to run properly. Might cause URL schemes to fail.",
     "wait_all": "Continue streaming until all app processes exit",

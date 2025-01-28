@@ -84,7 +84,7 @@
     "name": "名称",
     "output_desc": "存储命令输出的文件，如果未指定，输出将被忽略",
     "output_name": "输出",
-    "per_client_app_identrty": "按客户端区分 App 身份",
+    "per_client_app_identity": "按客户端区分 App 身份",
     "per_client_app_identity_desc": "当你希望在使用此 App 时每个客户端都有不同的虚拟显示器组合配置时有用。",
     "run_as_desc": "这可能是某些需要管理员权限才能正常运行的应用程序所必需的。可能会导致 URL schemes 无法正常启动。",
     "wait_all": "继续串流直到所有应用进程退出",
