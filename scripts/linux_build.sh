@@ -85,7 +85,7 @@ shift $((OPTIND -1))
 # dependencies array to build out
 dependencies=()
 
-function add_debain_based_deps() {
+function add_debian_based_deps() {
   dependencies+=(
     "bison"  # required if we need to compile doxygen
     "build-essential"
@@ -128,8 +128,8 @@ function add_debain_based_deps() {
   fi
 }
 
-function add_debain_deps() {
-  add_debain_based_deps
+function add_debian_deps() {
+  add_debian_based_deps
   dependencies+=(
     "libayatana-appindicator3-dev"
   )
@@ -141,7 +141,7 @@ function add_ubuntu_deps() {
     ${sudo_cmd} add-apt-repository ppa:ubuntu-toolchain-r/test -y
   fi
 
-  add_debain_based_deps
+  add_debian_based_deps
   dependencies+=(
     "libappindicator3-dev"
   )
@@ -276,7 +276,9 @@ function run_install() {
     "-DSUNSHINE_ENABLE_WAYLAND=ON"
     "-DSUNSHINE_ENABLE_X11=ON"
     "-DSUNSHINE_ENABLE_DRM=ON"
-  )
+    "-DBUILD_TESTS=false"
+    "-DBUILD_DOCS=false"
+    )
 
   if [ "$appimage_build" == 1 ]; then
     cmake_args+=("-DSUNSHINE_BUILD_APPIMAGE=ON")
@@ -297,7 +299,7 @@ function run_install() {
   $package_update_command
 
   if [ "$distro" == "debian" ]; then
-    add_debain_deps
+    add_debian_deps
   elif [ "$distro" == "ubuntu" ]; then
     add_ubuntu_deps
   elif [ "$distro" == "fedora" ] && [ "$version" == "41" ]; then
@@ -314,8 +316,8 @@ function run_install() {
 
   # reload the environment
   # shellcheck source=/dev/null
-  source ~/.bashrc
-
+ # source ~/.bashrc
+   
   gcc_alternative_files=(
     "gcc"
     "g++"
@@ -394,6 +396,8 @@ function run_install() {
     install_cuda
     cmake_args+=("-DSUNSHINE_ENABLE_CUDA=ON")
     cmake_args+=("-DCMAKE_CUDA_COMPILER:PATH=${build_dir}/cuda/bin/nvcc")
+  else 
+    cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF")
   fi
 
   # Cmake stuff here
