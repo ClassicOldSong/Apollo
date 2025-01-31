@@ -192,9 +192,6 @@ namespace proc {
     launch_session->width = render_width;
     launch_session->height = render_height;
 
-#ifdef _WIN32
-    bool create_virtual_display = config::video.headless_mode || launch_session->virtual_display || _app.virtual_display;
-
     this->initial_display = config::video.output_name;
     // Executed when returning from function
     auto fg = util::fail_guard([&]() {
@@ -204,7 +201,8 @@ namespace proc {
       display_device::revert_configuration();
     });
 
-    if (create_virtual_display) {
+#ifdef _WIN32
+    if (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
         initVDisplayDriver();

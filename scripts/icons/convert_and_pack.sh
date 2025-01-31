@@ -37,10 +37,10 @@ icon_sizes=${!icon_sizes_keys[@]}
 echo "using icon sizes:"
 echo ${icon_sizes[@]}
 
-src_vectors=("../../src_assets/common/assets/web/public/images/sunshine-locked.svg"
-             "../../src_assets/common/assets/web/public/images/sunshine-pausing.svg"
-             "../../src_assets/common/assets/web/public/images/sunshine-playing.svg"
-             "../../sunshine.svg")
+src_vectors=("../../src_assets/common/assets/web/public/images/apollo-locked.svg"
+             "../../src_assets/common/assets/web/public/images/apollo-pausing.svg"
+             "../../src_assets/common/assets/web/public/images/apollo-playing.svg"
+             "../../apollo.svg")
 
 echo "using sources vectors:"
 echo ${src_vectors[@]}
