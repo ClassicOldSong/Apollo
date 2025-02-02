@@ -278,6 +278,8 @@
     "lan_encryption_mode_1": "为支持的客户端启用",
     "lan_encryption_mode_2": "强制所有客户端使用",
     "lan_encryption_mode_desc": "这将决定在本地网络上进行流媒体传输时何时使用加密。加密会降低流媒体性能，尤其是在功能较弱的主机和客户端上。",
+    "limit_framerate": "限制捕获帧率",
+    "limit_framerate_desc": "将捕获帧率限制到客户端请求的帧率。当启用垂直同步且显示器刷新率与客户端刷新率不匹配时可能会跑不满请求的帧率。若禁用，可能会在某些客户端上导致延迟。",
     "locale": "本地化",
     "locale_desc": "用于 Apollo 用户界面的本地化设置。",
     "log_level": "日志级别",

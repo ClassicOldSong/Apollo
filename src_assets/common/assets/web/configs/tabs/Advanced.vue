@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import PlatformLayout from '../../PlatformLayout.vue'
+import Checkbox from "../../Checkbox.vue";
 
 const props = defineProps([
   'platform',
@@ -33,6 +34,14 @@ const config = ref(props.config)
       <input type="number" class="form-control" id="min_threads" placeholder="2" min="1" v-model="config.min_threads" />
       <div class="form-text">{{ $t('config.min_threads_desc') }}</div>
     </div>
+
+    <!-- Limit Framerate -->
+    <Checkbox class="mb-3"
+              id="limit_framerate"
+              locale-prefix="config"
+              v-model="config.limit_framerate"
+              default="true"
+    ></Checkbox>
 
     <!-- HEVC Support -->
     <div class="mb-3">

@@ -283,6 +283,8 @@
     "lan_encryption_mode_1": "Enabled for supported clients",
     "lan_encryption_mode_2": "Required for all clients",
     "lan_encryption_mode_desc": "This determines when encryption will be used when streaming over your local network. Encryption can reduce streaming performance, particularly on less powerful hosts and clients.",
+    "limit_framerate": "Limit capture framerate",
+    "limit_framerate_desc": "Limit the framerate being captured to client requested framerate. May not run at full framerate if vsync is enabled and display refreshrate does not match requested framerate. Could cause lag on some clients if disabled.",
     "locale": "Locale",
     "locale_desc": "The locale used for Apollo's user interface.",
     "log_level": "Log Level",
