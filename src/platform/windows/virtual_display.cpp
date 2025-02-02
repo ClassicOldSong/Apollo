@@ -213,9 +213,20 @@ void closeVDisplayDevice() {
 }
 
 DRIVER_STATUS openVDisplayDevice() {
-	SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
-	if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
-		return DRIVER_STATUS::FAILED;
+	uint32_t retryInterval = 20;
+	while (true) {
+		SUDOVDA_DRIVER_HANDLE = OpenDevice(&SUVDA_INTERFACE_GUID);
+		if (SUDOVDA_DRIVER_HANDLE == INVALID_HANDLE_VALUE) {
+			if (retryInterval > 320) {
+				printf("[SUDOVDA] Open device failed!\n");
+				return DRIVER_STATUS::FAILED;
+			}
+			retryInterval *= 2;
+			Sleep(retryInterval);
+			continue;
+		}
+
+		break;
 	}
 
 	if (!CheckProtocolCompatible(SUDOVDA_DRIVER_HANDLE)) {
@@ -317,7 +328,7 @@ std::wstring createVirtualDisplay(
 	wchar_t deviceName[CCHDEVICENAME]{};
 	while (!GetAddedDisplayName(output, deviceName)) {
 		Sleep(retryInterval);
-		if (retryInterval > 160) {
+		if (retryInterval > 320) {
 			printf("[SUDOVDA] Cannot get name for newly added virtual display!\n");
 			return std::wstring();
 		}

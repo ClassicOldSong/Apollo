@@ -101,6 +101,8 @@ namespace lifetime {
 #else
     std::raise(SIGTRAP);
 #endif
+    // If debug trap still doesn't work, abort
+    abort();
   }
 
   char **

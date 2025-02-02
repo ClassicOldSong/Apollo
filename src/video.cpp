@@ -1823,7 +1823,13 @@ namespace video {
 
     // set minimum frame time, avoiding violation of client-requested target framerate
     auto minimum_frame_time = std::chrono::milliseconds(1000 / std::min(config.framerate, (config::video.min_fps_factor * 10)));
+    auto frame_threshold = std::chrono::milliseconds(1000 / config.encodingFramerate);
+    // Leave 1ms headroom for slight variations
+    if (frame_threshold >= 2ms) {
+      frame_threshold -= 1ms;
+    }
     BOOST_LOG(debug) << "Minimum frame time set to "sv << minimum_frame_time.count() << "ms, based on min fps factor of "sv << config::video.min_fps_factor << "."sv;
+    BOOST_LOG(info) << "Frame threshold: "sv << frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);
     auto packets = mail::man->queue<packet_t>(mail::video_packets);
@@ -1840,6 +1846,32 @@ namespace video {
         return;
       }
     }
+
+    std::chrono::steady_clock::time_point last_frame_timestamp;
+    std::chrono::steady_clock::time_point last_encoded_timestamp = std::chrono::steady_clock::now();
+    bool stop_encoding = false;
+
+    std::thread alive_check_thread([&last_encoded_timestamp, &stop_encoding]{
+      uint8_t fail_count = 0;
+      std::chrono::steady_clock::time_point _last_timestamp = last_encoded_timestamp;
+      for (;;) {
+        if (stop_encoding) return;
+        std::this_thread::sleep_for(1s);
+        if (last_encoded_timestamp == _last_timestamp) {
+          fail_count += 1;
+          if (fail_count > 3) {
+            BOOST_LOG(error) << "Hang detected!!! Aborting..."sv;
+            proc::proc.terminate(true);
+            std::this_thread::sleep_for(1s);
+            abort();
+            return;
+          }
+        } else {
+          fail_count = 0;
+          _last_timestamp = last_encoded_timestamp;
+        };
+      }
+    });
 
     while (true) {
       // Break out of the encoding loop if any of the following are true:
@@ -1876,9 +1908,13 @@ namespace video {
       if (!requested_idr_frame || images->peek()) {
         if (auto img = images->pop(minimum_frame_time)) {
           frame_timestamp = img->frame_timestamp;
+          // If new frame comes in way too fast, just drop
+          if (*frame_timestamp - last_frame_timestamp < frame_threshold) {
+            continue;
+          }
           if (session->convert(*img)) {
             BOOST_LOG(error) << "Could not convert image"sv;
-            return;
+            break;
           }
         }
         else if (!images->running()) {
@@ -1888,11 +1924,17 @@ namespace video {
 
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
         BOOST_LOG(error) << "Could not encode video packet"sv;
-        return;
+        break;
       }
+
+      last_frame_timestamp = *frame_timestamp;
+      last_encoded_timestamp = std::chrono::steady_clock::now();
 
       session->request_normal_frame();
     }
+
+    stop_encoding = true;
+    alive_check_thread.join();
   }
 
   input::touch_port_t

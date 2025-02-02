@@ -1050,6 +1050,12 @@ namespace rtsp_stream {
       config.monitor.chromaSamplingType = util::from_view(args.at("x-ss-video[0].chromaSamplingType"sv));
       config.monitor.enableIntraRefresh = util::from_view(args.at("x-ss-video[0].intraRefresh"sv));
 
+      if (config::video.limit_framerate) {
+        config.monitor.encodingFramerate = session.fps;
+      } else {
+        config.monitor.encodingFramerate = config.monitor.framerate;
+      }
+
       configuredBitrateKbps = util::from_view(args.at("x-ml-video.configuredBitrateKbps"sv));
     }
     catch (std::out_of_range &) {

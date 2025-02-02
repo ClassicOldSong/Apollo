@@ -118,7 +118,7 @@ namespace proc {
     boost::process::environment
     get_env();
     void
-    terminate();
+    terminate(bool immediate = false);
 
   private:
     int _app_id;

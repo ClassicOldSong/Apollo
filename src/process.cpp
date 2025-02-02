@@ -510,10 +510,14 @@ namespace proc {
   }
 
   void
-  proc_t::terminate() {
+  proc_t::terminate(bool immediate) {
     std::error_code ec;
     placebo = false;
-    terminate_process_group(_process, _process_group, _app.exit_timeout);
+
+    if (!immediate) {
+      terminate_process_group(_process, _process_group, _app.exit_timeout);
+    }
+
     _process = boost::process::v1::child();
     _process_group = boost::process::v1::group();
 
