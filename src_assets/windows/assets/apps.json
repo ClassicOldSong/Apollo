@@ -4,7 +4,7 @@
     {
       "name": "Desktop",
       "image-path": "desktop.png",
-      "allow-client-commands": "false",
+      "allow-client-commands": "false"
     },
     {
       "name": "Steam Big Picture",
