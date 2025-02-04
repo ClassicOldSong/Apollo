@@ -17,6 +17,7 @@ namespace config {
   struct video_t {
     bool headless_mode;
     bool limit_framerate;
+    bool double_framerate;
     // ffmpeg params
     int qp;  // higher == more compression and less quality
 
@@ -198,6 +199,8 @@ namespace config {
 
     bool high_resolution_scrolling;
     bool native_pen_touch;
+
+    bool enable_input_only_mode;
   };
 
   namespace flag {

@@ -418,6 +418,7 @@ namespace config {
   video_t video {
     false, // headless_mode
     true, // limit_framerate
+    false, // double_framerate
     28,  // qp
 
     0,  // hevc_mode
@@ -543,6 +544,7 @@ namespace config {
     true,  // always send scancodes
     true,  // high resolution scrolling
     true,  // native pen/touch support
+    false, // enable input only mode
   };
 
   sunshine_t sunshine {
@@ -1091,6 +1093,7 @@ namespace config {
 
     bool_f(vars, "headless_mode", video.headless_mode);
     bool_f(vars, "limit_framerate", video.limit_framerate);
+    bool_f(vars, "double_framerate", video.double_framerate);
     int_f(vars, "qp", video.qp);
     int_between_f(vars, "hevc_mode", video.hevc_mode, { 0, 3 });
     int_between_f(vars, "av1_mode", video.av1_mode, { 0, 3 });
@@ -1263,6 +1266,7 @@ namespace config {
 
     bool_f(vars, "high_resolution_scrolling", input.high_resolution_scrolling);
     bool_f(vars, "native_pen_touch", input.native_pen_touch);
+    bool_f(vars, "enable_input_only_mode", input.enable_input_only_mode);
 
     bool_f(vars, "hide_tray_controls", sunshine.hide_tray_controls);
     bool_f(vars, "enable_pairing", sunshine.enable_pairing);

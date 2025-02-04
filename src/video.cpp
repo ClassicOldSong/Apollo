@@ -1847,6 +1847,20 @@ namespace video {
       }
     }
 
+    if (config.input_only) {
+      BOOST_LOG(info) << "Input only session, video will not be captured."sv;
+
+      // Encode the dummy img only once
+      if (encode(frame_nr++, *session, packets, channel_data, std::chrono::steady_clock::now())) {
+        BOOST_LOG(error) << "Could not encode dummy video packet"sv;
+        return;
+      }
+
+      shutdown_event->view();
+
+      return;
+    }
+
     std::chrono::steady_clock::time_point last_frame_timestamp;
     std::chrono::steady_clock::time_point last_encoded_timestamp = std::chrono::steady_clock::now();
     bool stop_encoding = false;

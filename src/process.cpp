@@ -49,6 +49,8 @@ namespace proc {
 
   proc_t proc;
 
+  std::string input_only_app_id;
+
 #ifdef _WIN32
   VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
 
@@ -158,10 +160,21 @@ namespace proc {
     return cmd_path.parent_path();
   }
 
+  void
+  proc_t::launch_input_only() {
+    _app_id = util::from_view(input_only_app_id);
+    placebo = true;
+  }
+
   int
   proc_t::execute(int app_id, const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
-    // Ensure starting from a clean slate
-    terminate();
+    if (_app_id == util::from_view(input_only_app_id)) {
+      terminate();
+      std::this_thread::sleep_for(1s);
+    } else {
+      // Ensure starting from a clean slate
+      terminate();
+    }
 
     _app = app;
     _app_id = app_id;
@@ -241,12 +254,18 @@ namespace proc {
 
         memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
 
+        int target_fps = launch_session->fps ? launch_session->fps : 60;
+
+        if (config::video.double_framerate) {
+          target_fps *= 2;
+        }
+
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           device_uuid_str.c_str(),
           device_name.c_str(),
           render_width,
           render_height,
-          launch_session->fps ? launch_session->fps : 60,
+          target_fps,
           launch_session->display_guid
         );
 
@@ -291,7 +310,7 @@ namespace proc {
     // encoder matches the active GPU (which could have changed
     // due to hotplugging, driver crash, primary monitor change,
     // or any number of other factors).
-    if (video::probe_encoders()) {
+    if (rtsp_stream::session_count() == 0 && video::probe_encoders()) {
       return 503;
     }
 
@@ -901,6 +920,73 @@ namespace proc {
       std::set<std::string> ids;
       std::vector<proc::ctx_t> apps;
       int i = 0;
+
+      // Input Only entry
+      if (config::input.enable_input_only_mode) {
+        proc::ctx_t ctx;
+        // ctx.uuid = ""; // We're not using uuid for this special entry
+        ctx.name = "Input Only";
+        ctx.image_path = parse_env_val(this_env, "input_only.png");
+        ctx.virtual_display = false;
+        ctx.scale_factor = 100;
+        ctx.use_app_identity = false;
+        ctx.per_client_app_identity = false;
+        ctx.allow_client_commands = false;
+
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = true;
+        ctx.exit_timeout = 5s;
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          // Avoid using index to generate id if possible
+          ctx.id = std::get<0>(possible_ids);
+        }
+        else {
+          // Fallback to include index on collision
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        input_only_app_id = ctx.id;
+
+        apps.emplace_back(std::move(ctx));
+      }
+
+      // Virtual Display entry
+    #ifdef _WIN32
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        proc::ctx_t ctx;
+        // ctx.uuid = ""; // We're not using uuid for this special entry
+        ctx.name = "Virtual Display";
+        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+        ctx.virtual_display = true;
+        ctx.scale_factor = 100;
+        ctx.use_app_identity = false;
+        ctx.per_client_app_identity = false;
+        ctx.allow_client_commands = false;
+
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = true;
+        ctx.exit_timeout = 5s;
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          // Avoid using index to generate id if possible
+          ctx.id = std::get<0>(possible_ids);
+        }
+        else {
+          // Fallback to include index on collision
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        apps.emplace_back(std::move(ctx));
+      }
+    #endif
+
       for (auto &[_, app_node] : apps_node) {
         proc::ctx_t ctx;
 
@@ -1031,38 +1117,6 @@ namespace proc {
 
         apps.emplace_back(std::move(ctx));
       }
-
-    #ifdef _WIN32
-      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
-        proc::ctx_t ctx;
-        // ctx.uuid = ""; // We're not using uuid for this special entry
-        ctx.name = "Virtual Display";
-        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
-        ctx.virtual_display = true;
-        ctx.scale_factor = 100;
-        ctx.use_app_identity = false;
-        ctx.per_client_app_identity = false;
-        ctx.allow_client_commands = false;
-
-        ctx.elevated = false;
-        ctx.auto_detach = true;
-        ctx.wait_all = true;
-        ctx.exit_timeout = 5s;
-
-        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-        if (ids.count(std::get<0>(possible_ids)) == 0) {
-          // Avoid using index to generate id if possible
-          ctx.id = std::get<0>(possible_ids);
-        }
-        else {
-          // Fallback to include index on collision
-          ctx.id = std::get<1>(possible_ids);
-        }
-        ids.insert(ctx.id);
-
-        apps.emplace_back(std::move(ctx));
-      }
-    #endif
 
       return proc::proc_t {
         std::move(this_env), std::move(apps)

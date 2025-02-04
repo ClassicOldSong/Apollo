@@ -132,6 +132,13 @@ namespace audio {
   void
   capture(safe::mail_t mail, config_t config, void *channel_data) {
     auto shutdown_event = mail->event<bool>(mail::shutdown);
+
+    if (config.input_only) {
+      BOOST_LOG(info) << "Input only session, audio will not be captured."sv;
+      shutdown_event->view();
+      return;
+    }
+
     auto stream = stream_configs[map_stream(config.channels, config.flags[config_t::HIGH_QUALITY])];
     if (config.flags[config_t::CUSTOM_SURROUND_PARAMS]) {
       apply_surround_params(stream, config.customStreamParams);
@@ -148,6 +155,7 @@ namespace audio {
       // Wait for shutdown to be signalled if we fail init.
       // This allows streaming to continue without audio.
       shutdown_event->view();
+      return;
     });
 
     auto &control = ref->control;

@@ -360,7 +360,7 @@ namespace nvhttp {
   }
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p) {
+  make_launch_session(bool host_audio, bool input_only, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p) {
     auto launch_session = std::make_shared<rtsp_stream::launch_session_t>();
 
     launch_session->id = ++session_id_counter;
@@ -419,6 +419,8 @@ namespace nvhttp {
 
     launch_session->client_do_cmds = named_cert_p->do_cmds;
     launch_session->client_undo_cmds = named_cert_p->undo_cmds;
+
+    launch_session->input_only = input_only;
 
     return launch_session;
   }
@@ -960,7 +962,10 @@ namespace nvhttp {
     tree.put("root.PairStatus", pair_status);
 
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
-      auto current_appid = proc::proc.running();
+      int current_appid = 0;
+      if (!config::input.enable_input_only_mode || rtsp_stream::session_count() == 0) {
+        current_appid = proc::proc.running();
+      }
       tree.put("root.currentgame", current_appid);
       tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
     } else {
@@ -1046,7 +1051,14 @@ namespace nvhttp {
 
     auto named_cert_p = get_verified_cert(request);
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
+      auto current_appid = proc::proc.running();
+      auto input_only_id_int = util::from_view(proc::input_only_app_id);
+      auto should_hide_inactive_apps = config::input.enable_input_only_mode && rtsp_stream::session_count() != 0 && current_appid != input_only_id_int;
       for (auto &app : proc::proc.get_apps()) {
+        auto appid = util::from_view(app.id);
+        if (should_hide_inactive_apps && appid != current_appid && appid != input_only_id_int) {
+          continue;
+        }
         pt::ptree app_node;
 
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
@@ -1086,8 +1098,22 @@ namespace nvhttp {
       response->close_connection_after_response = true;
     });
 
+    auto args = request->parse_query_string();
+
+    auto appid_str = get_arg(args, "appid");
+    auto appid = util::from_view(appid_str);
+    auto current_appid = proc::proc.running();
+    bool is_input_only = config::input.enable_input_only_mode && appid_str == proc::input_only_app_id;
+
     auto named_cert_p = get_verified_cert(request);
-    if (!(named_cert_p->perm & PERM::launch)) {
+    auto perm = PERM::launch;
+
+    // If we have already launched an app, we should allow clients with view permission to join the input only or current app's session.
+    if (current_appid > 0 && (is_input_only || appid == current_appid)) {
+      perm = PERM::_allow_view;
+    }
+
+    if (!(named_cert_p->perm & perm)) {
       BOOST_LOG(debug) << "Permission LaunchApp denied for [" << named_cert_p->name << "] (" << (uint32_t)named_cert_p->perm << ")";
 
       tree.put("root.resume", 0);
@@ -1096,8 +1122,6 @@ namespace nvhttp {
 
       return;
     }
-
-    auto args = request->parse_query_string();
     if (
       args.find("rikey"s) == std::end(args) ||
       args.find("rikeyid"s) == std::end(args) ||
@@ -1110,20 +1134,18 @@ namespace nvhttp {
       return;
     }
 
-    auto current_appid = proc::proc.running();
-    if (current_appid > 0) {
-      tree.put("root.resume", 0);
-      tree.put("root.<xmlattr>.status_code", 400);
-      tree.put("root.<xmlattr>.status_message", "An app is already running on this host");
+    if (!is_input_only) {
+      if (current_appid > 0 && current_appid != util::from_view(proc::input_only_app_id) && appid != current_appid) {
+        tree.put("root.resume", 0);
+        tree.put("root.<xmlattr>.status_code", 400);
+        tree.put("root.<xmlattr>.status_message", "An app is already running on this host");
 
-      return;
+        return;
+      }
     }
 
-    auto appid_str = get_arg(args, "appid");
-    auto appid = util::from_view(appid_str);
-
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
-    auto launch_session = make_launch_session(host_audio, appid, args, named_cert_p);
+    auto launch_session = make_launch_session(host_audio, is_input_only, appid, args, named_cert_p);
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());
     if (!launch_session->rtsp_cipher && encryption_mode == config::ENCRYPTION_MODE_MANDATORY) {
@@ -1136,7 +1158,18 @@ namespace nvhttp {
       return;
     }
 
-    if (appid > 0) {
+    if (is_input_only) {
+      BOOST_LOG(info) << "Launching input only session..."sv;
+
+      // Still probe encoders once, if input only session is launched first
+      // But we're ignoring if it's successful or not
+      if (rtsp_stream::session_count() == 0 && !proc::proc.virtual_display) {
+        video::probe_encoders();
+        if (current_appid == 0) {
+          proc::proc.launch_input_only();
+        }
+      }
+    } else if (appid > 0 && appid != current_appid) {
       const auto& apps = proc::proc.get_apps();
       auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str](const auto _app) {
         return _app.id == appid_str;
@@ -1229,7 +1262,7 @@ namespace nvhttp {
     if (no_active_sessions && args.find("localAudioPlayMode"s) != std::end(args)) {
       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     }
-    auto launch_session = make_launch_session(host_audio, 0, args, named_cert_p);
+    auto launch_session = make_launch_session(host_audio, false, 0, args, named_cert_p);
 
     if (!proc::proc.allow_client_commands) {
       launch_session->client_do_cmds.clear();

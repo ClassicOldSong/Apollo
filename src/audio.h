@@ -52,6 +52,8 @@ namespace audio {
     int channels;
     int mask;
 
+    bool input_only;
+
     stream_params_t customStreamParams;
 
     std::bitset<MAX_FLAGS> flags;

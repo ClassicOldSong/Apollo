@@ -36,6 +36,7 @@ namespace rtsp_stream {
     std::string unique_id;
     crypto::PERM perm;
 
+    bool input_only;
     bool host_audio;
     int width;
     int height;

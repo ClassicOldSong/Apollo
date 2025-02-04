@@ -96,6 +96,9 @@ namespace proc {
         _env(std::move(env)),
         _apps(std::move(apps)) {}
 
+    void
+    launch_input_only();
+
     int
     execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
 
@@ -178,4 +181,5 @@ namespace proc {
   terminate_process_group(boost::process::v1::child &proc, boost::process::v1::group &group, std::chrono::seconds exit_timeout);
 
   extern proc_t proc;
+  extern std::string input_only_app_id;
 }  // namespace proc
