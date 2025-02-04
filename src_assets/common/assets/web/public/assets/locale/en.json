@@ -224,6 +224,8 @@
     "dd_resolution_option_multi_instance_desc": "When using multiple instance of Apollo, make sure you have disabled this option in all instances, or it'll end up messing things up. It's still recommended to disable this part if you don't want your physical monitor's resolution to change or you only stream with virtual display.",
     "dd_wa_hdr_toggle_desc": "When using virtual display device as for streaming, it might display incorrect HDR color. With this option enabled, Apollo will try to mitigate this issue.",
     "dd_wa_hdr_toggle": "Enable high-contrast workaround for HDR",
+    "double_refreshrate": "Double refresh rate for Virtual Display",
+    "double_refreshrate_desc": "Double the requested fresh rate when creating virtual displays, streamed refresh rate still remain the same. Can potentially improve stutter problem on some systems.",
     "ds4_back_as_touchpad_click": "Map Back/Select to Touchpad Click",
     "ds4_back_as_touchpad_click_desc": "When forcing DS4 emulation, map Back/Select to Touchpad Click",
     "enable_input_only_mode": "Enable Input Only Mode",

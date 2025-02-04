@@ -137,11 +137,22 @@ const validateFallbackMode = (event) => {
     </div>
 
     <!-- Headless Mode -->
-    <div class="mb-3 form-check" v-if="platform === 'windows'">
-      <input type="checkbox" class="form-check-input" id="headless_mode" v-model="config.headless_mode" true-value="enabled" false-value="disabled"/>
-      <label for="headless_mode" class="form-check-label">{{ $t('config.headless_mode') }}</label>
-      <div class="form-text">{{ $t('config.headless_mode_desc') }}</div>
-    </div>
+    <Checkbox class="mb-3"
+              id="headless_mode"
+              locale-prefix="config"
+              v-model="config.headless_mode"
+              default="false"
+              v-if="platform === 'windows'"
+    ></Checkbox>
+
+    <!-- Double Refreshrate -->
+    <Checkbox class="mb-3"
+              id="double_refreshrate"
+              locale-prefix="config"
+              v-model="config.double_refreshrate"
+              default="false"
+              v-if="platform === 'windows'"
+    ></Checkbox>
 
     <!-- SudoVDA Driver Status -->
     <div class="alert" :class="[vdisplay === '0' ? 'alert-success' : 'alert-warning']" v-if="platform === 'windows'">

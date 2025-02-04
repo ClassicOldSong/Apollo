@@ -256,7 +256,7 @@ namespace proc {
 
         int target_fps = launch_session->fps ? launch_session->fps : 60;
 
-        if (config::video.double_framerate) {
+        if (config::video.double_refreshrate) {
           target_fps *= 2;
         }
 

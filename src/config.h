@@ -17,7 +17,7 @@ namespace config {
   struct video_t {
     bool headless_mode;
     bool limit_framerate;
-    bool double_framerate;
+    bool double_refreshrate;
     // ffmpeg params
     int qp;  // higher == more compression and less quality
 
