@@ -33,7 +33,7 @@ const config = ref(props.config)
             <option value="switch">{{ $t("config.gamepad_switch") }}</option>
             <option value="xone">{{ $t("config.gamepad_xone") }}</option>
           </template>
-          
+
           <template #windows>
             <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
             <option value="x360">{{ $t('config.gamepad_x360') }}</option>
@@ -167,6 +167,15 @@ const config = ref(props.config)
               locale-prefix="config"
               v-model="config.native_pen_touch"
               default="true"
+    ></Checkbox>
+
+    <!-- Enable Input Only Mode -->
+    <hr>
+    <Checkbox class="mb-3"
+              id="enable_input_only_mode"
+              locale-prefix="config"
+              v-model="config.enable_input_only_mode"
+              default="false"
     ></Checkbox>
   </div>
 </template>
