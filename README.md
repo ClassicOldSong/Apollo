@@ -8,6 +8,7 @@ Major features:
 - [x] Permission management for clients
 - [x] Clipboard sync
 - [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
+- [x] Input only mode
 
 ## Usage
 
