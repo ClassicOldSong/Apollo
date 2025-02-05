@@ -125,6 +125,7 @@ namespace proc {
 
   private:
     int _app_id;
+    std::string _app_name;
 
     boost::process::v1::environment _env;
 

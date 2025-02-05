@@ -1053,7 +1053,7 @@ namespace nvhttp {
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
       auto current_appid = proc::proc.running();
       auto input_only_id_int = util::from_view(proc::input_only_app_id);
-      auto should_hide_inactive_apps = config::input.enable_input_only_mode && rtsp_stream::session_count() != 0 && current_appid != input_only_id_int;
+      auto should_hide_inactive_apps = config::input.enable_input_only_mode && current_appid > 0 && current_appid != input_only_id_int;
       for (auto &app : proc::proc.get_apps()) {
         auto appid = util::from_view(app.id);
         if (should_hide_inactive_apps && appid != current_appid && appid != input_only_id_int) {
@@ -1160,6 +1160,9 @@ namespace nvhttp {
 
     if (is_input_only) {
       BOOST_LOG(info) << "Launching input only session..."sv;
+
+      launch_session->client_do_cmds.clear();
+      launch_session->client_undo_cmds.clear();
 
       // Still probe encoders once, if input only session is launched first
       // But we're ignoring if it's successful or not

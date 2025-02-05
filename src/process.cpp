@@ -163,7 +163,13 @@ namespace proc {
   void
   proc_t::launch_input_only() {
     _app_id = util::from_view(input_only_app_id);
+    _app_name = "Input Only";
+    allow_client_commands = false;
     placebo = true;
+
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+    system_tray::update_tray_playing(_app_name);
+#endif
   }
 
   int
@@ -178,6 +184,7 @@ namespace proc {
 
     _app = app;
     _app_id = app_id;
+    _app_name = app.name;
     _launch_session = launch_session;
     allow_client_commands = app.allow_client_commands;
 
@@ -607,6 +614,7 @@ namespace proc {
     }
 
     _app_id = -1;
+    _app_name.clear();
     display_name.clear();
     initial_display.clear();
     _launch_session.reset();
@@ -639,7 +647,7 @@ namespace proc {
 
   std::string
   proc_t::get_last_run_app_name() {
-    return _app.name;
+    return _app_name;
   }
 
   boost::process::environment
