@@ -968,7 +968,7 @@ namespace nvhttp {
         current_appid = 0;
       }
       tree.put("root.currentgame", current_appid);
-      tree.put("root.state", proc::proc.running() > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
+      tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
     } else {
       tree.put("root.currentgame", 0);
       tree.put("root.state", "SUNSHINE_SERVER_FREE");
@@ -1053,17 +1053,27 @@ namespace nvhttp {
     auto named_cert_p = get_verified_cert(request);
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
       auto current_appid = proc::proc.running();
-      auto input_only_id_int = proc::input_only_app_id;
-      auto should_hide_inactive_apps = config::input.enable_input_only_mode && current_appid > 0 && current_appid != input_only_id_int;
+      auto should_hide_inactive_apps = config::input.enable_input_only_mode && current_appid > 0 && current_appid != proc::input_only_app_id;
       for (auto &app : proc::proc.get_apps()) {
         auto appid = util::from_view(app.id);
-        if (should_hide_inactive_apps && appid != current_appid && appid != input_only_id_int) {
-          continue;
+        if (should_hide_inactive_apps) {
+          if (
+            appid != current_appid
+            && appid != proc::input_only_app_id
+            && appid != proc::terminate_app_id
+          ) {
+            continue;
+          }
+        } else {
+          if (appid == proc::terminate_app_id) {
+            continue;
+          }
         }
+
         pt::ptree app_node;
 
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        if (should_hide_inactive_apps && appid != input_only_id_int) {
+        if (should_hide_inactive_apps && appid != proc::input_only_app_id && appid != proc::terminate_app_id) {
           app_node.put("AppTitle"s, "Resume: "s + app.name);
         } else {
           app_node.put("AppTitle"s, app.name);
@@ -1114,7 +1124,7 @@ namespace nvhttp {
     auto perm = PERM::launch;
 
     // If we have already launched an app, we should allow clients with view permission to join the input only or current app's session.
-    if (current_appid > 0 && (is_input_only || appid == current_appid)) {
+    if (current_appid > 0 && appid != proc::terminate_app_id && (is_input_only || appid == current_appid)) {
       perm = PERM::_allow_view;
     }
 
@@ -1140,6 +1150,17 @@ namespace nvhttp {
     }
 
     if (!is_input_only) {
+      // Special handling for the "terminate" app
+      if (config::input.enable_input_only_mode && appid == proc::terminate_app_id) {
+        proc::proc.terminate();
+
+        tree.put("root.resume", 0);
+        tree.put("root.<xmlattr>.status_code", 410);
+        tree.put("root.<xmlattr>.status_message", "App terminated.");
+
+        return;
+      }
+
       if (current_appid > 0 && current_appid != proc::input_only_app_id && appid != current_appid) {
         tree.put("root.resume", 0);
         tree.put("root.<xmlattr>.status_code", 400);

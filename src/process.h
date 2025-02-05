@@ -182,6 +182,9 @@ namespace proc {
   terminate_process_group(boost::process::v1::child &proc, boost::process::v1::group &group, std::chrono::seconds exit_timeout);
 
   extern proc_t proc;
+
   extern int input_only_app_id;
   extern std::string input_only_app_id_str;
+  extern int terminate_app_id;
+  extern std::string terminate_app_id_str;
 }  // namespace proc

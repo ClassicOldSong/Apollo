@@ -51,6 +51,8 @@ namespace proc {
 
   int input_only_app_id = -1;
   std::string input_only_app_id_str;
+  int terminate_app_id = -1;
+  std::string terminate_app_id_str;
 
 #ifdef _WIN32
   VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
@@ -930,38 +932,74 @@ namespace proc {
       std::vector<proc::ctx_t> apps;
       int i = 0;
 
-      // Input Only entry
       if (config::input.enable_input_only_mode) {
-        proc::ctx_t ctx;
-        // ctx.uuid = ""; // We're not using uuid for this special entry
-        ctx.name = "Remote Input";
-        ctx.image_path = parse_env_val(this_env, "input_only.png");
-        ctx.virtual_display = false;
-        ctx.scale_factor = 100;
-        ctx.use_app_identity = false;
-        ctx.per_client_app_identity = false;
-        ctx.allow_client_commands = false;
+        // Input Only entry
+        {
+          proc::ctx_t ctx;
+          // ctx.uuid = ""; // We're not using uuid for this special entry
+          ctx.name = "Remote Input";
+          ctx.image_path = parse_env_val(this_env, "input_only.png");
+          ctx.virtual_display = false;
+          ctx.scale_factor = 100;
+          ctx.use_app_identity = false;
+          ctx.per_client_app_identity = false;
+          ctx.allow_client_commands = false;
 
-        ctx.elevated = false;
-        ctx.auto_detach = true;
-        ctx.wait_all = true;
-        ctx.exit_timeout = 5s;
+          ctx.elevated = false;
+          ctx.auto_detach = true;
+          ctx.wait_all = true;
+          ctx.exit_timeout = 5s;
 
-        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-        if (ids.count(std::get<0>(possible_ids)) == 0) {
-          // Avoid using index to generate id if possible
-          ctx.id = std::get<0>(possible_ids);
+          auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+          if (ids.count(std::get<0>(possible_ids)) == 0) {
+            // Avoid using index to generate id if possible
+            ctx.id = std::get<0>(possible_ids);
+          }
+          else {
+            // Fallback to include index on collision
+            ctx.id = std::get<1>(possible_ids);
+          }
+          ids.insert(ctx.id);
+
+          input_only_app_id_str = ctx.id;
+          input_only_app_id = util::from_view(ctx.id);
+
+          apps.emplace_back(std::move(ctx));
         }
-        else {
-          // Fallback to include index on collision
-          ctx.id = std::get<1>(possible_ids);
+
+        // Terminate entry
+        {
+          proc::ctx_t ctx;
+          // ctx.uuid = ""; // We're not using uuid for this special entry
+          ctx.name = "Terminate";
+          ctx.image_path = parse_env_val(this_env, "terminate.png");
+          ctx.virtual_display = false;
+          ctx.scale_factor = 100;
+          ctx.use_app_identity = false;
+          ctx.per_client_app_identity = false;
+          ctx.allow_client_commands = false;
+
+          ctx.elevated = false;
+          ctx.auto_detach = true;
+          ctx.wait_all = true;
+          ctx.exit_timeout = 5s;
+
+          auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+          if (ids.count(std::get<0>(possible_ids)) == 0) {
+            // Avoid using index to generate id if possible
+            ctx.id = std::get<0>(possible_ids);
+          }
+          else {
+            // Fallback to include index on collision
+            ctx.id = std::get<1>(possible_ids);
+          }
+          ids.insert(ctx.id);
+
+          terminate_app_id_str = ctx.id;
+          terminate_app_id = util::from_view(ctx.id);
+
+          apps.emplace_back(std::move(ctx));
         }
-        ids.insert(ctx.id);
-
-        input_only_app_id_str = ctx.id;
-        input_only_app_id = util::from_view(ctx.id);
-
-        apps.emplace_back(std::move(ctx));
       }
 
       // Virtual Display entry
