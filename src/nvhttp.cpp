@@ -963,11 +963,12 @@ namespace nvhttp {
 
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
       int current_appid = 0;
-      if (!config::input.enable_input_only_mode || rtsp_stream::session_count() == 0) {
+      // When input only mode is enabled, the only resume method should be launching the same app again.
+      if (!config::input.enable_input_only_mode) {
         current_appid = proc::proc.running();
       }
       tree.put("root.currentgame", current_appid);
-      tree.put("root.state", current_appid > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
+      tree.put("root.state", proc::proc.running() > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
     } else {
       tree.put("root.currentgame", 0);
       tree.put("root.state", "SUNSHINE_SERVER_FREE");
@@ -1062,7 +1063,11 @@ namespace nvhttp {
         pt::ptree app_node;
 
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        app_node.put("AppTitle"s, app.name);
+        if (should_hide_inactive_apps && appid != input_only_id_int) {
+          app_node.put("AppTitle"s, "Resume: "s + app.name);
+        } else {
+          app_node.put("AppTitle"s, app.name);
+        }
         app_node.put("UUID", app.uuid);
         app_node.put("ID", app.id);
 
@@ -1158,6 +1163,8 @@ namespace nvhttp {
       return;
     }
 
+    bool no_active_sessions = rtsp_stream::session_count() == 0;
+
     if (is_input_only) {
       BOOST_LOG(info) << "Launching input only session..."sv;
 
@@ -1166,43 +1173,66 @@ namespace nvhttp {
 
       // Still probe encoders once, if input only session is launched first
       // But we're ignoring if it's successful or not
-      if (rtsp_stream::session_count() == 0 && !proc::proc.virtual_display) {
+      if (no_active_sessions && !proc::proc.virtual_display) {
         video::probe_encoders();
         if (current_appid == 0) {
           proc::proc.launch_input_only();
         }
       }
-    } else if (appid > 0 && appid != current_appid) {
-      const auto& apps = proc::proc.get_apps();
-      auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str](const auto _app) {
-        return _app.id == appid_str;
-      });
+    } else if (appid > 0) {
+      if (appid == current_appid) {
+        // We're basically resuming the same app
+        if (!proc::proc.allow_client_commands) {
+          launch_session->client_do_cmds.clear();
+          launch_session->client_undo_cmds.clear();
+        }
 
-      if (app_iter == apps.end()) {
-        BOOST_LOG(error) << "Couldn't find app with ID ["sv << appid_str << ']';
-        tree.put("root.<xmlattr>.status_code", 404);
-        tree.put("root.<xmlattr>.status_message", "Cannot find requested application");
-        tree.put("root.gamesession", 0);
-        return;
+        if (no_active_sessions && !proc::proc.virtual_display) {
+          display_device::configure_display(config::video, *launch_session);
+          if (video::probe_encoders()) {
+            tree.put("root.resume", 0);
+            tree.put("root.<xmlattr>.status_code", 503);
+            tree.put("root.<xmlattr>.status_message", "Failed to initialize video capture/encoding. Is a display connected and turned on?");
+
+            return;
+          }
+        }
+      } else {
+        const auto& apps = proc::proc.get_apps();
+        auto app_iter = std::find_if(apps.begin(), apps.end(), [&appid_str](const auto _app) {
+          return _app.id == appid_str;
+        });
+
+        if (app_iter == apps.end()) {
+          BOOST_LOG(error) << "Couldn't find app with ID ["sv << appid_str << ']';
+          tree.put("root.<xmlattr>.status_code", 404);
+          tree.put("root.<xmlattr>.status_message", "Cannot find requested application");
+          tree.put("root.gamesession", 0);
+          return;
+        }
+
+        if (!app_iter->allow_client_commands) {
+          launch_session->client_do_cmds.clear();
+          launch_session->client_undo_cmds.clear();
+        }
+
+        auto err = proc::proc.execute(appid, *app_iter, launch_session);
+        if (err) {
+          tree.put("root.<xmlattr>.status_code", err);
+          tree.put(
+            "root.<xmlattr>.status_message",
+            err == 503
+            ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
+            : "Failed to start the specified application");
+          tree.put("root.gamesession", 0);
+
+          return;
+        }
       }
-
-      if (!app_iter->allow_client_commands) {
-        launch_session->client_do_cmds.clear();
-        launch_session->client_undo_cmds.clear();
-      }
-
-      auto err = proc::proc.execute(appid, *app_iter, launch_session);
-      if (err) {
-        tree.put("root.<xmlattr>.status_code", err);
-        tree.put(
-          "root.<xmlattr>.status_message",
-          err == 503
-          ? "Failed to initialize video capture/encoding. Is a display connected and turned on?"
-          : "Failed to start the specified application");
-        tree.put("root.gamesession", 0);
-
-        return;
-      }
+    } else {
+      tree.put("root.<xmlattr>.status_code", 403);
+      tree.put("root.<xmlattr>.status_message", "How did you get here?");
+      tree.put("root.gamesession", 0);
     }
 
     tree.put("root.<xmlattr>.status_code", 200);
