@@ -962,10 +962,10 @@ namespace nvhttp {
     tree.put("root.PairStatus", pair_status);
 
     if constexpr (std::is_same_v<SunshineHTTPS, T>) {
-      int current_appid = 0;
+      int current_appid = proc::proc.running();
       // When input only mode is enabled, the only resume method should be launching the same app again.
-      if (!config::input.enable_input_only_mode) {
-        current_appid = proc::proc.running();
+      if (config::input.enable_input_only_mode && current_appid != proc::input_only_app_id) {
+        current_appid = 0;
       }
       tree.put("root.currentgame", current_appid);
       tree.put("root.state", proc::proc.running() > 0 ? "SUNSHINE_SERVER_BUSY" : "SUNSHINE_SERVER_FREE");
@@ -1187,6 +1187,10 @@ namespace nvhttp {
           launch_session->client_undo_cmds.clear();
         }
 
+        if (current_appid == proc::input_only_app_id) {
+          launch_session->input_only = true;
+        }
+
         if (no_active_sessions && !proc::proc.virtual_display) {
           display_device::configure_display(config::video, *launch_session);
           if (video::probe_encoders()) {
@@ -1300,6 +1304,10 @@ namespace nvhttp {
     if (!proc::proc.allow_client_commands) {
       launch_session->client_do_cmds.clear();
       launch_session->client_undo_cmds.clear();
+    }
+
+    if (config::input.enable_input_only_mode && current_appid == proc::input_only_app_id) {
+      launch_session->input_only = true;
     }
 
     if (no_active_sessions && !proc::proc.virtual_display) {
