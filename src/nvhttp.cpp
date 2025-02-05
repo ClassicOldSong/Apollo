@@ -1053,7 +1053,7 @@ namespace nvhttp {
     auto named_cert_p = get_verified_cert(request);
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
       auto current_appid = proc::proc.running();
-      auto input_only_id_int = util::from_view(proc::input_only_app_id);
+      auto input_only_id_int = proc::input_only_app_id;
       auto should_hide_inactive_apps = config::input.enable_input_only_mode && current_appid > 0 && current_appid != input_only_id_int;
       for (auto &app : proc::proc.get_apps()) {
         auto appid = util::from_view(app.id);
@@ -1108,7 +1108,7 @@ namespace nvhttp {
     auto appid_str = get_arg(args, "appid");
     auto appid = util::from_view(appid_str);
     auto current_appid = proc::proc.running();
-    bool is_input_only = config::input.enable_input_only_mode && appid_str == proc::input_only_app_id;
+    bool is_input_only = config::input.enable_input_only_mode && appid == proc::input_only_app_id;
 
     auto named_cert_p = get_verified_cert(request);
     auto perm = PERM::launch;
@@ -1140,7 +1140,7 @@ namespace nvhttp {
     }
 
     if (!is_input_only) {
-      if (current_appid > 0 && current_appid != util::from_view(proc::input_only_app_id) && appid != current_appid) {
+      if (current_appid > 0 && current_appid != proc::input_only_app_id && appid != current_appid) {
         tree.put("root.resume", 0);
         tree.put("root.<xmlattr>.status_code", 400);
         tree.put("root.<xmlattr>.status_message", "An app is already running on this host");

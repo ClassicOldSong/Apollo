@@ -49,7 +49,8 @@ namespace proc {
 
   proc_t proc;
 
-  std::string input_only_app_id;
+  int input_only_app_id = -1;
+  std::string input_only_app_id_str;
 
 #ifdef _WIN32
   VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
@@ -162,8 +163,8 @@ namespace proc {
 
   void
   proc_t::launch_input_only() {
-    _app_id = util::from_view(input_only_app_id);
-    _app_name = "Input Only";
+    _app_id = input_only_app_id;
+    _app_name = "Remote Input";
     allow_client_commands = false;
     placebo = true;
 
@@ -174,7 +175,7 @@ namespace proc {
 
   int
   proc_t::execute(int app_id, const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
-    if (_app_id == util::from_view(input_only_app_id)) {
+    if (_app_id == input_only_app_id) {
       terminate();
       std::this_thread::sleep_for(1s);
     } else {
@@ -933,7 +934,7 @@ namespace proc {
       if (config::input.enable_input_only_mode) {
         proc::ctx_t ctx;
         // ctx.uuid = ""; // We're not using uuid for this special entry
-        ctx.name = "Input Only";
+        ctx.name = "Remote Input";
         ctx.image_path = parse_env_val(this_env, "input_only.png");
         ctx.virtual_display = false;
         ctx.scale_factor = 100;
@@ -957,7 +958,8 @@ namespace proc {
         }
         ids.insert(ctx.id);
 
-        input_only_app_id = ctx.id;
+        input_only_app_id_str = ctx.id;
+        input_only_app_id = util::from_view(ctx.id);
 
         apps.emplace_back(std::move(ctx));
       }
