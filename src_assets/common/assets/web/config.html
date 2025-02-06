@@ -192,6 +192,7 @@
               "dd_manual_refresh_rate": "",
               "dd_hdr_option": "auto",
               "dd_config_revert_delay": 3000,
+              "dd_config_revert_on_disconnect": "disabled",
               "dd_mode_remapping": {"mixed": [], "resolution_only": [], "refresh_rate_only": []},
               "dd_wa_hdr_toggle": "disabled",
               "fallback_mode": "",
@@ -400,17 +401,8 @@
           Object.keys(tab.options).forEach(optionKey => {
             let delete_value = false
 
-            if (["global_prep_cmd", "dd_mode_remapping"].includes(optionKey)) {
-              const config_value = config[optionKey]
-              const default_value = JSON.stringify(tab.options[optionKey])
-
-              if (config_value === default_value) {
-                delete_value = true
-              }
-            }
-
             // todo: add proper type checking
-            if (String(config[optionKey]) === String(tab.options[optionKey])) {
+            if (JSON.stringify(config[optionKey]) === JSON.stringify(tab.options[optionKey])) {
               delete_value = true
             }
 

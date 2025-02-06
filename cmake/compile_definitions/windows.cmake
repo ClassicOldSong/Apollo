@@ -82,7 +82,6 @@ list(PREPEND PLATFORM_LIBRARIES
         libstdc++.a
         libwinpthread.a
         minhook::minhook
-        nlohmann_json::nlohmann_json
         ntdll
         setupapi
         shlwapi

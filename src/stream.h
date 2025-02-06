@@ -3,10 +3,14 @@
  * @brief Declarations for the streaming protocols.
  */
 #pragma once
+
+// standard includes
 #include <utility>
 
+// lib includes
 #include <boost/asio.hpp>
 
+// local includes
 #include "audio.h"
 #include "crypto.h"
 #include "video.h"
@@ -17,6 +21,7 @@ namespace stream {
   constexpr auto AUDIO_STREAM_PORT = 11;
 
   struct session_t;
+
   struct config_t {
     audio::config_t audio;
     video::config_t monitor;
@@ -41,25 +46,15 @@ namespace stream {
       RUNNING,  ///< The session is running
     };
 
-    std::shared_ptr<session_t>
-    alloc(config_t &config, rtsp_stream::launch_session_t &launch_session);
-    std::string
-    uuid(const session_t& session);
-    bool
-    uuid_match(const session_t& session, const std::string& uuid);
-    bool
-    update_device_info(session_t& session, const std::string& name, const crypto::PERM& newPerm);
-    int
-    start(session_t &session, const std::string &addr_string);
-    void
-    stop(session_t &session);
-    void
-    graceful_stop(session_t& session);
-    void
-    join(session_t &session);
-    state_e
-    state(session_t &session);
-    inline bool
-    send(session_t& session);
+    std::shared_ptr<session_t> alloc(config_t &config, rtsp_stream::launch_session_t &launch_session);
+    std::string uuid(const session_t& session);
+    bool uuid_match(const session_t& session, const std::string& uuid);
+    bool update_device_info(session_t& session, const std::string& name, const crypto::PERM& newPerm);
+    int start(session_t &session, const std::string &addr_string);
+    void stop(session_t &session);
+    void graceful_stop(session_t& session);
+    void join(session_t &session);
+    state_e state(session_t &session);
+    inline bool send(session_t& session, const std::string_view &payload);
   }  // namespace session
 }  // namespace stream

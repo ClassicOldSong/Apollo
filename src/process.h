@@ -8,12 +8,15 @@
   #define __kernel_entry
 #endif
 
+// standard includes
 #include <optional>
 #include <unordered_map>
 
+// lib includes
 #include <boost/process/v1.hpp>
 #include <boost/property_tree/ptree.hpp>
 
+// local includes
 #include "config.h"
 #include "platform/common.h"
 #include "rtsp.h"
@@ -31,6 +34,7 @@ namespace proc {
 #endif
 
   typedef config::prep_cmd_t cmd_t;
+
   /**
    * pre_cmds -- guaranteed to be executed unless any of the commands fail.
    * detached -- commands detached from Sunshine
@@ -91,37 +95,30 @@ namespace proc {
 
     proc_t(
       boost::process::v1::environment &&env,
-      std::vector<ctx_t> &&apps):
+      std::vector<ctx_t> &&apps
+    ):
         _app_id(0),
         _env(std::move(env)),
-        _apps(std::move(apps)) {}
+        _apps(std::move(apps)) {
+    }
 
-    void
-    launch_input_only();
+    void launch_input_only();
 
-    int
-    execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
+    int execute(int app_id, const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
 
     /**
      * @return `_app_id` if a process is running, otherwise returns `0`
      */
-    int
-    running();
+    int running();
 
     ~proc_t();
 
-    const std::vector<ctx_t> &
-    get_apps() const;
-    std::vector<ctx_t> &
-    get_apps();
-    std::string
-    get_app_image(int app_id);
-    std::string
-    get_last_run_app_name();
-    boost::process::environment
-    get_env();
-    void
-    terminate(bool immediate = false);
+    const std::vector<ctx_t> &get_apps() const;
+    std::vector<ctx_t> &get_apps();
+    std::string get_app_image(int app_id);
+    std::string get_last_run_app_name();
+    boost::process::environment get_env();
+    void terminate();
 
   private:
     int _app_id;
@@ -153,24 +150,18 @@ namespace proc {
    * @brief Calculate a stable id based on name and image data
    * @return Tuple of id calculated without index (for use if no collision) and one with.
    */
-  std::tuple<std::string, std::string>
-  calculate_app_id(const std::string &app_name, std::string app_image_path, int index);
+  std::tuple<std::string, std::string> calculate_app_id(const std::string &app_name, std::string app_image_path, int index);
 
-  std::string
-  validate_app_image_path(std::string app_image_path);
-  void
-  refresh(const std::string &file_name);
-  void
-  migrate_apps(boost::property_tree::ptree* fileTree_p, boost::property_tree::ptree* inputTree_p);
-  std::optional<proc::proc_t>
-  parse(const std::string &file_name);
+  std::string validate_app_image_path(std::string app_image_path);
+  void refresh(const std::string &file_name);
+  void migrate_apps(boost::property_tree::ptree* fileTree_p, boost::property_tree::ptree* inputTree_p);
+  std::optional<proc::proc_t> parse(const std::string &file_name);
 
   /**
    * @brief Initialize proc functions
    * @return Unique pointer to `deinit_t` to manage cleanup
    */
-  std::unique_ptr<platf::deinit_t>
-  init();
+  std::unique_ptr<platf::deinit_t> init();
 
   /**
    * @brief Terminates all child processes in a process group.
@@ -178,8 +169,7 @@ namespace proc {
    * @param group The group of all children in the process tree.
    * @param exit_timeout The timeout to wait for the process group to gracefully exit.
    */
-  void
-  terminate_process_group(boost::process::v1::child &proc, boost::process::v1::group &group, std::chrono::seconds exit_timeout);
+  void terminate_process_group(boost::process::v1::child &proc, boost::process::v1::group &group, std::chrono::seconds exit_timeout);
 
   extern proc_t proc;
 

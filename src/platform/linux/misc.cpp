@@ -12,16 +12,18 @@
 #include <fstream>
 #include <iostream>
 
-// lib includes
+// platform includes
 #include <arpa/inet.h>
-#include <boost/asio/ip/address.hpp>
-#include <boost/asio/ip/host_name.hpp>
-#include <boost/process/v1.hpp>
 #include <dlfcn.h>
-#include <fcntl.h>
 #include <ifaddrs.h>
 #include <netinet/udp.h>
 #include <pwd.h>
+
+// lib includes
+#include <boost/asio/ip/address.hpp>
+#include <boost/asio/ip/host_name.hpp>
+#include <boost/process/v1.hpp>
+#include <fcntl.h>
 #include <unistd.h>
 
 // local includes
@@ -48,8 +50,7 @@ namespace bp = boost::process;
 window_system_e window_system;
 
 namespace dyn {
-  void *
-  handle(const std::vector<const char *> &libs) {
+  void *handle(const std::vector<const char *> &libs) {
     void *handle;
 
     for (auto lib : libs) {
@@ -72,8 +73,7 @@ namespace dyn {
     return nullptr;
   }
 
-  int
-  load(void *handle, const std::vector<std::tuple<apiproc *, const char *>> &funcs, bool strict) {
+  int load(void *handle, const std::vector<std::tuple<apiproc *, const char *>> &funcs, bool strict) {
     int err = 0;
     for (auto &func : funcs) {
       TUPLE_2D_REF(fn, name, func);
@@ -90,16 +90,16 @@ namespace dyn {
     return err;
   }
 }  // namespace dyn
+
 namespace platf {
   using ifaddr_t = util::safe_ptr<ifaddrs, freeifaddrs>;
 
-  ifaddr_t
-  get_ifaddrs() {
-    ifaddrs *p { nullptr };
+  ifaddr_t get_ifaddrs() {
+    ifaddrs *p {nullptr};
 
     getifaddrs(&p);
 
-    return ifaddr_t { p };
+    return ifaddr_t {p};
   }
 
   /**
@@ -107,8 +107,7 @@ namespace platf {
    * @details This is used for the log directory, so it cannot invoke Boost logging!
    * @return The path of the appdata directory that should be used.
    */
-  fs::path
-  appdata() {
+  fs::path appdata() {
     static std::once_flag migration_flag;
     static fs::path config_path;
 
@@ -174,8 +173,7 @@ namespace platf {
               std::cerr << "Migration failed: " << ec.message() << std::endl;
               config_path = old_config_path;
             }
-          }
-          else {
+          } else {
             // We cannot use Boost logging because it hasn't been initialized yet!
             std::cerr << "Config exists in both "sv << old_config_path << " and "sv << config_path << ". Using "sv << config_path << " for config" << std::endl;
             std::cerr << "It is recommended to remove "sv << old_config_path << std::endl;
@@ -187,45 +185,36 @@ namespace platf {
     return config_path;
   }
 
-  std::string
-  from_sockaddr(const sockaddr *const ip_addr) {
+  std::string from_sockaddr(const sockaddr *const ip_addr) {
     char data[INET6_ADDRSTRLEN] = {};
 
     auto family = ip_addr->sa_family;
     if (family == AF_INET6) {
-      inet_ntop(AF_INET6, &((sockaddr_in6 *) ip_addr)->sin6_addr, data,
-        INET6_ADDRSTRLEN);
-    }
-    else if (family == AF_INET) {
-      inet_ntop(AF_INET, &((sockaddr_in *) ip_addr)->sin_addr, data,
-        INET_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &((sockaddr_in6 *) ip_addr)->sin6_addr, data, INET6_ADDRSTRLEN);
+    } else if (family == AF_INET) {
+      inet_ntop(AF_INET, &((sockaddr_in *) ip_addr)->sin_addr, data, INET_ADDRSTRLEN);
     }
 
-    return std::string { data };
+    return std::string {data};
   }
 
-  std::pair<std::uint16_t, std::string>
-  from_sockaddr_ex(const sockaddr *const ip_addr) {
+  std::pair<std::uint16_t, std::string> from_sockaddr_ex(const sockaddr *const ip_addr) {
     char data[INET6_ADDRSTRLEN] = {};
 
     auto family = ip_addr->sa_family;
     std::uint16_t port = 0;
     if (family == AF_INET6) {
-      inet_ntop(AF_INET6, &((sockaddr_in6 *) ip_addr)->sin6_addr, data,
-        INET6_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &((sockaddr_in6 *) ip_addr)->sin6_addr, data, INET6_ADDRSTRLEN);
       port = ((sockaddr_in6 *) ip_addr)->sin6_port;
-    }
-    else if (family == AF_INET) {
-      inet_ntop(AF_INET, &((sockaddr_in *) ip_addr)->sin_addr, data,
-        INET_ADDRSTRLEN);
+    } else if (family == AF_INET) {
+      inet_ntop(AF_INET, &((sockaddr_in *) ip_addr)->sin_addr, data, INET_ADDRSTRLEN);
       port = ((sockaddr_in *) ip_addr)->sin_port;
     }
 
-    return { port, std::string { data } };
+    return {port, std::string {data}};
   }
 
-  std::string
-  get_mac_address(const std::string_view &address) {
+  std::string get_mac_address(const std::string_view &address) {
     auto ifaddrs = get_ifaddrs();
     for (auto pos = ifaddrs.get(); pos != nullptr; pos = pos->ifa_next) {
       if (pos->ifa_addr && address == from_sockaddr(pos->ifa_addr)) {
@@ -242,8 +231,7 @@ namespace platf {
     return "00:00:00:00:00:00"s;
   }
 
-std::string
-get_local_ip_for_gateway() {
+std::string get_local_ip_for_gateway() {
   int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
   if (fd < 0) {
     BOOST_LOG(warning) << "Socket creation failed: " << strerror(errno);
@@ -323,8 +311,7 @@ get_local_ip_for_gateway() {
   return local_ip;
 }
 
-  bp::child
-  run_command(bool elevated, bool interactive, const std::string &cmd, boost::filesystem::path &working_dir, const bp::environment &env, FILE *file, std::error_code &ec, bp::group *group) {
+  bp::child run_command(bool elevated, bool interactive, const std::string &cmd, boost::filesystem::path &working_dir, const bp::environment &env, FILE *file, std::error_code &ec, bp::group *group) {
     // clang-format off
     if (!group) {
       if (!file) {
@@ -349,8 +336,7 @@ get_local_ip_for_gateway() {
    * @brief Open a url in the default web browser.
    * @param url The url to open.
    */
-  void
-  open_url(const std::string &url) {
+  void open_url(const std::string &url) {
     // set working dir to user home directory
     auto working_dir = boost::filesystem::path(std::getenv("HOME"));
     std::string cmd = R"(xdg-open ")" + url + R"(")";
@@ -360,30 +346,25 @@ get_local_ip_for_gateway() {
     auto child = run_command(false, false, cmd, working_dir, _env, nullptr, ec, nullptr);
     if (ec) {
       BOOST_LOG(warning) << "Couldn't open url ["sv << url << "]: System: "sv << ec.message();
-    }
-    else {
+    } else {
       BOOST_LOG(info) << "Opened url ["sv << url << "]"sv;
       child.detach();
     }
   }
 
-  void
-  adjust_thread_priority(thread_priority_e priority) {
+  void adjust_thread_priority(thread_priority_e priority) {
     // Unimplemented
   }
 
-  void
-  streaming_will_start() {
+  void streaming_will_start() {
     // Nothing to do
   }
 
-  void
-  streaming_will_stop() {
+  void streaming_will_stop() {
     // Nothing to do
   }
 
-  void
-  restart_on_exit() {
+  void restart_on_exit() {
     char executable[PATH_MAX];
     ssize_t len = readlink("/proc/self/exe", executable, PATH_MAX - 1);
     if (len == -1) {
@@ -405,42 +386,35 @@ get_local_ip_for_gateway() {
     }
   }
 
-  void
-  restart() {
+  void restart() {
     // Gracefully clean up and restart ourselves instead of exiting
     atexit(restart_on_exit);
     lifetime::exit_sunshine(0, true);
   }
 
-  int
-  set_env(const std::string &name, const std::string &value) {
+  int set_env(const std::string &name, const std::string &value) {
     return setenv(name.c_str(), value.c_str(), 1);
   }
 
-  int
-  unset_env(const std::string &name) {
+  int unset_env(const std::string &name) {
     return unsetenv(name.c_str());
   }
 
-  bool
-  request_process_group_exit(std::uintptr_t native_handle) {
+  bool request_process_group_exit(std::uintptr_t native_handle) {
     if (kill(-((pid_t) native_handle), SIGTERM) == 0 || errno == ESRCH) {
       BOOST_LOG(debug) << "Successfully sent SIGTERM to process group: "sv << native_handle;
       return true;
-    }
-    else {
+    } else {
       BOOST_LOG(warning) << "Unable to send SIGTERM to process group ["sv << native_handle << "]: "sv << errno;
       return false;
     }
   }
 
-  bool
-  process_group_running(std::uintptr_t native_handle) {
+  bool process_group_running(std::uintptr_t native_handle) {
     return waitpid(-((pid_t) native_handle), nullptr, WNOHANG) >= 0;
   }
 
-  struct sockaddr_in
-  to_sockaddr(boost::asio::ip::address_v4 address, uint16_t port) {
+  struct sockaddr_in to_sockaddr(boost::asio::ip::address_v4 address, uint16_t port) {
     struct sockaddr_in saddr_v4 = {};
 
     saddr_v4.sin_family = AF_INET;
@@ -452,8 +426,7 @@ get_local_ip_for_gateway() {
     return saddr_v4;
   }
 
-  struct sockaddr_in6
-  to_sockaddr(boost::asio::ip::address_v6 address, uint16_t port) {
+  struct sockaddr_in6 to_sockaddr(boost::asio::ip::address_v6 address, uint16_t port) {
     struct sockaddr_in6 saddr_v6 = {};
 
     saddr_v6.sin6_family = AF_INET6;
@@ -466,8 +439,7 @@ get_local_ip_for_gateway() {
     return saddr_v6;
   }
 
-  bool
-  send_batch(batched_send_info_t &send_info) {
+  bool send_batch(batched_send_info_t &send_info) {
     auto sockfd = (int) send_info.native_socket;
     struct msghdr msg = {};
 
@@ -479,8 +451,7 @@ get_local_ip_for_gateway() {
 
       msg.msg_name = (struct sockaddr *) &taddr_v6;
       msg.msg_namelen = sizeof(taddr_v6);
-    }
-    else {
+    } else {
       taddr_v4 = to_sockaddr(send_info.target_address.to_v4(), send_info.target_port);
 
       msg.msg_name = (struct sockaddr *) &taddr_v4;
@@ -488,10 +459,10 @@ get_local_ip_for_gateway() {
     }
 
     union {
-      char buf[CMSG_SPACE(sizeof(uint16_t)) +
-               std::max(CMSG_SPACE(sizeof(struct in_pktinfo)), CMSG_SPACE(sizeof(struct in6_pktinfo)))];
+      char buf[CMSG_SPACE(sizeof(uint16_t)) + std::max(CMSG_SPACE(sizeof(struct in_pktinfo)), CMSG_SPACE(sizeof(struct in6_pktinfo)))];
       struct cmsghdr alignment;
     } cmbuf = {};  // Must be zeroed for CMSG_NXTHDR()
+
     socklen_t cmbuflen = 0;
 
     msg.msg_control = cmbuf.buf;
@@ -513,8 +484,7 @@ get_local_ip_for_gateway() {
       pktinfo_cm->cmsg_type = IPV6_PKTINFO;
       pktinfo_cm->cmsg_len = CMSG_LEN(sizeof(pktInfo));
       memcpy(CMSG_DATA(pktinfo_cm), &pktInfo, sizeof(pktInfo));
-    }
-    else {
+    } else {
       struct in_pktinfo pktInfo;
 
       struct sockaddr_in saddr_v4 = to_sockaddr(send_info.source_address.to_v4(), 0);
@@ -552,8 +522,7 @@ get_local_ip_for_gateway() {
             iovs[iovlen].iov_len = send_info.payload_size;
             iovlen++;
           }
-        }
-        else {
+        } else {
           // Translate buffer descriptors into iovs
           auto payload_offset = (send_info.block_offset + seg_index) * send_info.payload_size;
           auto payload_length = payload_offset + (segs_in_batch * send_info.payload_size);
@@ -579,8 +548,7 @@ get_local_ip_for_gateway() {
           cm->cmsg_type = UDP_SEGMENT;
           cm->cmsg_len = CMSG_LEN(sizeof(uint16_t));
           *((uint16_t *) CMSG_DATA(cm)) = msg_size;
-        }
-        else {
+        } else {
           msg.msg_controllen = cmbuflen;
         }
 
@@ -676,8 +644,7 @@ get_local_ip_for_gateway() {
     }
   }
 
-  bool
-  send(send_info_t &send_info) {
+  bool send(send_info_t &send_info) {
     auto sockfd = (int) send_info.native_socket;
     struct msghdr msg = {};
 
@@ -689,8 +656,7 @@ get_local_ip_for_gateway() {
 
       msg.msg_name = (struct sockaddr *) &taddr_v6;
       msg.msg_namelen = sizeof(taddr_v6);
-    }
-    else {
+    } else {
       taddr_v4 = to_sockaddr(send_info.target_address.to_v4(), send_info.target_port);
 
       msg.msg_name = (struct sockaddr *) &taddr_v4;
@@ -701,6 +667,7 @@ get_local_ip_for_gateway() {
       char buf[std::max(CMSG_SPACE(sizeof(struct in_pktinfo)), CMSG_SPACE(sizeof(struct in6_pktinfo)))];
       struct cmsghdr alignment;
     } cmbuf;
+
     socklen_t cmbuflen = 0;
 
     msg.msg_control = cmbuf.buf;
@@ -720,8 +687,7 @@ get_local_ip_for_gateway() {
       pktinfo_cm->cmsg_type = IPV6_PKTINFO;
       pktinfo_cm->cmsg_len = CMSG_LEN(sizeof(pktInfo));
       memcpy(CMSG_DATA(pktinfo_cm), &pktInfo, sizeof(pktInfo));
-    }
-    else {
+    } else {
       struct in_pktinfo pktInfo;
 
       struct sockaddr_in saddr_v4 = to_sockaddr(send_info.source_address.to_v4(), 0);
@@ -786,7 +752,8 @@ get_local_ip_for_gateway() {
   class qos_t: public deinit_t {
   public:
     qos_t(int sockfd, std::vector<std::tuple<int, int, int>> options):
-        sockfd(sockfd), options(options) {
+        sockfd(sockfd),
+        options(options) {
       qos_ref_count++;
     }
 
@@ -814,8 +781,7 @@ get_local_ip_for_gateway() {
    * @param data_type The type of traffic sent on this socket.
    * @param dscp_tagging Specifies whether to enable DSCP tagging on outgoing traffic.
    */
-  std::unique_ptr<deinit_t>
-  enable_socket_qos(uintptr_t native_socket, boost::asio::ip::address &address, uint16_t port, qos_data_type_e data_type, bool dscp_tagging) {
+  std::unique_ptr<deinit_t> enable_socket_qos(uintptr_t native_socket, boost::asio::ip::address &address, uint16_t port, qos_data_type_e data_type, bool dscp_tagging) {
     int sockfd = (int) native_socket;
     std::vector<std::tuple<int, int, int>> reset_options;
 
@@ -828,8 +794,7 @@ get_local_ip_for_gateway() {
       if (address.is_v6() && !address.to_v6().is_v4_mapped()) {
         level = SOL_IPV6;
         option = IPV6_TCLASS;
-      }
-      else {
+      } else {
         level = SOL_IP;
         option = IP_TOS;
       }
@@ -856,8 +821,7 @@ get_local_ip_for_gateway() {
         if (setsockopt(sockfd, level, option, &dscp, sizeof(dscp)) == 0) {
           // Reset TOS to -1 when QoS is disabled
           reset_options.emplace_back(std::make_tuple(level, option, -1));
-        }
-        else {
+        } else {
           BOOST_LOG(error) << "Failed to set TOS/TCLASS: "sv << errno;
         }
       }
@@ -873,20 +837,17 @@ get_local_ip_for_gateway() {
     if (setsockopt(sockfd, SOL_SOCKET, SO_PRIORITY, &priority, sizeof(priority)) == 0) {
       // Reset SO_PRIORITY to 0 when QoS is disabled
       reset_options.emplace_back(std::make_tuple(SOL_SOCKET, SO_PRIORITY, 0));
-    }
-    else {
+    } else {
       BOOST_LOG(error) << "Failed to set SO_PRIORITY: "sv << errno;
     }
 
     return std::make_unique<qos_t>(sockfd, reset_options);
   }
 
-  std::string
-  get_host_name() {
+  std::string get_host_name() {
     try {
       return boost::asio::ip::host_name();
-    }
-    catch (boost::system::system_error &err) {
+    } catch (boost::system::system_error &err) {
       BOOST_LOG(error) << "Failed to get hostname: "sv << err.what();
       return "Sunshine"s;
     }
@@ -913,67 +874,62 @@ get_local_ip_for_gateway() {
   static std::bitset<source::MAX_FLAGS> sources;
 
 #ifdef SUNSHINE_BUILD_CUDA
-  std::vector<std::string>
-  nvfbc_display_names();
-  std::shared_ptr<display_t>
-  nvfbc_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+  std::vector<std::string> nvfbc_display_names();
+  std::shared_ptr<display_t> nvfbc_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
-  bool
-  verify_nvfbc() {
+  bool verify_nvfbc() {
     return !nvfbc_display_names().empty();
   }
 #endif
 
 #ifdef SUNSHINE_BUILD_WAYLAND
-  std::vector<std::string>
-  wl_display_names();
-  std::shared_ptr<display_t>
-  wl_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+  std::vector<std::string> wl_display_names();
+  std::shared_ptr<display_t> wl_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
-  bool
-  verify_wl() {
+  bool verify_wl() {
     return window_system == window_system_e::WAYLAND && !wl_display_names().empty();
   }
 #endif
 
 #ifdef SUNSHINE_BUILD_DRM
-  std::vector<std::string>
-  kms_display_names(mem_type_e hwdevice_type);
-  std::shared_ptr<display_t>
-  kms_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+  std::vector<std::string> kms_display_names(mem_type_e hwdevice_type);
+  std::shared_ptr<display_t> kms_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
-  bool
-  verify_kms() {
+  bool verify_kms() {
     return !kms_display_names(mem_type_e::unknown).empty();
   }
 #endif
 
 #ifdef SUNSHINE_BUILD_X11
-  std::vector<std::string>
-  x11_display_names();
-  std::shared_ptr<display_t>
-  x11_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+  std::vector<std::string> x11_display_names();
+  std::shared_ptr<display_t> x11_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
 
-  bool
-  verify_x11() {
+  bool verify_x11() {
     return window_system == window_system_e::X11 && !x11_display_names().empty();
   }
 #endif
 
-  std::vector<std::string>
-  display_names(mem_type_e hwdevice_type) {
+  std::vector<std::string> display_names(mem_type_e hwdevice_type) {
 #ifdef SUNSHINE_BUILD_CUDA
     // display using NvFBC only supports mem_type_e::cuda
-    if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) return nvfbc_display_names();
+    if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
+      return nvfbc_display_names();
+    }
 #endif
 #ifdef SUNSHINE_BUILD_WAYLAND
-    if (sources[source::WAYLAND]) return wl_display_names();
+    if (sources[source::WAYLAND]) {
+      return wl_display_names();
+    }
 #endif
 #ifdef SUNSHINE_BUILD_DRM
-    if (sources[source::KMS]) return kms_display_names(hwdevice_type);
+    if (sources[source::KMS]) {
+      return kms_display_names(hwdevice_type);
+    }
 #endif
 #ifdef SUNSHINE_BUILD_X11
-    if (sources[source::X11]) return x11_display_names();
+    if (sources[source::X11]) {
+      return x11_display_names();
+    }
 #endif
     return {};
   }
@@ -982,14 +938,12 @@ get_local_ip_for_gateway() {
    * @brief Returns if GPUs/drivers have changed since the last call to this function.
    * @return `true` if a change has occurred or if it is unknown whether a change occurred.
    */
-  bool
-  needs_encoder_reenumeration() {
+  bool needs_encoder_reenumeration() {
     // We don't track GPU state, so we will always reenumerate. Fortunately, it is fast on Linux.
     return true;
   }
 
-  std::shared_ptr<display_t>
-  display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+  std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
 #ifdef SUNSHINE_BUILD_CUDA
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
       BOOST_LOG(info) << "Screencasting with NvFBC"sv;
@@ -1018,8 +972,7 @@ get_local_ip_for_gateway() {
     return nullptr;
   }
 
-  std::unique_ptr<deinit_t>
-  init() {
+  std::unique_ptr<deinit_t> init() {
     // enable low latency mode for AMD
     // https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/30039
     set_env("AMD_DEBUG", "lowlatencyenc");
@@ -1088,8 +1041,7 @@ get_local_ip_for_gateway() {
 
   class linux_high_precision_timer: public high_precision_timer {
   public:
-    void
-    sleep_for(const std::chrono::nanoseconds &duration) override {
+    void sleep_for(const std::chrono::nanoseconds &duration) override {
       std::this_thread::sleep_for(duration);
     }
 
@@ -1098,8 +1050,7 @@ get_local_ip_for_gateway() {
     }
   };
 
-  std::unique_ptr<high_precision_timer>
-  create_high_precision_timer() {
+  std::unique_ptr<high_precision_timer> create_high_precision_timer() {
     return std::make_unique<linux_high_precision_timer>();
   }
 
