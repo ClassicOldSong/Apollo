@@ -520,7 +520,10 @@ namespace confighttp {
         "exclude-global-prep-cmd",
         "elevated",
         "auto-detach",
-        "wait-all"
+        "wait-all",
+        "use-app-identity",
+        "per-client-app-identity",
+        "virtual-display"
       };
 
       // List of keys to convert to integers
