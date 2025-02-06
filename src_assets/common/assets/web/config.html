@@ -356,9 +356,13 @@
             if (typeof this.config[optionKey] === "string") {
               this.config[optionKey] = JSON.parse(this.config[optionKey]);
             } else {
-              this.config[optionKey] = [];
+              this.config[optionKey] = null;
             }
           }
+
+          this.config.dd_mode_remapping ??= {mixed: [], resolution_only: [], refresh_rate_only: []};
+          this.config.global_prep_cmd ??= [];
+          this.config.server_cmd ??= [];
 
           // Populate default values from tabs options
           this.tabs.forEach(tab => {
