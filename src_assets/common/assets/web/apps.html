@@ -171,7 +171,7 @@
           <label for="appName" class="form-label">{{ $t('apps.cmd_prep_name') }}</label>
           <div class="form-text">{{ $t('apps.cmd_prep_desc') }}</div>
           <div class="d-flex justify-content-start mb-3 mt-3" v-if="editForm['prep-cmd'].length === 0">
-            <button class="btn btn-success" @click="addPrepCmd">
+            <button class="btn btn-success" @click="addPrepCmd(-1)">
               <i class="fas fa-plus mr-1"></i> {{ $t('apps.add_cmds') }}
             </button>
           </div>
@@ -205,7 +205,7 @@
                   <button class="btn btn-danger" @click="editForm['prep-cmd'].splice(i,1)">
                     <i class="fas fa-trash"></i>
                   </button>
-                  <button class="btn btn-success" @click="addPrepCmd">
+                  <button class="btn btn-success" @click="addPrepCmd(i)">
                     <i class="fas fa-plus"></i>
                   </button>
                 </td>
@@ -510,7 +510,7 @@
           });
         }
       },
-      addPrepCmd() {
+      addPrepCmd(idx) {
         const template = {
           do: "",
           undo: ""
@@ -520,7 +520,7 @@
           template.elevated = false;
         }
 
-        this.editForm["prep-cmd"].push(template);
+        this.editForm["prep-cmd"].splice(idx + 1, 0, template);
       },
       showCoverFinder($event) {
         this.coverCandidates = [];
