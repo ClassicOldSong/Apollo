@@ -120,7 +120,7 @@ namespace nvhttp {
               return;
             }
             if (!ec) {
-              if (verify && !verify(session->request, session->connection->socket->native_handle()))
+              if (verify && !verify(session->request, session->connection->socket->native_handle())) {
                 this->write(session, on_verify_failed);
               } else {
                 this->read(session);
@@ -159,7 +159,7 @@ namespace nvhttp {
     REMOVE  ///< Remove certificate
   };
 
-  std::string get_arg(const args_t &args, const char *name, const char *default_value = nullptr) {
+  std::string get_arg(const args_t &args, const char *name, const char *default_value) {
     auto it = args.find(name);
     if (it == std::end(args)) {
       if (default_value != NULL) {
@@ -171,25 +171,28 @@ namespace nvhttp {
     return it->second;
   }
 
-  // Helper function to extract command entries
-  cmd_list_t extract_command_entries(const pt::ptree& pt, const std::string& key) {
+  // Helper function to extract command entries from a JSON object.
+  cmd_list_t extract_command_entries(const nlohmann::json& j, const std::string& key) {
     cmd_list_t commands;
 
-    // Check if the specified key exists
-    auto it = pt.find(key);
-    if (it != pt.not_found()) {
-      // Traverse the array and extract entries
-      for (const auto& item : pt.get_child(key)) {
-        try {
-          // Extract "cmd" and "elevated" fields
-          std::string cmd = item.second.get<std::string>("cmd");
-          bool elevated = item.second.get<bool>("elevated");
+    // Check if the key exists in the JSON.
+    if (j.contains(key)) {
+      // Ensure that the value for the key is an array.
+      try {
+        for (const auto& item : j.at(key)) {
+          try {
+            // Extract "cmd" and "elevated" fields from the JSON object.
+            std::string cmd = item.at("cmd").get<std::string>();
+            bool elevated = util::get_non_string_json_value<bool>(item, "elevated", false);
 
-          // Add to the list of commands
-          commands.push_back({cmd, elevated});
-        } catch (const std::exception& e) {
-          BOOST_LOG(warning) << "Error parsing entry: " << e.what();
+            // Add the command entry to the list.
+            commands.push_back({cmd, elevated});
+          } catch (const std::exception& e) {
+            BOOST_LOG(warning) << "Error parsing command entry: " << e.what();
+          }
         }
+      } catch (const std::exception &e) {
+        BOOST_LOG(warning) << "Error retrieving key \"" << key << "\": " << e.what();
       }
     } else {
       BOOST_LOG(debug) << "Key \"" << key << "\" not found in the JSON.";
@@ -198,33 +201,38 @@ namespace nvhttp {
     return commands;
   }
 
-  void
-  save_state() {
-    pt::ptree root;
-
+  void save_state() {
+    nlohmann::json root = nlohmann::json::object();
+    // If the state file exists, try to read it.
     if (fs::exists(config::nvhttp.file_state)) {
       try {
-        pt::read_json(config::nvhttp.file_state, root);
+        std::ifstream in(config::nvhttp.file_state);
+        in >> root;
       } catch (std::exception &e) {
         BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state << ": "sv << e.what();
         return;
       }
     }
 
-    root.erase("root"s);
+    // Erase any previous "root" key.
+    root.erase("root");
 
-    root.put("root.uniqueid", http::unique_id);
+    // Create a new "root" object and set the unique id.
+    root["root"] = nlohmann::json::object();
+    root["root"]["uniqueid"] = http::unique_id;
+
     client_t &client = client_root;
-    pt::ptree node;
+    nlohmann::json named_cert_nodes = nlohmann::json::array();
 
-    pt::ptree named_cert_nodes;
     std::unordered_set<std::string> unique_certs;
     std::unordered_map<std::string, int> name_counts;
+
     for (auto &named_cert_p : client.named_devices) {
+      // Only add each unique certificate once.
       if (unique_certs.insert(named_cert_p->cert).second) {
-        pt::ptree named_cert_node;
+        nlohmann::json named_cert_node = nlohmann::json::object();
         std::string base_name = named_cert_p->name;
-        // Remove existing pending id if present
+        // Remove any pending id suffix (e.g., " (2)") if present.
         size_t pos = base_name.find(" (");
         if (pos != std::string::npos) {
           base_name = base_name.substr(0, pos);
@@ -234,36 +242,38 @@ namespace nvhttp {
         if (count > 0) {
           final_name += " (" + std::to_string(count + 1) + ")";
         }
-        named_cert_node.put("name"s, final_name);
-        named_cert_node.put("cert"s, named_cert_p->cert);
-        named_cert_node.put("uuid"s, named_cert_p->uuid);
-        named_cert_node.put("perm"s, (uint32_t)named_cert_p->perm);
+        named_cert_node["name"] = final_name;
+        named_cert_node["cert"] = named_cert_p->cert;
+        named_cert_node["uuid"] = named_cert_p->uuid;
+        named_cert_node["perm"] = static_cast<uint32_t>(named_cert_p->perm);
 
-        // Add "do" commands
+        // Add "do" commands if available.
         if (!named_cert_p->do_cmds.empty()) {
-          pt::ptree do_cmds_node;
-          for (const auto& cmd : named_cert_p->do_cmds) {
-            do_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+          nlohmann::json do_cmds_node = nlohmann::json::array();
+          for (const auto &cmd : named_cert_p->do_cmds) {
+            do_cmds_node.push_back(crypto::command_entry_t::serialize(cmd));
           }
-          named_cert_node.add_child("do", do_cmds_node);
+          named_cert_node["do"] = do_cmds_node;
         }
 
-        // Add "undo" commands
+        // Add "undo" commands if available.
         if (!named_cert_p->undo_cmds.empty()) {
-          pt::ptree undo_cmds_node;
-          for (const auto& cmd : named_cert_p->undo_cmds) {
-            undo_cmds_node.push_back(std::make_pair(""s, crypto::command_entry_t::serialize(cmd)));
+          nlohmann::json undo_cmds_node = nlohmann::json::array();
+          for (const auto &cmd : named_cert_p->undo_cmds) {
+            undo_cmds_node.push_back(crypto::command_entry_t::serialize(cmd));
           }
-          named_cert_node.add_child("undo", undo_cmds_node);
+          named_cert_node["undo"] = undo_cmds_node;
         }
 
-        named_cert_nodes.push_back(std::make_pair(""s, named_cert_node));
+        named_cert_nodes.push_back(named_cert_node);
       }
     }
-    root.add_child("root.named_devices"s, named_cert_nodes);
+
+    root["root"]["named_devices"] = named_cert_nodes;
 
     try {
-      pt::write_json(config::nvhttp.file_state, root);
+      std::ofstream out(config::nvhttp.file_state);
+      out << root.dump(4);  // Pretty-print with an indent of 4 spaces.
     } catch (std::exception &e) {
       BOOST_LOG(error) << "Couldn't write "sv << config::nvhttp.file_state << ": "sv << e.what();
       return;
@@ -277,38 +287,38 @@ namespace nvhttp {
       return;
     }
 
-    pt::ptree tree;
+    nlohmann::json tree;
     try {
-      pt::read_json(config::nvhttp.file_state, tree);
+      std::ifstream in(config::nvhttp.file_state);
+      in >> tree;
     } catch (std::exception &e) {
       BOOST_LOG(error) << "Couldn't read "sv << config::nvhttp.file_state << ": "sv << e.what();
       return;
     }
 
-    auto unique_id_p = tree.get_optional<std::string>("root.uniqueid");
-    if (!unique_id_p) {
-      // This file doesn't contain moonlight credentials
+    // Check that the file contains a "root.uniqueid" value.
+    if (!tree.contains("root") || !tree["root"].contains("uniqueid")) {
       http::uuid = uuid_util::uuid_t::generate();
       http::unique_id = http::uuid.string();
       return;
     }
-    http::uuid = uuid_util::uuid_t::parse(*unique_id_p);
-    http::unique_id = std::move(*unique_id_p);
 
-    auto root = tree.get_child("root");
-    client_t client;
+    std::string uid = tree["root"]["uniqueid"];
+    http::uuid = uuid_util::uuid_t::parse(uid);
+    http::unique_id = uid;
 
-    // Import from old format
-    if (root.get_child_optional("devices")) {
-      auto device_nodes = root.get_child("devices");
-      for (auto& [_, device_node] : device_nodes) {
-        auto uniqID = device_node.get<std::string>("uniqueid");
+    nlohmann::json root = tree["root"];
+    client_t client;  // Local client to load into
 
-        if (device_node.count("certs")) {
-          for (auto& [_, el] : device_node.get_child("certs")) {
+    // Import from the old format if available.
+    if (root.contains("devices")) {
+      for (auto &device_node : root["devices"]) {
+        // For each device, if there is a "certs" array, add a named certificate.
+        if (device_node.contains("certs")) {
+          for (auto &el : device_node["certs"]) {
             auto named_cert_p = std::make_shared<crypto::named_cert_t>();
-            named_cert_p->name = ""s;
-            named_cert_p->cert = el.get_value<std::string>();
+            named_cert_p->name = "";
+            named_cert_p->cert = el.get<std::string>();
             named_cert_p->uuid = uuid_util::uuid_t::generate().string();
             named_cert_p->perm = PERM::_all;
             client.named_devices.emplace_back(named_cert_p);
@@ -317,25 +327,24 @@ namespace nvhttp {
       }
     }
 
-    if (root.count("named_devices")) {
-      for (auto& [_, el] : root.get_child("named_devices")) {
+    // Import from the new format.
+    if (root.contains("named_devices")) {
+      for (auto &el : root["named_devices"]) {
         auto named_cert_p = std::make_shared<crypto::named_cert_t>();
-        named_cert_p->name = el.get<std::string>("name");
-        named_cert_p->cert = el.get<std::string>("cert");
-        named_cert_p->uuid = el.get<std::string>("uuid");
-        named_cert_p->perm = (PERM)el.get("perm", (uint32_t)PERM::_all) & PERM::_all;
-
-        // Load commands
+        named_cert_p->name = el.value("name", "");
+        named_cert_p->cert = el.value("cert", "");
+        named_cert_p->uuid = el.value("uuid", "");
+        named_cert_p->perm = (PERM)(util::get_non_string_json_value<uint32_t>(el, "perm", (uint32_t)PERM::_all)) & PERM::_all;
+        // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
-
         client.named_devices.emplace_back(named_cert_p);
       }
     }
 
-    // Empty certificate chain and import certs from file
+    // Clear any existing certificate chain and add the imported certificates.
     cert_chain.clear();
-    for (auto& named_cert : client.named_devices) {
+    for (auto &named_cert : client.named_devices) {
       cert_chain.add(named_cert);
     }
 
@@ -970,23 +979,23 @@ namespace nvhttp {
 
     for (auto &named_cert : client.named_devices) {
       nlohmann::json named_cert_node;
-      named_cert_node["name"] = named_cert.name;
-      named_cert_node["uuid"] = named_cert.uuid;
-      named_cert_node["perm"] = static_cast<uint32_t>(named_cert.perm);
+      named_cert_node["name"] = named_cert->name;
+      named_cert_node["uuid"] = named_cert->uuid;
+      named_cert_node["perm"] = static_cast<uint32_t>(named_cert->perm);
 
       // Add "do" commands if available
-      if (!named_cert.do_cmds.empty()) {
+      if (!named_cert->do_cmds.empty()) {
         nlohmann::json do_cmds_node = nlohmann::json::array();
-        for (const auto &cmd : named_cert.do_cmds) {
+        for (const auto &cmd : named_cert->do_cmds) {
           do_cmds_node.push_back(crypto::command_entry_t::serialize(cmd));
         }
         named_cert_node["do"] = do_cmds_node;
       }
 
       // Add "undo" commands if available
-      if (!named_cert.undo_cmds.empty()) {
+      if (!named_cert->undo_cmds.empty()) {
         nlohmann::json undo_cmds_node = nlohmann::json::array();
-        for (const auto &cmd : named_cert.undo_cmds) {
+        for (const auto &cmd : named_cert->undo_cmds) {
           undo_cmds_node.push_back(crypto::command_entry_t::serialize(cmd));
         }
         named_cert_node["undo"] = undo_cmds_node;
@@ -998,7 +1007,7 @@ namespace nvhttp {
         connected = false;
       } else {
         for (auto it = connected_uuids.begin(); it != connected_uuids.end(); ++it) {
-          if (*it == named_cert.uuid) {
+          if (*it == named_cert->uuid) {
             connected = true;
             connected_uuids.erase(it);
             break;

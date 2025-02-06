@@ -13,7 +13,7 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 #include <openssl/x509.h>
-#include <boost/property_tree/ptree.hpp>
+#include <nlohmann/json.hpp>
 
 // local includes
 #include "utility.h"
@@ -87,11 +87,11 @@ namespace crypto {
     std::string cmd;
     bool elevated;
 
-    // Serialize method
-    static inline boost::property_tree::ptree serialize(const command_entry_t& entry) {
-      boost::property_tree::ptree node;
-      node.put("cmd", entry.cmd);
-      node.put("elevated", entry.elevated);
+    // Serialize method using nlohmann::json
+    static inline nlohmann::json serialize(const command_entry_t& entry) {
+      nlohmann::json node;
+      node["cmd"] = entry.cmd;
+      node["elevated"] = entry.elevated;
       return node;
     }
   };
@@ -102,7 +102,7 @@ namespace crypto {
     std::string cert;
     std::list<command_entry_t> do_cmds;
     std::list<command_entry_t> undo_cmds;
-    PERM        perm;
+    PERM perm;
   };
 
   using p_named_cert_t = std::shared_ptr<named_cert_t>;

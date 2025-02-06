@@ -300,7 +300,7 @@
         ></Checkbox>
         <!-- use app identity -->
         <Checkbox class="mb-3"
-                  v-if="editForm['use-app-identity'] === 'true'"
+                  v-if="editForm['use-app-identity']"
                   id="perClientAppIdentity"
                   label="apps.per_client_app_identity"
                   desc="apps.per_client_app_identity_desc"
@@ -432,6 +432,7 @@
     "use-app-identity": false,
     "per-client-app-identity": false,
     "allow-client-commands": true,
+    "virtual-display": false,
   }
 
   const app = createApp({

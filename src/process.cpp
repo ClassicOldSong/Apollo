@@ -1059,7 +1059,7 @@ namespace proc {
             prep_cmds.emplace_back(
               std::move(do_cmd),
               std::move(undo_cmd),
-              prep_cmd.elevated
+              std::move(prep_cmd.elevated)
             );
           }
         }

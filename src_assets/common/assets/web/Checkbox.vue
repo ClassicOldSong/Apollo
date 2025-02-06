@@ -79,7 +79,7 @@ const checkboxValues = (() => {
     }
 
     // Return fallback if nothing matches
-    console.error(`Checkbox value ${model.value} did not match any acceptable pattern!`);
+    console.error(`Checkbox value ${model.value} for "${props.id}" did not match any acceptable pattern!`);
     return ["true", "false"];
   })();
 

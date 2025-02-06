@@ -67,7 +67,7 @@ namespace nvhttp {
 
   // Helper function to extract command entries
   cmd_list_t
-  extract_command_entries(const boost::property_tree::ptree& pt, const std::string& key);
+  extract_command_entries(const nlohmann::json& j, const std::string& key);
 
   std::shared_ptr<rtsp_stream::launch_session_t>
   make_launch_session(bool host_audio, bool input_only, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p);

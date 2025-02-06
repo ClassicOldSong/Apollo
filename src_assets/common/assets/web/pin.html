@@ -126,8 +126,7 @@
                   </td>
                   <td v-if="platform === 'windows'">
                     <div class="form-check">
-                      <input type="checkbox" class="form-check-input" :id="`client-${cmdType}-cmd-admin-${i}`" v-model="c.elevated"
-                             true-value="true" false-value="false" />
+                      <input type="checkbox" class="form-check-input" :id="`client-${cmdType}-cmd-admin-${i}`" v-model="c.elevated"/>
                       <label :for="`client-${cmdType}-cmd-admin-${i}`" class="form-check-label">{{ $t('_common.elevated') }}</label>
                     </div>
                   </td>
@@ -410,7 +409,7 @@
         })
         .then(resp => resp.json())
         .then(resp => {
-          if (resp.status !== 'true') {
+          if (!resp.status) {
             this.otpMessage = resp.message
             this.otpStatus = 'danger'
             return
@@ -574,7 +573,7 @@
           .then((r) => r.json())
           .then((r) => {
             this.unpairAllPressed = false;
-            this.unpairAllStatus = r.status.toString() === "true";
+            this.unpairAllStatus = r.status;
             setTimeout(() => {
               this.unpairAllStatus = null;
             }, 5000);
@@ -598,7 +597,7 @@
         fetch("./api/clients/list", { credentials: 'include' })
           .then((response) => response.json())
           .then((response) => {
-            if (response.status === 'true' && response.named_certs && response.named_certs.length) {
+            if (response.status && response.named_certs && response.named_certs.length) {
               this.platform = response.platform
               this.clients = response.named_certs.map(({name, uuid, perm, connected, do: _do, undo}) => {
                 const permInt = parseInt(perm, 10);
@@ -606,7 +605,7 @@
                   name,
                   uuid,
                   perm: permInt,
-                  connected: connected === 'true',
+                  connected,
                   editing: false,
                   do: _do,
                   undo

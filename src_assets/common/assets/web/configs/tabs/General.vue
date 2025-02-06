@@ -173,8 +173,7 @@ onMounted(() => {
           </td>
           <td v-if="platform === 'windows'">
             <div class="form-check">
-              <input type="checkbox" class="form-check-input" :id="'server-cmd-admin-' + i" v-model="c.elevated"
-                     true-value="true" false-value="false" />
+              <input type="checkbox" class="form-check-input" :id="'server-cmd-admin-' + i" v-model="c.elevated"/>
               <label :for="'server-cmd-admin-' + i" class="form-check-label">{{ $t('_common.elevated') }}</label>
             </div>
           </td>

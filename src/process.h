@@ -118,7 +118,7 @@ namespace proc {
     std::string get_app_image(int app_id);
     std::string get_last_run_app_name();
     boost::process::environment get_env();
-    void terminate();
+    void terminate(bool immediate = false);
 
   private:
     int _app_id;

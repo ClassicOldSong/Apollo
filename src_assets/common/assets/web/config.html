@@ -149,6 +149,8 @@
               "global_prep_cmd": [],
               "server_cmd": [],
               "notify_pre_releases": "disabled",
+              "hide_tray_controls": "disabled",
+              "enable_pairing": "enabled",
             },
           },
           {
@@ -349,10 +351,12 @@
           // TODO: let each tab's Component handle it's own data instead of doing it here
 
           // Parse the special options before population if available
-          const specialOptions = ["dd_mode_remapping", "global_prep_cmd"]
+          const specialOptions = ["dd_mode_remapping", "global_prep_cmd", "server_cmd"]
           for (const optionKey of specialOptions) {
-            if (this.config.hasOwnProperty(optionKey)) {
+            if (typeof this.config[optionKey] === "string") {
               this.config[optionKey] = JSON.parse(this.config[optionKey]);
+            } else {
+              this.config[optionKey] = [];
             }
           }
 
@@ -366,10 +370,8 @@
             });
           });
 
-          this.config.global_prep_cmd = this.config.global_prep_cmd || [];
-          this.config.server_cmd = this.config.server_cmd || [];
           this.global_prep_cmd = this.config.global_prep_cmd;
-          this.server_cmd = JSON.parse(this.config.server_cmd);
+          this.server_cmd = this.config.server_cmd;
         });
     },
     methods: {
@@ -384,9 +386,9 @@
           fallbackDisplayModeCache = this.config.fallback_mode;
         }
         let config = JSON.parse(JSON.stringify(this.config));
-        config.global_prep_cmd = JSON.stringify(this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo));
-        config.dd_mode_remapping = JSON.stringify(config.dd_mode_remapping);
-        config.server_cmd = JSON.stringify(this.server_cmd.filter(cmd => cmd.name && cmd.cmd));
+        config.global_prep_cmd = this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo);
+        config.dd_mode_remapping = config.dd_mode_remapping;
+        config.server_cmd = this.server_cmd.filter(cmd => cmd.name && cmd.cmd);
         return config;
       },
       save() {

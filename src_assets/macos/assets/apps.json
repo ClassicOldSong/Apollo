@@ -5,10 +5,17 @@
   "apps": [
     {
       "name": "Desktop",
-      "image-path": "desktop.png"
+      "image-path": "desktop.png",
+      "allow-client-commands": false
     },
     {
       "name": "Steam Big Picture",
+      "prep-cmd": [
+        {
+          "do": "",
+          "undo": "steam://close/bigpicture"
+        }
+      ],
       "detached": [
         "open steam://open/bigpicture"
       ],

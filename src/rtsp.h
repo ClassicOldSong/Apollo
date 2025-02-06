@@ -79,7 +79,7 @@ namespace rtsp_stream {
   int session_count();
 
   std::shared_ptr<stream::session_t>
-  find_session(const std::string& uuid);
+  find_session(const std::string_view& uuid);
 
   std::list<std::string>
   get_all_session_uuids();

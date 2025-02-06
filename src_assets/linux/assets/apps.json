@@ -5,11 +5,13 @@
   "apps": [
     {
       "name": "Desktop",
-      "image-path": "desktop.png"
+      "image-path": "desktop.png",
+      "allow-client-commands": false
     },
     {
       "name": "Low Res Desktop",
       "image-path": "desktop.png",
+      "allow-client-commands": false,
       "prep-cmd": [
         {
           "do": "xrandr --output HDMI-1 --mode 1920x1080",
@@ -19,6 +21,12 @@
     },
     {
       "name": "Steam Big Picture",
+      "prep-cmd": [
+        {
+          "do": "",
+          "undo": "setsid steam steam://close/bigpicture"
+        }
+      ],
       "detached": [
         "setsid steam steam://open/bigpicture"
       ],

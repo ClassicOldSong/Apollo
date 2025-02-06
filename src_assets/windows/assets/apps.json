@@ -14,7 +14,7 @@
       "prep-cmd": [
         {
           "do": "",
-          "undo": "steam:\/\/close\/bigpicture",
+          "undo": "steam://close/bigpicture",
           "elevated": false
         }
       ],

@@ -17,6 +17,8 @@
 #include <variant>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #define KITTY_WHILE_LOOP(x, y, z) \
   { \
     x; \
@@ -451,6 +453,30 @@ namespace util {
     }
 
     return buf;
+  }
+
+  template<typename T>
+  T get_non_string_json_value(const nlohmann::json& j, const std::string& key, const T& default_value = T{}) {
+    if (!j.contains(key))
+      return default_value;
+    const auto& val = j.at(key);
+    if (val.is_number() || val.is_boolean())
+      return val.get<T>();
+    if (val.is_string()) {
+      std::string s = val.get<std::string>();
+      if constexpr (std::is_same_v<T, int>) {
+        return std::stoi(s);
+      } else if constexpr (std::is_same_v<T, double>) {
+        return std::stod(s);
+      } else if constexpr (std::is_same_v<T, bool>) {
+        return s == "true";
+      } else if constexpr (std::is_same_v<T, std::string>) {
+        return s;
+      } else {
+        return default_value;
+      }
+    }
+    return default_value;
   }
 
   template<class T>

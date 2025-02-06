@@ -584,7 +584,7 @@ namespace rtsp_stream {
     }
 
     std::shared_ptr<stream::session_t>
-    find_session(const std::string& uuid) {
+    find_session(const std::string_view& uuid) {
       auto lg = _session_slots.lock();
 
       for (auto &slot : *_session_slots) {
@@ -638,7 +638,7 @@ namespace rtsp_stream {
     return server.session_count();
   }
 
-  std::shared_ptr<stream::session_t> find_session(const std::string& uuid) {
+  std::shared_ptr<stream::session_t> find_session(const std::string_view& uuid) {
     return server.find_session(uuid);
   }
 
