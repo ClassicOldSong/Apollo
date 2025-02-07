@@ -1939,30 +1939,6 @@ namespace video {
     }
 
     std::chrono::steady_clock::time_point last_frame_timestamp;
-    std::chrono::steady_clock::time_point last_encoded_timestamp = std::chrono::steady_clock::now();
-    bool stop_encoding = false;
-
-    std::thread alive_check_thread([&last_encoded_timestamp, &stop_encoding]{
-      uint8_t fail_count = 0;
-      std::chrono::steady_clock::time_point _last_timestamp = last_encoded_timestamp;
-      for (;;) {
-        if (stop_encoding) return;
-        std::this_thread::sleep_for(1s);
-        if (last_encoded_timestamp == _last_timestamp) {
-          fail_count += 1;
-          if (fail_count > 3) {
-            BOOST_LOG(error) << "Hang detected!!! Aborting..."sv;
-            proc::proc.terminate(true);
-            std::this_thread::sleep_for(1s);
-            abort();
-            return;
-          }
-        } else {
-          fail_count = 0;
-          _last_timestamp = last_encoded_timestamp;
-        };
-      }
-    });
 
     while (true) {
       // Break out of the encoding loop if any of the following are true:
@@ -2018,13 +1994,9 @@ namespace video {
       }
 
       last_frame_timestamp = *frame_timestamp;
-      last_encoded_timestamp = std::chrono::steady_clock::now();
 
       session->request_normal_frame();
     }
-
-    stop_encoding = true;
-    alive_check_thread.join();
   }
 
   input::touch_port_t make_port(platf::display_t *display, const config_t &config) {
