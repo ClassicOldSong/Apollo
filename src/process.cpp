@@ -604,6 +604,7 @@ namespace proc {
 
     _app_id = -1;
     _app_name.clear();
+    _app = {};
     display_name.clear();
     initial_display.clear();
     _launch_session.reset();
@@ -634,6 +635,10 @@ namespace proc {
 
   std::string proc_t::get_last_run_app_name() {
     return _app_name;
+  }
+
+  std::string proc_t::get_running_app_uuid() {
+    return _app.uuid;
   }
 
   boost::process::environment proc_t::get_env() {

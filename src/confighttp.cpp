@@ -552,6 +552,8 @@ namespace confighttp {
         }
       }
 
+      file_tree["current_app"] = proc::proc.get_running_app_uuid();
+
       send_response(response, file_tree);
     } catch (std::exception &e) {
       BOOST_LOG(warning) << "GetApps: "sv << e.what();

@@ -89,14 +89,17 @@
           <tr v-for="(app,i) in apps" :key="app.uuid">
             <td>{{app.name}}</td>
             <td>
-              <button class="btn btn-success me-2" :disabled="app.launching" @click="launchApp(app)">
-                <i class="fas fa-play"></i> {{ $t('apps.launch') }}
-              </button>
-              <button class="btn btn-primary me-2" :disabled="app.launching" @click="editApp(app)">
+              <button class="btn btn-primary me-2" :disabled="actionDisabled" @click="editApp(app)">
                 <i class="fas fa-edit"></i> {{ $t('apps.edit') }}
               </button>
-              <button class="btn btn-danger" :disabled="app.launching" @click="showDeleteForm(app)">
+              <button class="btn btn-danger me-2" :disabled="actionDisabled" @click="showDeleteForm(app)">
                 <i class="fas fa-trash"></i> {{ $t('apps.delete') }}
+              </button>
+              <button class="btn btn-warning" :disabled="actionDisabled" @click="closeApp()" v-if="currentApp === app.uuid">
+                <i class="fas fa-stop"></i> {{ $t('apps.close') }}
+              </button>
+              <button class="btn btn-success" :disabled="actionDisabled" @click="launchApp(app)" v-else>
+                <i class="fas fa-play"></i> {{ $t('apps.launch') }}
               </button>
             </td>
           </tr>
@@ -444,12 +447,14 @@
       return {
         apps: [],
         showEditForm: false,
+        actionDisabled: false,
         editForm: null,
         detachedCmd: "",
         coverSearching: false,
         coverFinderBusy: false,
         coverCandidates: [],
         platform: "",
+        currentApp: ""
       };
     },
     created() {
@@ -469,6 +474,7 @@
           .then(r => r.json())
           .then(r => {
             this.apps = r.apps.map(i => ({...i, launching: false}));
+            this.currentApp = r.current_app;
           });
       },
       newApp() {
@@ -477,20 +483,40 @@
       },
       launchApp(app) {
         if (confirm(this.$t('apps.launch_warning'))) {
-          app.launching = true;
+          this.actionDisabled = true;
           fetch("./api/apps/launch?uuid=" + app.uuid, {
             credentials: 'include',
             method: "POST",
           })
           .then(r => r.json())
           .then(r => {
-            if (r.status) {
-              alert(this.$t('apps.launch_success'));
-            } else {
+            if (!r.status) {
               alert(this.$t('apps.launch_failed') + r.error);
             }
           })
-          .finally(() => app.launching = false);
+          .finally(() => {
+            this.actionDisabled = false;
+            this.loadApps()
+          });
+        }
+      },
+      closeApp() {
+        if (confirm(this.$t('apps.close_warning'))) {
+          this.actionDisabled = true;
+          fetch("./api/apps/close", {
+            credentials: 'include',
+            method: "POST"
+          })
+          .then((r) => r.json())
+          .then((r) => {
+            if (!r.status) {
+              alert("apps.close_failed")
+            }
+          })
+          .finally(() => {
+            this.actionDisabled = false;
+            this.loadApps()
+          });
         }
       },
       editApp(app) {
@@ -620,7 +646,6 @@
       save() {
         this.editForm.name = this.editForm.name.trim();
         this.editForm["image-path"] = this.editForm["image-path"].toString().trim().replace(/"/g, '');
-        delete this.editForm["launching"];
         delete this.editForm["id"];
         fetch("./api/apps", {
           credentials: 'include',
