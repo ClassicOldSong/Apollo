@@ -514,44 +514,6 @@ namespace confighttp {
       std::string content = file_handler::read_file(config::stream.file_apps.c_str());
       nlohmann::json file_tree = nlohmann::json::parse(content);
 
-      // Legacy versions of Sunshine/Apollo used strings for boolean and integers, let's convert them
-      // List of keys to convert to boolean
-      std::vector<std::string> boolean_keys = {
-        "exclude-global-prep-cmd",
-        "elevated",
-        "auto-detach",
-        "wait-all",
-        "use-app-identity",
-        "per-client-app-identity",
-        "virtual-display"
-      };
-
-      // List of keys to convert to integers
-      std::vector<std::string> integer_keys = {
-        "exit-timeout"
-      };
-
-      // Walk fileTree and convert true/false strings to boolean or integer values
-      for (auto &app : file_tree["apps"]) {
-        for (const auto &key : boolean_keys) {
-          if (app.contains(key) && app[key].is_string()) {
-            app[key] = app[key] == "true";
-          }
-        }
-        for (const auto &key : integer_keys) {
-          if (app.contains(key) && app[key].is_string()) {
-            app[key] = std::stoi(app[key].get<std::string>());
-          }
-        }
-        if (app.contains("prep-cmd")) {
-          for (auto &prep : app["prep-cmd"]) {
-            if (prep.contains("elevated") && prep["elevated"].is_string()) {
-              prep["elevated"] = prep["elevated"] == "true";
-            }
-          }
-        }
-      }
-
       file_tree["current_app"] = proc::proc.get_running_app_uuid();
 
       send_response(response, file_tree);
@@ -562,7 +524,8 @@ namespace confighttp {
   }
 
   /**
-   * @brief Save an application. To save a new application the index must be `-1`. To update an existing application, you must provide the current index of the application.
+   * @brief Save an application. To save a new application the UUID must be empty.
+   *        To update an existing application, you must provide the current UUID of the application.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
    * The body for the post request should be JSON serialized in the following format:
@@ -571,7 +534,6 @@ namespace confighttp {
    *   "name": "Application Name",
    *   "output": "Log Output Path",
    *   "cmd": "Command to run the application",
-   *   "index": -1,
    *   "exclude-global-prep-cmd": false,
    *   "elevated": false,
    *   "auto-detach": true,
@@ -587,11 +549,12 @@ namespace confighttp {
    *   "detached": [
    *     "Detached command"
    *   ],
-   *   "image-path": "Full path to the application image. Must be a png file."
+   *   "image-path": "Full path to the application image. Must be a png file.",
+   *   "uuid": "aaaa-bbbb"
    * }
    * @endcode
    *
-   * @api_examples{/api/apps| POST| {"name":"Hello, World!","index":-1}}
+   * @api_examples{/api/apps| POST| {"name":"Hello, World!","uuid": "aaaa-bbbb"}}
    */
   void saveApp(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) {
@@ -602,39 +565,31 @@ namespace confighttp {
 
     std::stringstream ss;
     ss << request->content.rdbuf();
+
+    BOOST_LOG(info) << config::stream.file_apps;
     try {
-      nlohmann::json input_tree = nlohmann::json::parse(ss.str());
-      std::string file = file_handler::read_file(config::stream.file_apps.c_str());
-      nlohmann::json file_tree = nlohmann::json::parse(file);
-      // Remove empty keys if needed
-      if (input_tree.contains("prep-cmd") && input_tree["prep-cmd"].empty())
-        input_tree.erase("prep-cmd");
-      if (input_tree.contains("detached") && input_tree["detached"].empty())
-        input_tree.erase("detached");
-      auto &apps_node = file_tree["apps"];
-      int index = input_tree["index"].get<int>();
-      input_tree.erase("index");
-      if (index == -1) {
-        apps_node.push_back(input_tree);
-      } else {
-        nlohmann::json newApps = nlohmann::json::array();
-        for (size_t i = 0; i < apps_node.size(); ++i) {
-          if (static_cast<int>(i) == index)
-            newApps.push_back(input_tree);
-          else
-            newApps.push_back(apps_node[i]);
-        }
-        file_tree["apps"] = newApps;
-      }
-      std::sort(apps_node.begin(), apps_node.end(), [](const nlohmann::json &a, const nlohmann::json &b) {
-        return a["name"].get<std::string>() < b["name"].get<std::string>();
-      });
-      file_handler::write_file(config::stream.file_apps.c_str(), file_tree.dump(4));
+      // TODO: Input Validation
+
+      // Read the input JSON from the request body.
+      nlohmann::json inputTree = nlohmann::json::parse(ss.str());
+
+      // Read the existing apps file.
+      std::string content = file_handler::read_file(config::stream.file_apps.c_str());
+      nlohmann::json fileTree = nlohmann::json::parse(content);
+
+      // Migrate/merge the new app into the file tree.
+      proc::migrate_apps(&fileTree, &inputTree);
+
+      // Write the updated file tree back to disk.
+      file_handler::write_file(config::stream.file_apps.c_str(), fileTree.dump(4));
       proc::refresh(config::stream.file_apps);
-      nlohmann::json output_tree;
-      output_tree["status"] = true;
-      send_response(response, output_tree);
-    } catch (std::exception &e) {
+
+      // Prepare and send the output response.
+      nlohmann::json outputTree;
+      outputTree["status"] = true;
+      send_response(response, outputTree);
+    }
+    catch (std::exception &e) {
       BOOST_LOG(warning) << "SaveApp: "sv << e.what();
       bad_request(response, request, e.what());
     }
@@ -668,41 +623,44 @@ namespace confighttp {
    * @api_examples{/api/apps/9999| DELETE| null}
    */
   void deleteApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request))
       return;
-    }
 
     print_req(request);
 
+    auto args = request->parse_query_string();
+    if (args.find("uuid"s) == std::end(args)) {
+      bad_request(response, request, "Missing a required parameter to delete app");
+      return;
+    }
+    auto uuid = nvhttp::get_arg(args, "uuid");
+
     try {
-      nlohmann::json output_tree;
-      nlohmann::json new_apps = nlohmann::json::array();
-      std::string file = file_handler::read_file(config::stream.file_apps.c_str());
-      nlohmann::json file_tree = nlohmann::json::parse(file);
-      auto &apps_node = file_tree["apps"];
-      // In this merged version we assume the app index is part of the URL match (convert as needed)
-      const int index = std::stoi(request->path_match[1]);
-      if (index < 0 || index >= static_cast<int>(apps_node.size())) {
-        std::string error;
-        if (apps_node.empty()) {
-          error = "No applications to delete";
-        } else {
-          error = "'index' out of range, max index is " + std::to_string(apps_node.size() - 1);
-        }
-        bad_request(response, request, error);
-        return;
+      // Read the apps file into a nlohmann::json object.
+      std::string content = file_handler::read_file(config::stream.file_apps.c_str());
+      nlohmann::json fileTree = nlohmann::json::parse(content);
+
+      // Remove any app with the matching uuid directly from the "apps" array.
+      if (fileTree.contains("apps") && fileTree["apps"].is_array()) {
+        auto& apps = fileTree["apps"];
+        apps.erase(
+          std::remove_if(apps.begin(), apps.end(), [&uuid](const nlohmann::json& app) {
+            return app.value("uuid", "") == uuid;
+          }),
+          apps.end()
+        );
       }
-      for (size_t i = 0; i < apps_node.size(); ++i) {
-        if (static_cast<int>(i) != index)
-          new_apps.push_back(apps_node[i]);
-      }
-      file_tree["apps"] = new_apps;
-      file_handler::write_file(config::stream.file_apps.c_str(), file_tree.dump(4));
+
+      // Write the updated JSON back to the file.
+      file_handler::write_file(config::stream.file_apps.c_str(), fileTree.dump(4));
       proc::refresh(config::stream.file_apps);
-      output_tree["status"] = true;
-      output_tree["result"] = "application " + std::to_string(index) + " deleted";
-      send_response(response, output_tree);
-    } catch (std::exception &e) {
+
+      // Prepare and send the response.
+      nlohmann::json outputTree;
+      outputTree["status"] = true;
+      send_response(response, outputTree);
+    }
+    catch (std::exception &e) {
       BOOST_LOG(warning) << "DeleteApp: "sv << e.what();
       bad_request(response, request, e.what());
     }

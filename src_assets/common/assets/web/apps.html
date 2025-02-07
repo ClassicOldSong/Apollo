@@ -399,7 +399,7 @@
           <button @click="showEditForm = false" class="btn btn-secondary m-2">
             {{ $t('_common.cancel') }}
           </button>
-          <button class="btn btn-primary m-2" @click="save">{{ $t('_common.save') }}</button>
+          <button class="btn btn-primary m-2" :disabled="!editForm.name.trim()" @click="save">{{ $t('_common.save') }}</button>
         </div>
       </div>
     </div>
@@ -418,18 +418,18 @@
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
   const newApp = {
-    name: "",
-    output: "",
-    cmd: [],
+    "name": "New App",
+    "output": "",
+    "cmd": "",
     "exclude-global-prep-cmd": false,
-    elevated: false,
+    "elevated": false,
     "auto-detach": true,
     "wait-all": true,
     "exit-timeout": 5,
     "prep-cmd": [],
-    detached: [],
+    "detached": [],
     "image-path": "",
-    "scale-factor": "100",
+    "scale-factor": 100,
     "use-app-identity": false,
     "per-client-app-identity": false,
     "allow-client-commands": true,
@@ -526,11 +526,19 @@
           "Are you sure to delete " + app.name + "?"
         );
         if (resp) {
+          this.actionDisabled = true;
           fetch("./api/apps/delete?uuid=" + app.uuid, {
             credentials: 'include',
             method: "POST"
-          }).then((r) => {
-            if (r.status === 200) document.location.reload();
+          }).then((r) => r.json())
+          .then((r) => {
+            if (!r.status) {
+              alert("Delete failed! " + r.error);
+            }
+          })
+          .finally(() => {
+            this.actionDisabled = false;
+            this.loadApps();
           });
         }
       },
@@ -643,14 +651,26 @@
       },
       save() {
         this.editForm.name = this.editForm.name.trim();
+        if (!this.editForm.name) {
+          return;
+        }
+        this.editForm["exit-timeout"] = parseInt(this.editForm["exit-timeout"]) || 5
+        this.editForm["scale-factor"] = parseInt(this.editForm["scale-factor"]) || 100
         this.editForm["image-path"] = this.editForm["image-path"].toString().trim().replace(/"/g, '');
         delete this.editForm["id"];
         fetch("./api/apps", {
           credentials: 'include',
           method: "POST",
           body: JSON.stringify(this.editForm),
-        }).then((r) => {
-          if (r.status === 200) document.location.reload();
+        }).then((r) => r.json())
+        .then((r) => {
+          if (!r.status) {
+            alert(this.$t('apps.save_failed') + r.error);
+          }
+        })
+        .finally(() => {
+          this.showEditForm = false;
+          this.loadApps();
         });
       },
     },

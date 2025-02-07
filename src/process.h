@@ -15,6 +15,7 @@
 // lib includes
 #include <boost/process/v1.hpp>
 #include <boost/property_tree/ptree.hpp>
+#include <nlohmann/json.hpp>
 
 // local includes
 #include "config.h"
@@ -155,7 +156,7 @@ namespace proc {
 
   std::string validate_app_image_path(std::string app_image_path);
   void refresh(const std::string &file_name);
-  void migrate_apps(boost::property_tree::ptree* fileTree_p, boost::property_tree::ptree* inputTree_p);
+  void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p);
   std::optional<proc::proc_t> parse(const std::string &file_name);
 
   /**

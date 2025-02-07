@@ -24,6 +24,7 @@
 #include "config.h"
 #include "crypto.h"
 #include "display_device.h"
+#include "file_handler.h"
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
@@ -838,158 +839,280 @@ namespace proc {
     return std::make_tuple(id_no_index, id_with_index);
   }
 
-  void migrate_apps(pt::ptree* fileTree_p, pt::ptree* inputTree_p) {
+  /**
+   * @brief Migrate the applications stored in the file tree by merging in a new app.
+   *
+   * This function updates the application entries in *fileTree_p* using the data in *inputTree_p*.
+   * If an app in the file tree does not have a UUID, one is generated and inserted.
+   * If an app with the same UUID as the new app is found, it is replaced.
+   * Additionally, empty keys (such as "prep-cmd" or "detached") and keys no longer needed ("launching", "index")
+   * are removed from the input.
+   *
+   * Legacy versions of Sunshine/Apollo stored boolean and integer values as strings.
+   * The following keys are converted:
+   *   - Boolean keys: "exclude-global-prep-cmd", "elevated", "auto-detach", "wait-all",
+   *                     "use-app-identity", "per-client-app-identity", "virtual-display"
+   *   - Integer keys: "exit-timeout"
+   *
+   * A migration version is stored in the file tree (under "version") so that future changes can be applied.
+   *
+   * @param fileTree_p Pointer to the JSON object representing the file tree.
+   * @param inputTree_p Pointer to the JSON object representing the new app.
+   */
+  void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p) {
     std::string new_app_uuid;
 
     if (inputTree_p) {
-      auto input_uuid = inputTree_p->get_optional<std::string>("uuid"s);
-      if (input_uuid && !input_uuid.value().empty()) {
-        new_app_uuid = input_uuid.value();
+      // If the input contains a non-empty "uuid", use it; otherwise generate one.
+      if (inputTree_p->contains("uuid") && !(*inputTree_p)["uuid"].get<std::string>().empty()) {
+        new_app_uuid = (*inputTree_p)["uuid"].get<std::string>();
       } else {
         new_app_uuid = uuid_util::uuid_t::generate().string();
-        inputTree_p->erase("uuid");
-        inputTree_p->put("uuid", new_app_uuid);
+        (*inputTree_p)["uuid"] = new_app_uuid;
       }
 
-      if (inputTree_p->get_child("prep-cmd").empty()) {
+      // Remove "prep-cmd" if empty.
+      if (inputTree_p->contains("prep-cmd") && (*inputTree_p)["prep-cmd"].empty()) {
         inputTree_p->erase("prep-cmd");
       }
 
-      if (inputTree_p->get_child("detached").empty()) {
+      // Remove "detached" if empty.
+      if (inputTree_p->contains("detached") && (*inputTree_p)["detached"].empty()) {
         inputTree_p->erase("detached");
       }
 
+      // Remove keys that are no longer needed.
       inputTree_p->erase("launching");
       inputTree_p->erase("index");
     }
 
-    auto &apps_node = fileTree_p->get_child("apps"s);
-
-    pt::ptree newApps;
-    for (auto &kv : apps_node) {
-      // Check if we have apps that have not got an uuid assigned
-      auto app_uuid = kv.second.get_optional<std::string>("uuid"s);
-      if (!app_uuid || app_uuid.value().empty()) {
-        kv.second.erase("uuid");
-        kv.second.put("uuid", uuid_util::uuid_t::generate().string());
-        kv.second.erase("launching");
-        newApps.push_back(std::make_pair("", std::move(kv.second)));
-      } else {
-        if (!new_app_uuid.empty() && app_uuid.value() == new_app_uuid) {
-          newApps.push_back(std::make_pair("", *inputTree_p));
-          new_app_uuid.clear();
+    // Get the current apps array; if it doesn't exist, create one.
+    nlohmann::json newApps = nlohmann::json::array();
+    if (fileTree_p->contains("apps") && (*fileTree_p)["apps"].is_array()) {
+      for (auto &app : (*fileTree_p)["apps"]) {
+        // For apps without a UUID, generate one and remove "launching".
+        if (!app.contains("uuid") || app["uuid"].get<std::string>().empty()) {
+          app["uuid"] = uuid_util::uuid_t::generate().string();
+          app.erase("launching");
+          newApps.push_back(std::move(app));
         } else {
-          newApps.push_back(std::make_pair("", std::move(kv.second)));
+          // If an app with the same UUID as the new app is found, replace it.
+          if (!new_app_uuid.empty() && app["uuid"].get<std::string>() == new_app_uuid) {
+            newApps.push_back(*inputTree_p);
+            new_app_uuid.clear();
+          } else {
+            newApps.push_back(std::move(app));
+          }
         }
       }
     }
+    // If the new app's UUID has not been merged yet, add it.
+    if (!new_app_uuid.empty() && inputTree_p) {
+      newApps.push_back(*inputTree_p);
+    }
+    (*fileTree_p)["apps"] = newApps;
+  }
 
-    // Finally add the new app
-    if (!new_app_uuid.empty()) {
-      newApps.push_back(std::make_pair("", *inputTree_p));
+  void migration_v2(nlohmann::json& fileTree) {
+    int this_version = 2;
+    // Determine the current migration version (default to 1 if not present).
+    int file_version = 1;
+    if (fileTree.contains("version")) {
+      file_version = fileTree["version"].get<int>();
     }
 
-    fileTree_p->erase("apps");
-    fileTree_p->push_back(std::make_pair("apps", newApps));
+    // If the version is less than this_version, perform legacy conversion.
+    if (file_version < this_version) {
+      BOOST_LOG(info) << "Migrating app list from v1 to v2...";
+      migrate_apps(&fileTree, nullptr);
+
+      // List of keys to convert to booleans.
+      std::vector<std::string> boolean_keys = {
+        "allow-client-commands",
+        "exclude-global-prep-cmd",
+        "elevated",
+        "auto-detach",
+        "wait-all",
+        "use-app-identity",
+        "per-client-app-identity",
+        "virtual-display"
+      };
+
+      // List of keys to convert to integers.
+      std::vector<std::string> integer_keys = {
+        "exit-timeout",
+        "scale-factor"
+      };
+
+      // Walk through each app and convert legacy string values.
+      for (auto &app : fileTree["apps"]) {
+        for (const auto &key : boolean_keys) {
+          if (app.contains(key) && app[key].is_string()) {
+            std::string s = app[key].get<std::string>();
+            app[key] = (s == "true");
+          }
+        }
+        for (const auto &key : integer_keys) {
+          if (app.contains(key) && app[key].is_string()) {
+            std::string s = app[key].get<std::string>();
+            app[key] = std::stoi(s);
+          }
+        }
+        // For each entry in the "prep-cmd" array, convert "elevated" if necessary.
+        if (app.contains("prep-cmd") && app["prep-cmd"].is_array()) {
+          for (auto &prep : app["prep-cmd"]) {
+            if (prep.contains("elevated") && prep["elevated"].is_string()) {
+              std::string s = prep["elevated"].get<std::string>();
+              prep["elevated"] = (s == "true");
+            }
+          }
+        }
+      }
+
+      // Update migration version to this_version.
+      fileTree["version"] = this_version;
+
+      BOOST_LOG(info) << "Migrated app list from v1 to v2.";
+    }
+  }
+
+  void migrate(nlohmann::json& fileTree, const std::string& fileName) {
+    int last_version = 2;
+
+    int file_version = 0;
+    if (fileTree.contains("version")) {
+      file_version = fileTree["version"].get<int>();
+    }
+
+    if (file_version < last_version) {
+      migration_v2(fileTree);
+      file_handler::write_file(fileName.c_str(), fileTree.dump(4));
+    }
   }
 
   std::optional<proc::proc_t> parse(const std::string &file_name) {
-    pt::ptree tree;
+    // Prepare environment variables.
+    auto this_env = boost::this_process::environment();
+
+    std::set<std::string> ids;
+    std::vector<proc::ctx_t> apps;
+    int i = 0;
 
     try {
-      pt::read_json(file_name, tree);
+      // Read the JSON file into a tree.
+      std::string content = file_handler::read_file(file_name.c_str());
+      nlohmann::json tree = nlohmann::json::parse(content);
 
-      auto &apps_node = tree.get_child("apps"s);
-      auto &env_vars = tree.get_child("env"s);
+      migrate(tree, file_name);
 
-      auto this_env = boost::this_process::environment();
-
-      for (auto &[name, val] : env_vars) {
-        this_env[name] = parse_env_val(this_env, val.get_value<std::string>());
-      }
-
-      std::set<std::string> ids;
-      std::vector<proc::ctx_t> apps;
-      int i = 0;
-
-      if (config::input.enable_input_only_mode) {
-        // Input Only entry
-        {
-          proc::ctx_t ctx;
-          // ctx.uuid = ""; // We're not using uuid for this special entry
-          ctx.name = "Remote Input";
-          ctx.image_path = parse_env_val(this_env, "input_only.png");
-          ctx.virtual_display = false;
-          ctx.scale_factor = 100;
-          ctx.use_app_identity = false;
-          ctx.per_client_app_identity = false;
-          ctx.allow_client_commands = false;
-
-          ctx.elevated = false;
-          ctx.auto_detach = true;
-          ctx.wait_all = true;
-          ctx.exit_timeout = 5s;
-
-          auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-          if (ids.count(std::get<0>(possible_ids)) == 0) {
-            // Avoid using index to generate id if possible
-            ctx.id = std::get<0>(possible_ids);
-          }
-          else {
-            // Fallback to include index on collision
-            ctx.id = std::get<1>(possible_ids);
-          }
-          ids.insert(ctx.id);
-
-          input_only_app_id_str = ctx.id;
-          input_only_app_id = util::from_view(ctx.id);
-
-          apps.emplace_back(std::move(ctx));
-        }
-
-        // Terminate entry
-        {
-          proc::ctx_t ctx;
-          // ctx.uuid = ""; // We're not using uuid for this special entry
-          ctx.name = "Terminate";
-          ctx.image_path = parse_env_val(this_env, "terminate.png");
-          ctx.virtual_display = false;
-          ctx.scale_factor = 100;
-          ctx.use_app_identity = false;
-          ctx.per_client_app_identity = false;
-          ctx.allow_client_commands = false;
-
-          ctx.elevated = false;
-          ctx.auto_detach = true;
-          ctx.wait_all = true;
-          ctx.exit_timeout = 5s;
-
-          auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-          if (ids.count(std::get<0>(possible_ids)) == 0) {
-            // Avoid using index to generate id if possible
-            ctx.id = std::get<0>(possible_ids);
-          }
-          else {
-            // Fallback to include index on collision
-            ctx.id = std::get<1>(possible_ids);
-          }
-          ids.insert(ctx.id);
-
-          terminate_app_id_str = ctx.id;
-          terminate_app_id = util::from_view(ctx.id);
-
-          apps.emplace_back(std::move(ctx));
+      if (tree.contains("env") && tree["env"].is_object()) {
+        for (auto &item : tree["env"].items()) {
+          this_env[item.key()] = parse_env_val(this_env, item.value().get<std::string>());
         }
       }
 
-      // Virtual Display entry
-    #ifdef _WIN32
-      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+      // Ensure the "apps" array exists.
+      if (!tree.contains("apps") || !tree["apps"].is_array()) {
+        BOOST_LOG(warning) << "No apps were defined in apps.json!!!";
+        return std::nullopt;
+      }
+
+      // Iterate over each application in the "apps" array.
+      for (auto &app_node : tree["apps"]) {
+        proc::ctx_t ctx;
+        ctx.uuid = app_node.value("uuid", "");
+
+        // Build the list of preparation commands.
+        std::vector<proc::cmd_t> prep_cmds;
+        bool exclude_global_prep = app_node.value("exclude-global-prep-cmd", false);
+        if (!exclude_global_prep) {
+          prep_cmds.reserve(config::sunshine.prep_cmds.size());
+          for (auto &prep_cmd : config::sunshine.prep_cmds) {
+            auto do_cmd = parse_env_val(this_env, prep_cmd.do_cmd);
+            auto undo_cmd = parse_env_val(this_env, prep_cmd.undo_cmd);
+            prep_cmds.emplace_back(
+              std::move(do_cmd),
+              std::move(undo_cmd),
+              std::move(prep_cmd.elevated)
+            );
+          }
+        }
+        if (app_node.contains("prep-cmd") && app_node["prep-cmd"].is_array()) {
+          for (auto &prep_node : app_node["prep-cmd"]) {
+            std::string do_cmd = parse_env_val(this_env, prep_node.value("do", ""));
+            std::string undo_cmd = parse_env_val(this_env, prep_node.value("undo", ""));
+            bool elevated = prep_node.value("elevated", false);
+            prep_cmds.emplace_back(
+              std::move(do_cmd),
+              std::move(undo_cmd),
+              std::move(elevated)
+            );
+          }
+        }
+
+        // Build the list of detached commands.
+        std::vector<std::string> detached;
+        if (app_node.contains("detached") && app_node["detached"].is_array()) {
+          for (auto &detached_val : app_node["detached"]) {
+            detached.emplace_back(parse_env_val(this_env, detached_val.get<std::string>()));
+          }
+        }
+
+        // Process other fields.
+        if (app_node.contains("output"))
+          ctx.output = parse_env_val(this_env, app_node.value("output", ""));
+        std::string name = parse_env_val(this_env, app_node.value("name", ""));
+        if (app_node.contains("cmd"))
+          ctx.cmd = parse_env_val(this_env, app_node.value("cmd", ""));
+        if (app_node.contains("working-dir")) {
+          ctx.working_dir = parse_env_val(this_env, app_node.value("working-dir", ""));
+  #ifdef _WIN32
+          // The working directory, unlike the command itself, should not be quoted.
+          boost::erase_all(ctx.working_dir, "\"");
+          ctx.working_dir += '\\';
+  #endif
+        }
+        if (app_node.contains("image-path"))
+          ctx.image_path = parse_env_val(this_env, app_node.value("image-path", ""));
+
+        ctx.elevated = app_node.value("elevated", false);
+        ctx.auto_detach = app_node.value("auto-detach", true);
+        ctx.wait_all = app_node.value("wait-all", true);
+        ctx.exit_timeout = std::chrono::seconds { app_node.value("exit-timeout", 5) };
+        ctx.virtual_display = app_node.value("virtual-display", false);
+        ctx.scale_factor = app_node.value("scale-factor", 100);
+        ctx.use_app_identity = app_node.value("use-app-identity", false);
+        ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
+        ctx.allow_client_commands = app_node.value("allow-client-commands", true);
+
+        // Calculate a unique application id.
+        auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          ctx.id = std::get<0>(possible_ids);
+        } else {
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        ctx.name = std::move(name);
+        ctx.prep_cmds = std::move(prep_cmds);
+        ctx.detached = std::move(detached);
+
+        apps.emplace_back(std::move(ctx));
+      }
+    } catch (std::exception &e) {
+      BOOST_LOG(error) << e.what();
+      return std::nullopt;
+    }
+
+    if (config::input.enable_input_only_mode) {
+      // Input Only entry
+      {
         proc::ctx_t ctx;
         // ctx.uuid = ""; // We're not using uuid for this special entry
-        ctx.name = "Virtual Display";
-        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
-        ctx.virtual_display = true;
+        ctx.name = "Remote Input";
+        ctx.image_path = parse_env_val(this_env, "input_only.png");
+        ctx.virtual_display = false;
         ctx.scale_factor = 100;
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
@@ -1011,150 +1134,84 @@ namespace proc {
         }
         ids.insert(ctx.id);
 
+        input_only_app_id_str = ctx.id;
+        input_only_app_id = util::from_view(ctx.id);
+
         apps.emplace_back(std::move(ctx));
       }
-    #endif
 
-      for (auto &[_, app_node] : apps_node) {
+      // Terminate entry
+      {
         proc::ctx_t ctx;
+        // ctx.uuid = ""; // We're not using uuid for this special entry
+        ctx.name = "Terminate";
+        ctx.image_path = parse_env_val(this_env, "terminate.png");
+        ctx.virtual_display = false;
+        ctx.scale_factor = 100;
+        ctx.use_app_identity = false;
+        ctx.per_client_app_identity = false;
+        ctx.allow_client_commands = false;
 
-        auto app_uuid = app_node.get_optional<std::string>("uuid"s);
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = true;
+        ctx.exit_timeout = 5s;
 
-        if (!app_uuid) {
-          // We need an upgrade to the app list
-          try {
-            BOOST_LOG(info) << "Migrating app list...";
-            migrate_apps(&tree, nullptr);
-            pt::write_json(file_name, tree);
-            BOOST_LOG(info) << "Migration complete.";
-            return parse(file_name);
-          } catch (std::exception &e) {
-            BOOST_LOG(warning) << "Error happened wilie migrating the app list: "sv << e.what();
-            return std::nullopt;
-          }
-        }
-
-        auto prep_nodes_opt = app_node.get_child_optional("prep-cmd"s);
-        auto detached_nodes_opt = app_node.get_child_optional("detached"s);
-        auto exclude_global_prep = app_node.get_optional<bool>("exclude-global-prep-cmd"s);
-        auto output = app_node.get_optional<std::string>("output"s);
-        auto name = parse_env_val(this_env, app_node.get<std::string>("name"s));
-        auto cmd = app_node.get_optional<std::string>("cmd"s);
-        auto image_path = app_node.get_optional<std::string>("image-path"s);
-        auto working_dir = app_node.get_optional<std::string>("working-dir"s);
-        auto elevated = app_node.get_optional<bool>("elevated"s);
-        auto auto_detach = app_node.get_optional<bool>("auto-detach"s);
-        auto wait_all = app_node.get_optional<bool>("wait-all"s);
-        auto exit_timeout = app_node.get_optional<int>("exit-timeout"s);
-        auto virtual_display = app_node.get_optional<bool>("virtual-display"s);
-        auto resolution_scale_factor = app_node.get_optional<int>("scale-factor"s);
-        auto use_app_identity = app_node.get_optional<bool>("use-app-identity"s);
-        auto per_client_app_identity = app_node.get_optional<bool>("per-client-app-identity");
-        auto allow_client_commands = app_node.get_optional<bool>("allow-client-commands");
-
-        ctx.uuid = app_uuid.value();
-
-        std::vector<proc::cmd_t> prep_cmds;
-        if (!exclude_global_prep.value_or(false)) {
-          prep_cmds.reserve(config::sunshine.prep_cmds.size());
-          for (auto &prep_cmd : config::sunshine.prep_cmds) {
-            auto do_cmd = parse_env_val(this_env, prep_cmd.do_cmd);
-            auto undo_cmd = parse_env_val(this_env, prep_cmd.undo_cmd);
-
-            prep_cmds.emplace_back(
-              std::move(do_cmd),
-              std::move(undo_cmd),
-              std::move(prep_cmd.elevated)
-            );
-          }
-        }
-
-        if (prep_nodes_opt) {
-          auto &prep_nodes = *prep_nodes_opt;
-
-          prep_cmds.reserve(prep_cmds.size() + prep_nodes.size());
-          for (auto &[_, prep_node] : prep_nodes) {
-            auto do_cmd = prep_node.get_optional<std::string>("do"s);
-            auto undo_cmd = prep_node.get_optional<std::string>("undo"s);
-            auto elevated = prep_node.get_optional<bool>("elevated");
-
-            prep_cmds.emplace_back(
-              parse_env_val(this_env, do_cmd.value_or("")),
-              parse_env_val(this_env, undo_cmd.value_or("")),
-              std::move(elevated.value_or(false))
-            );
-          }
-        }
-
-        std::vector<std::string> detached;
-        if (detached_nodes_opt) {
-          auto &detached_nodes = *detached_nodes_opt;
-
-          detached.reserve(detached_nodes.size());
-          for (auto &[_, detached_val] : detached_nodes) {
-            detached.emplace_back(parse_env_val(this_env, detached_val.get_value<std::string>()));
-          }
-        }
-
-        if (output) {
-          ctx.output = parse_env_val(this_env, *output);
-        }
-
-        if (cmd) {
-          ctx.cmd = parse_env_val(this_env, *cmd);
-        }
-
-        if (working_dir) {
-          ctx.working_dir = parse_env_val(this_env, *working_dir);
-#ifdef _WIN32
-          // The working directory, unlike the command itself, should not be quoted
-          // when it contains spaces. Unlike POSIX, Windows forbids quotes in paths,
-          // so we can safely strip them all out here to avoid confusing the user.
-          boost::erase_all(ctx.working_dir, "\"");
-          ctx.working_dir += '\\';
-#endif
-        }
-
-        if (image_path) {
-          ctx.image_path = parse_env_val(this_env, *image_path);
-        }
-
-        ctx.elevated = elevated.value_or(false);
-        ctx.auto_detach = auto_detach.value_or(true);
-        ctx.wait_all = wait_all.value_or(true);
-        ctx.exit_timeout = std::chrono::seconds {exit_timeout.value_or(5)};
-        ctx.virtual_display = virtual_display.value_or(false);
-        ctx.scale_factor = resolution_scale_factor.value_or(100);
-        ctx.use_app_identity = use_app_identity.value_or(false);
-        ctx.per_client_app_identity = per_client_app_identity.value_or(false);
-        ctx.allow_client_commands = allow_client_commands.value_or(true);
-
-        auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
         if (ids.count(std::get<0>(possible_ids)) == 0) {
           // Avoid using index to generate id if possible
           ctx.id = std::get<0>(possible_ids);
-        } else {
+        }
+        else {
           // Fallback to include index on collision
           ctx.id = std::get<1>(possible_ids);
         }
         ids.insert(ctx.id);
 
-        ctx.name = std::move(name);
-        ctx.prep_cmds = std::move(prep_cmds);
-        ctx.detached = std::move(detached);
+        terminate_app_id_str = ctx.id;
+        terminate_app_id = util::from_view(ctx.id);
 
         apps.emplace_back(std::move(ctx));
       }
-
-      return proc::proc_t {
-        std::move(this_env),
-        std::move(apps)
-      };
-    } catch (std::exception &e) {
-      BOOST_LOG(error) << e.what();
     }
 
-    return std::nullopt;
+    // Virtual Display entry
+  #ifdef _WIN32
+    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+      proc::ctx_t ctx;
+      // ctx.uuid = ""; // We're not using uuid for this special entry
+      ctx.name = "Virtual Display";
+      ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+      ctx.virtual_display = true;
+      ctx.scale_factor = 100;
+      ctx.use_app_identity = false;
+      ctx.per_client_app_identity = false;
+      ctx.allow_client_commands = false;
+
+      ctx.elevated = false;
+      ctx.auto_detach = true;
+      ctx.wait_all = true;
+      ctx.exit_timeout = 5s;
+
+      auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+      if (ids.count(std::get<0>(possible_ids)) == 0) {
+        // Avoid using index to generate id if possible
+        ctx.id = std::get<0>(possible_ids);
+      }
+      else {
+        // Fallback to include index on collision
+        ctx.id = std::get<1>(possible_ids);
+      }
+      ids.insert(ctx.id);
+
+      apps.emplace_back(std::move(ctx));
+    }
+  #endif
+
+    return proc::proc_t {
+      std::move(this_env),
+      std::move(apps)
+    };
   }
 
   void refresh(const std::string &file_name) {
