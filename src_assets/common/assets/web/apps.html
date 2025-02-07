@@ -298,8 +298,7 @@
                   label="apps.use_app_identity"
                   desc="apps.use_app_identity_desc"
                   v-model="editForm['use-app-identity']"
-                  true-value="true"
-                  false-value="false"
+                  default="false"
         ></Checkbox>
         <!-- use app identity -->
         <Checkbox class="mb-3"
@@ -308,8 +307,7 @@
                   label="apps.per_client_app_identity"
                   desc="apps.per_client_app_identity_desc"
                   v-model="editForm['per-client-app-identity']"
-                  true-value="true"
-                  false-value="false"
+                  default="false"
         ></Checkbox>
         <!-- resolution scale factor -->
         <div class="mb-3" v-if="platform === 'windows'">
