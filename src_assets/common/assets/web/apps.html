@@ -484,7 +484,7 @@
           })
           .then(r => r.json())
           .then(r => {
-            if (r.status == "true") {
+            if (r.status) {
               alert(this.$t('apps.launch_success'));
             } else {
               alert(this.$t('apps.launch_failed') + r.error);
