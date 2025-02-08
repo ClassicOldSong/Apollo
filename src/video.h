@@ -21,10 +21,12 @@ namespace video {
 
   /* Encoding configuration requested by remote client */
   struct config_t {
+    // DO NOT CHANGE ORDER OR ADD FIELDS IN THE MIDDLE!!!!!
+    // ONLY APPEND NEW FIELD AFTERWARDS!!!!!!!!!
+    // BIG F WORD to Sunshine!!!!!!!!!
     int width;  // Video width in pixels
     int height;  // Video height in pixels
     int framerate;  // Requested framerate, used in individual frame bitrate budget calculation
-    int encodingFramerate; // Requested display framerate
     int bitrate;  // Video bitrate in kilobits (1000 bits) for requested framerate
     int slicesPerFrame;  // Number of slices per frame
     int numRefFrames;  // Max number of reference frames
@@ -44,6 +46,7 @@ namespace video {
 
     int enableIntraRefresh;  // 0 - disabled, 1 - enabled
 
+    int encodingFramerate; // Requested display framerate
     bool input_only;
   };
 
