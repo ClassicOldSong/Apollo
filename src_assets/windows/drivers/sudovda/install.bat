@@ -1,12 +1,14 @@
 @echo off
-
 pushd %~dp0
+
+set "CERTUTIL=certutil"
+where certutil >nul 2>&1 || set "CERTUTIL=%SystemRoot%\System32\certutil.exe"
 
 echo ================
 echo Installing cert for the SudoVDA driver...
 
-certutil -addstore -f root "code_signing.crt"
-certutil -addstore -f TrustedPublisher "code_signing.crt"
+%CERTUTIL% -addstore -f root "code_signing.crt"
+%CERTUTIL% -addstore -f TrustedPublisher "code_signing.crt"
 
 echo ================
 echo Removing the old driver... It's OK to show an error if you're installing the driver for the first time.
