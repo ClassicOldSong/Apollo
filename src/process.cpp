@@ -44,6 +44,9 @@
 #endif
 
 #define DEFAULT_APP_IMAGE_PATH SUNSHINE_ASSETS_DIR "/box.png"
+#define REMOTE_INPUT_UUID "8CB5C136-DA67-4F99-B4A1-F9CD35005CF4"
+#define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
+#define TERMINATE_APP_UUID "E16CBE1B-295D-4632-9A76-EC4180C857D3"
 
 namespace proc {
   using namespace std::literals;
@@ -1109,7 +1112,7 @@ namespace proc {
       // Input Only entry
       {
         proc::ctx_t ctx;
-        // ctx.uuid = ""; // We're not using uuid for this special entry
+        ctx.uuid = REMOTE_INPUT_UUID;
         ctx.name = "Remote Input";
         ctx.image_path = parse_env_val(this_env, "input_only.png");
         ctx.virtual_display = false;
@@ -1143,7 +1146,7 @@ namespace proc {
       // Terminate entry
       {
         proc::ctx_t ctx;
-        // ctx.uuid = ""; // We're not using uuid for this special entry
+        ctx.uuid = TERMINATE_APP_UUID;
         ctx.name = "Terminate";
         ctx.image_path = parse_env_val(this_env, "terminate.png");
         ctx.virtual_display = false;
@@ -1179,7 +1182,7 @@ namespace proc {
   #ifdef _WIN32
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       proc::ctx_t ctx;
-      // ctx.uuid = ""; // We're not using uuid for this special entry
+      ctx.uuid = VIRTUAL_DISPLAY_UUID;
       ctx.name = "Virtual Display";
       ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
       ctx.virtual_display = true;
