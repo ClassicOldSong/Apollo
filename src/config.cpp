@@ -513,7 +513,10 @@ namespace config {
       {},  // mode_remapping
       {}  // wa
     },  // display_device
+
     1,  // min_fps_factor
+    0  // max_bitrate
+
     "1920x1080x60",  // fallback_mode
   };
 
@@ -1183,6 +1186,7 @@ namespace config {
     bool_f(vars, "dd_wa_hdr_toggle", video.dd.wa.hdr_toggle);
 
     int_between_f(vars, "min_fps_factor", video.min_fps_factor, {1, 3});
+    int_f(vars, "max_bitrate", video.max_bitrate);
     string_f(vars, "fallback_mode", video.fallback_mode);
 
     path_f(vars, "pkey", nvhttp.pkey);
