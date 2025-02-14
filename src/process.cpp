@@ -445,33 +445,41 @@ namespace proc {
         retryInterval *= 2;
       }
 
+      retryInterval = 200ms;
+      while (this->display_name.empty()) {
+        if (retryInterval > 2s) {
+          BOOST_LOG(warning) << "Not getting current display in time! HDR will not be toggled.";
+          return;
+        }
+        std::this_thread::sleep_for(retryInterval);
+        retryInterval *= 2;
+      }
+
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
-      if (currentDisplay.empty()) {
-        BOOST_LOG(warning) << "Not getting current display in time! HDR will not be toggled.";
-      } else {
-        auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
+      auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
 
-        bool initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
+      initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
 
-        if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
-          if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
-            return;
-          }
+      if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
+        mode_changed_display = currentDisplay;
 
-          if (enable_hdr) {
-            if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
-              BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
-            } else {
-              BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
-            }
-          }
-        } else if (initial_hdr) {
-          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
-            BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
+        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
+          return;
+        }
+
+        if (enable_hdr) {
+          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+            BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
           } else {
-            BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
+            BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
           }
+        }
+      } else if (initial_hdr) {
+        if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+          BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
+        } else {
+          BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
         }
       }
     });
@@ -570,6 +578,16 @@ namespace proc {
     bool has_run = _app_id > 0;
 
 #ifdef _WIN32
+    // Revert HDR state
+    if (has_run && !mode_changed_display.empty()) {
+      auto displayNameW = platf::from_utf8(mode_changed_display);
+      if (VDISPLAY::setDisplayHDRByName(displayNameW.c_str(), initial_hdr)) {
+        BOOST_LOG(info) << "HDR reverted for display " << mode_changed_display;
+      } else {
+        BOOST_LOG(info) << "HDR revert failed for display " << mode_changed_display;
+      }
+    }
+
     bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display;
     if (used_virtual_display) {
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
@@ -599,8 +617,8 @@ namespace proc {
 
     // Load the configured output_name first
     // to prevent the value being write to empty when the initial terminate happens
-    if (!has_run && proc.initial_display.empty()) {
-      proc.initial_display = config::video.output_name;
+    if (!has_run && initial_display.empty()) {
+      initial_display = config::video.output_name;
     } else {
       // Restore output name to its original value
       config::video.output_name = initial_display;
@@ -611,6 +629,7 @@ namespace proc {
     _app = {};
     display_name.clear();
     initial_display.clear();
+    mode_changed_display.clear();
     _launch_session.reset();
     virtual_display = false;
     allow_client_commands = false;

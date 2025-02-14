@@ -90,6 +90,8 @@ namespace proc {
 
     std::string display_name;
     std::string initial_display;
+    std::string mode_changed_display;
+    bool initial_hdr;
     bool virtual_display;
     bool allow_client_commands;
 

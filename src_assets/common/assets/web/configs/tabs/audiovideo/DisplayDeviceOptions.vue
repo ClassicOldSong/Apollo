@@ -126,7 +126,7 @@ function addRemappingEntry() {
               </div>
 
               <!-- HDR option -->
-              <div class="mb-3" v-if="config.dd_configuration_option !== 'disabled'">
+              <div class="mb-3">
                 <label for="dd_hdr_option" class="form-label">
                   {{ $t('config.dd_hdr_option') }}
                 </label>
@@ -135,11 +135,12 @@ function addRemappingEntry() {
                   <option value="auto">{{ $t('config.dd_hdr_option_auto') }}</option>
                 </select>
                 <!-- HDR toggle -->
-                <Checkbox id="dd_wa_hdr_toggle"
+                <!-- <Checkbox id="dd_wa_hdr_toggle"
                           locale-prefix="config"
                           v-model="config.dd_wa_hdr_toggle"
                           default="false"
-                ></Checkbox>
+                          v-if="config.dd_configuration_option !== 'disabled'"
+                ></Checkbox> -->
               </div>
 
               <!-- Config revert delay -->
