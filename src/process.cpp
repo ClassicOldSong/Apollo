@@ -263,10 +263,6 @@ namespace proc {
 
         int target_fps = launch_session->fps ? launch_session->fps : 60;
 
-        if (config::video.double_refreshrate) {
-          target_fps *= 2;
-        }
-
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           device_uuid_str.c_str(),
           device_name.c_str(),
@@ -275,6 +271,10 @@ namespace proc {
           target_fps,
           launch_session->display_guid
         );
+
+        if (config::video.double_refreshrate) {
+          target_fps *= 2;
+        }
 
         if (!vdisplayName.empty()) {
           BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
