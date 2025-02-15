@@ -1062,11 +1062,7 @@ namespace nvhttp {
         pt::ptree app_node;
 
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        if (should_hide_inactive_apps && appid != proc::input_only_app_id && appid != proc::terminate_app_id) {
-          app_node.put("AppTitle"s, "Resume: "s + app.name);
-        } else {
-          app_node.put("AppTitle"s, app.name);
-        }
+        app_node.put("AppTitle"s, app.name);
         app_node.put("UUID", app.uuid);
         app_node.put("ID", app.id);
 
