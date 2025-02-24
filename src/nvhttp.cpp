@@ -245,6 +245,7 @@ namespace nvhttp {
         named_cert_node["name"] = final_name;
         named_cert_node["cert"] = named_cert_p->cert;
         named_cert_node["uuid"] = named_cert_p->uuid;
+        named_cert_node["display_mode"] = named_cert_p->display_mode;
         named_cert_node["perm"] = static_cast<uint32_t>(named_cert_p->perm);
 
         // Add "do" commands if available.
@@ -320,6 +321,7 @@ namespace nvhttp {
             named_cert_p->name = "";
             named_cert_p->cert = el.get<std::string>();
             named_cert_p->uuid = uuid_util::uuid_t::generate().string();
+            named_cert_p->display_mode = "";
             named_cert_p->perm = PERM::_all;
             client.named_devices.emplace_back(named_cert_p);
           }
@@ -334,6 +336,7 @@ namespace nvhttp {
         named_cert_p->name = el.value("name", "");
         named_cert_p->cert = el.value("cert", "");
         named_cert_p->uuid = el.value("uuid", "");
+        named_cert_p->display_mode = el.value("display_mode", "");
         named_cert_p->perm = (PERM)(util::get_non_string_json_value<uint32_t>(el, "perm", (uint32_t)PERM::_all)) & PERM::_all;
         // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
@@ -399,7 +402,16 @@ namespace nvhttp {
       std::copy(prepend_iv_p, prepend_iv_p + sizeof(prepend_iv), std::begin(launch_session->iv));
     }
 
-    std::stringstream mode = std::stringstream(get_arg(args, "mode", config::video.fallback_mode.c_str()));
+    std::stringstream mode;
+    if (named_cert_p->display_mode.empty()) {
+      auto mode_str = get_arg(args, "mode", config::video.fallback_mode.c_str());
+      mode = std::stringstream(mode_str);
+      BOOST_LOG(info) << "Display mode for client ["sv << named_cert_p->name <<"] requested to ["sv << mode_str << ']';
+    } else {
+      mode = std::stringstream(named_cert_p->display_mode);
+      BOOST_LOG(info) << "Display mode for client ["sv << named_cert_p->name <<"] overriden to ["sv << named_cert_p->display_mode << ']';
+    }
+
     // Split mode by the char "x", to populate width/height/fps
     int x = 0;
     std::string segment;
@@ -411,9 +423,22 @@ namespace nvhttp {
         launch_session->height = atoi(segment.c_str());
       }
       if (x == 2) {
-        launch_session->fps = atoi(segment.c_str());
+        auto fps = atof(segment.c_str());
+        launch_session->fps = (int)(fps * 1000);
+        break;
       }
       x++;
+    }
+
+    // Parsing have failed or missing components
+    if (x != 2) {
+      launch_session->width = 1920;
+      launch_session->height = 1080;
+      launch_session->fps = 60000; // 60fps * 1000 denominator
+    }
+
+    if (launch_session->fps < 1000) {
+      launch_session->fps *= 1000;
     }
 
     launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;
@@ -981,6 +1006,7 @@ namespace nvhttp {
       nlohmann::json named_cert_node;
       named_cert_node["name"] = named_cert->name;
       named_cert_node["uuid"] = named_cert->uuid;
+      named_cert_node["display_mode"] = named_cert->display_mode;
       named_cert_node["perm"] = static_cast<uint32_t>(named_cert->perm);
 
       // Add "do" commands if available
@@ -1724,6 +1750,7 @@ namespace nvhttp {
   bool update_device_info(
     const std::string& uuid,
     const std::string& name,
+    const std::string& display_mode,
     const cmd_list_t& do_cmds,
     const cmd_list_t& undo_cmds,
     const crypto::PERM newPerm
@@ -1736,6 +1763,7 @@ namespace nvhttp {
       auto named_cert_p = *it;
       if (named_cert_p->uuid == uuid) {
         named_cert_p->name = name;
+        named_cert_p->display_mode = display_mode;
         named_cert_p->perm = newPerm;
         named_cert_p->do_cmds = do_cmds;
         named_cert_p->undo_cmds = undo_cmds;

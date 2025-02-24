@@ -700,6 +700,7 @@ namespace confighttp {
    * {
    *   "uuid": "<uuid>",
    *   "name": "<Friendly Name>",
+   *   "display_mode": "1920x1080x59.94",
    *   "do": [ { "cmd": "<command>", "elevated": false }, ... ],
    *   "undo": [ { "cmd": "<command>", "elevated": false }, ... ],
    *   "perm": <uint32_t>
@@ -720,10 +721,11 @@ namespace confighttp {
       nlohmann::json output_tree;
       std::string uuid = input_tree.value("uuid", "");
       std::string name = input_tree.value("name", "");
+      std::string display_mode = input_tree.value("display_mode", "");
       auto do_cmds = nvhttp::extract_command_entries(input_tree, "do");
       auto undo_cmds = nvhttp::extract_command_entries(input_tree, "undo");
       auto perm = static_cast<crypto::PERM>(input_tree.value("perm", static_cast<uint32_t>(crypto::PERM::_no)) & static_cast<uint32_t>(crypto::PERM::_all));
-      output_tree["status"] = nvhttp::update_device_info(uuid, name, do_cmds, undo_cmds, perm);
+      output_tree["status"] = nvhttp::update_device_info(uuid, name, display_mode, do_cmds, undo_cmds, perm);
       send_response(response, output_tree);
     } catch (std::exception &e) {
       BOOST_LOG(warning) << "Update Client: "sv << e.what();

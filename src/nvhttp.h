@@ -271,6 +271,7 @@ namespace nvhttp {
   bool update_device_info(
     const std::string& uuid,
     const std::string& name,
+    const std::string& display_mode,
     const cmd_list_t& do_cmds,
     const cmd_list_t& undo_cmds,
     const crypto::PERM newPerm

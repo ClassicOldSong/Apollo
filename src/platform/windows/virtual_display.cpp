@@ -27,20 +27,74 @@ LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode) {
 }
 
 LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate) {
-	DEVMODEW devMode = {0};
-	devMode.dmSize = sizeof(devMode);
-
-	if (EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
-		devMode.dmPelsWidth = width;
-		devMode.dmPelsHeight = height;
-		devMode.dmDisplayFrequency = refresh_rate;
-		devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
-
-		return ChangeDisplaySettingsExW(deviceName, &devMode, NULL, CDS_UPDATEREGISTRY, NULL);
+	UINT32 pathCount = 0;
+	UINT32 modeCount = 0;
+	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
+		wprintf(L"[SUDOVDA] Failed to query display configuration size.\n");
+		return ERROR_INVALID_PARAMETER;
 	}
 
-	return 0;
+	std::vector<DISPLAYCONFIG_PATH_INFO> pathArray(pathCount);
+	std::vector<DISPLAYCONFIG_MODE_INFO> modeArray(modeCount);
+
+	if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, pathArray.data(), &modeCount, modeArray.data(), nullptr) != ERROR_SUCCESS) {
+		wprintf(L"[SUDOVDA] Failed to query display configuration.\n");
+		return ERROR_INVALID_PARAMETER;
+	}
+
+	for (UINT32 i = 0; i < pathCount; i++) {
+		DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
+		sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+		sourceName.header.size = sizeof(sourceName);
+		sourceName.header.adapterId = pathArray[i].sourceInfo.adapterId;
+		sourceName.header.id = pathArray[i].sourceInfo.id;
+
+		if (DisplayConfigGetDeviceInfo(&sourceName.header) != ERROR_SUCCESS) {
+			continue;
+		}
+
+		auto* sourceInfo = &pathArray[i].sourceInfo;
+		auto* targetInfo = &pathArray[i].targetInfo;
+
+		if (std::wstring_view(sourceName.viewGdiDeviceName) == std::wstring_view(deviceName)) {
+			wprintf(L"[SUDOVDA] Display found: %ls\n", deviceName);
+			for (UINT32 j = 0; j < modeCount; j++) {
+				if (
+					modeArray[j].infoType == DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE &&
+					modeArray[j].adapterId.HighPart == sourceInfo->adapterId.HighPart &&
+					modeArray[j].adapterId.LowPart == sourceInfo->adapterId.LowPart &&
+					modeArray[j].id == sourceInfo->id
+				) {
+					auto* sourceMode = &modeArray[j].sourceMode;
+
+					wprintf(L"[SUDOVDA] Current mode found: %dx%dx%d\n", sourceMode->width, sourceMode->height, targetInfo->refreshRate);
+
+					sourceMode->width = width;
+					sourceMode->height = height;
+
+					targetInfo->refreshRate = {(UINT32)refresh_rate, 1000};
+
+					// Apply the changes
+					LONG status = SetDisplayConfig(pathCount, pathArray.data(), modeCount, modeArray.data(), SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE | SDC_ALLOW_CHANGES);
+					if (status != ERROR_SUCCESS) {
+						wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
+					} else {
+						wprintf(L"[SUDOVDA] Display settings updated successfully.\n");
+					}
+
+					return status;
+				}
+			}
+
+			wprintf(L"[SUDOVDA] Mode %dx%dx%d not found for display: %ls\n", width, height, refresh_rate, deviceName);
+			return ERROR_INVALID_PARAMETER;
+		}
+	}
+
+	wprintf(L"[SUDOVDA] Display not found: %ls\n", deviceName);
+	return ERROR_DEVICE_NOT_CONNECTED;
 }
+
 
 std::wstring getPrimaryDisplay() {
 	DISPLAY_DEVICEW displayDevice;
@@ -117,8 +171,8 @@ bool setPrimaryDisplay(const wchar_t* primaryDeviceName) {
 }
 
 bool findDisplayIds(const wchar_t* displayName, LUID& adapterId, uint32_t& targetId) {
-	UINT pathCount;
-	UINT modeCount;
+	UINT32 pathCount;
+	UINT32 modeCount;
 	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
 		return false;
 	}
@@ -132,17 +186,17 @@ bool findDisplayIds(const wchar_t* displayName, LUID& adapterId, uint32_t& targe
 	auto path = std::find_if(paths.begin(), paths.end(), [&displayName](DISPLAYCONFIG_PATH_INFO _path) {
 		DISPLAYCONFIG_PATH_SOURCE_INFO sourceInfo = _path.sourceInfo;
 
-		DISPLAYCONFIG_SOURCE_DEVICE_NAME deviceName = {};
-		deviceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
-		deviceName.header.size = sizeof(deviceName);
-		deviceName.header.adapterId = sourceInfo.adapterId;
-		deviceName.header.id = sourceInfo.id;
+		DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
+		sourceName.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME;
+		sourceName.header.size = sizeof(sourceName);
+		sourceName.header.adapterId = sourceInfo.adapterId;
+		sourceName.header.id = sourceInfo.id;
 
-		if (DisplayConfigGetDeviceInfo(&deviceName.header) != ERROR_SUCCESS) {
+		if (DisplayConfigGetDeviceInfo(&sourceName.header) != ERROR_SUCCESS) {
 			return false;
 		}
 
-		return std::wstring_view(displayName) == deviceName.viewGdiDeviceName;
+		return std::wstring_view(displayName) == sourceName.viewGdiDeviceName;
 	});
 
 	if (path == paths.end()) {

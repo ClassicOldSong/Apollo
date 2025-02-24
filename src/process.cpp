@@ -261,7 +261,11 @@ namespace proc {
 
         memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
 
-        int target_fps = launch_session->fps ? launch_session->fps : 60;
+        int target_fps = launch_session->fps ? launch_session->fps : 60000;
+
+        if (target_fps < 1000) {
+          target_fps *= 1000;
+        }
 
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           device_uuid_str.c_str(),
