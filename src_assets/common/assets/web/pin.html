@@ -105,10 +105,24 @@
               </div>
             </div>
 
+            <!-- Display Mode Override -->
+            <div class="mb-3 mt-2">
+              <label for="display_mode_override" class="form-label">{{ $t('pin.display_mode_override') }}</label>
+              <input
+                type="text"
+                class="form-control"
+                id="display_mode_override"
+                v-model="client.editDisplayMode"
+                placeholder="1920x1080x59.94"
+                @input="validateModeOverride"
+              />
+              <div class="form-text">{{ $t('pin.display_mode_override_desc') }} <a href="https://github.com/ClassicOldSong/Apollo/wiki/Display-Mode-Override" target="_blank">{{ $t('_common.learn_more') }}</a></div>
+            </div>
+
             <!-- connect/disconnect commands -->
             <div class="mb-3 mt-2 d-flex flex-column" v-for="cmdType in ['do', 'undo']">
-              <label class="mb-0 orm-label">{{ $t(`config.client_${cmdType}_cmd`) }}</label>
-              <div class="form-text">{{ $t(`config.client_${cmdType}_cmd_desc`) }} <a href="https://github.com/ClassicOldSong/Apollo/wiki/Client-Commands" target="_blank">{{ $t('_common.learn_more') }}</a></div>
+              <label class="mb-0 orm-label">{{ $t(`pin.client_${cmdType}_cmd`) }}</label>
+              <div class="form-text">{{ $t(`pin.client_${cmdType}_cmd_desc`) }} <a href="https://github.com/ClassicOldSong/Apollo/wiki/Client-Commands" target="_blank">{{ $t('_common.learn_more') }}</a></div>
               <table class="mt-2 table" v-if="client[`edit_${cmdType}`].length > 0">
                 <thead>
                   <tr>
@@ -479,6 +493,7 @@
         client.editing = true;
         client.editPerm = client.perm;
         client.editName = client.name;
+        client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
 
@@ -488,6 +503,7 @@
         client.editing = false;
         client.editPerm = client.perm;
         client.editName = client.name;
+        client.editDisplayMode = client.display_mode;
         currentEditingClient = null;
       },
       saveClient(client) {
@@ -496,6 +512,7 @@
         const editedClient = {
           uuid: client.uuid,
           name: client.editName,
+          display_mode: client.editDisplayMode.trim(),
           perm: client.editPerm & permissionMapping._all,
           do: client.edit_do.reduce((filtered, {cmd: _cmd, elevated}) => {
             const cmd = _cmd.trim()
@@ -553,6 +570,16 @@
       togglePermission(client, permission) {
         client.editPerm ^= permissionMapping[permission];
       },
+      validateModeOverride(event) {
+        const value = event.target.value.trim();
+        if (value && !value.match(/^\d+x\d+x\d+(\.\d+)?$/)) {
+          event.target.setCustomValidity(this.i18n.t('pin.display_mode_override_error'));
+        } else {
+          event.target.setCustomValidity('');
+        }
+
+        event.target.reportValidity();
+      },
       disconnectClient(uuid) {
         fetch("./api/clients/disconnect", {
           credentials: 'include',
@@ -599,11 +626,12 @@
           .then((response) => {
             if (response.status && response.named_certs && response.named_certs.length) {
               this.platform = response.platform
-              this.clients = response.named_certs.map(({name, uuid, perm, connected, do: _do, undo}) => {
+              this.clients = response.named_certs.map(({name, uuid, display_mode, perm, connected, do: _do, undo}) => {
                 const permInt = parseInt(perm, 10);
                 return {
                   name,
                   uuid,
+                  display_mode,
                   perm: permInt,
                   connected,
                   editing: false,

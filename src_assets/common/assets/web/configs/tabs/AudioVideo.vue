@@ -31,7 +31,7 @@ const config = ref(props.config)
 
 const validateFallbackMode = (event) => {
   const value = event.target.value;
-  if (!value.match(/^\d+x\d+x\d+$/)) {
+  if (!value.match(/^\d+x\d+x\d+(\.\d+)?$/)) {
     event.target.setCustomValidity($t('config.fallback_mode_error'));
   } else {
     event.target.setCustomValidity('');
