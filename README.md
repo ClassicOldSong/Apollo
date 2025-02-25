@@ -116,6 +116,8 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
     This will clear your monitor configuration cache.
 
     Then you're good to go!
+- **Stuttery video stream on some clients**
+  - Checkout [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Display-Mode-Override)
 - **I would like to capture sound from only one app.**
   - Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
 
