@@ -26,7 +26,7 @@ LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode) {
 	return EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, &devMode);
 }
 
-LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate) {
+LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, int refresh_rate) {
 	UINT32 pathCount = 0;
 	UINT32 modeCount = 0;
 	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
@@ -67,7 +67,7 @@ LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int
 				) {
 					auto* sourceMode = &modeArray[j].sourceMode;
 
-					wprintf(L"[SUDOVDA] Current mode found: %dx%dx%d\n", sourceMode->width, sourceMode->height, targetInfo->refreshRate);
+					wprintf(L"[SUDOVDA] Current mode found: [%dx%dx%d]\n", sourceMode->width, sourceMode->height, targetInfo->refreshRate);
 
 					sourceMode->width = width;
 					sourceMode->height = height;
@@ -75,7 +75,15 @@ LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int
 					targetInfo->refreshRate = {(UINT32)refresh_rate, 1000};
 
 					// Apply the changes
-					LONG status = SetDisplayConfig(pathCount, pathArray.data(), modeCount, modeArray.data(), SDC_APPLY | SDC_USE_SUPPLIED_DISPLAY_CONFIG | SDC_SAVE_TO_DATABASE | SDC_ALLOW_CHANGES);
+					LONG status = SetDisplayConfig(
+						pathCount,
+						pathArray.data(),
+						modeCount,
+						modeArray.data(),
+						SDC_APPLY
+						| SDC_USE_SUPPLIED_DISPLAY_CONFIG
+						| SDC_SAVE_TO_DATABASE
+					);
 					if (status != ERROR_SUCCESS) {
 						wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
 					} else {
@@ -86,13 +94,59 @@ LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int
 				}
 			}
 
-			wprintf(L"[SUDOVDA] Mode %dx%dx%d not found for display: %ls\n", width, height, refresh_rate, deviceName);
+			wprintf(L"[SUDOVDA] Mode [%dx%dx%d] not found for display: %ls\n", width, height, refresh_rate, deviceName);
 			return ERROR_INVALID_PARAMETER;
 		}
 	}
 
 	wprintf(L"[SUDOVDA] Display not found: %ls\n", deviceName);
 	return ERROR_DEVICE_NOT_CONNECTED;
+}
+
+LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate) {
+	DEVMODEW devMode = {0};
+	devMode.dmSize = sizeof(devMode);
+
+	// Old method to set at least baseline refresh rate
+	if (EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, &devMode)) {
+		DWORD targetRefreshRate = refresh_rate / 1000;
+		DWORD altRefreshRate = targetRefreshRate;
+
+		if (refresh_rate % 1000) {
+			if (refresh_rate % 1000 >= 900) {
+				targetRefreshRate += 1;
+			} else {
+				altRefreshRate += 1;
+			}
+		} else {
+			altRefreshRate -= 1;
+		}
+
+		wprintf(L"[SUDOVDA] Applying baseline display mode [%dx%dx%d] for %ls.\n", width, height, targetRefreshRate, deviceName);
+
+		devMode.dmPelsWidth = width;
+		devMode.dmPelsHeight = height;
+		devMode.dmDisplayFrequency = targetRefreshRate;
+		devMode.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
+
+		auto res = ChangeDisplaySettingsExW(deviceName, &devMode, NULL, CDS_UPDATEREGISTRY, NULL);
+
+		if (res != ERROR_SUCCESS) {
+			wprintf(L"[SUDOVDA] Failed to apply baseline display mode, trying alt mode: [%dx%dx%d].\n", width, height, altRefreshRate);
+			devMode.dmDisplayFrequency = altRefreshRate;
+			res = ChangeDisplaySettingsExW(deviceName, &devMode, NULL, CDS_UPDATEREGISTRY, NULL);
+			if (res != ERROR_SUCCESS) {
+				wprintf(L"[SUDOVDA] Failed to apply alt baseline display mode.\n");
+			}
+		}
+
+		if (res == ERROR_SUCCESS) {
+			wprintf(L"[SUDOVDA] Baseline display mode applied successfully.");
+		}
+	}
+
+	// Use new method to set refresh rate if fine tuned
+	return changeDisplaySettings2(deviceName, width, height, refresh_rate);
 }
 
 
