@@ -1902,10 +1902,6 @@ namespace video {
     // set minimum frame time, avoiding violation of client-requested target framerate
     auto minimum_frame_time = std::chrono::milliseconds(1000 / std::min(config.framerate, (config::video.min_fps_factor * 10)));
     auto frame_threshold = std::chrono::milliseconds(1000 / config.encodingFramerate);
-    // Leave 1ms headroom for slight variations
-    if (frame_threshold >= 2ms) {
-      frame_threshold -= 1ms;
-    }
     BOOST_LOG(debug) << "Minimum frame time set to "sv << minimum_frame_time.count() << "ms, based on min fps factor of "sv << config::video.min_fps_factor << "."sv;
     BOOST_LOG(info) << "Frame threshold: "sv << frame_threshold;
 
@@ -1939,7 +1935,7 @@ namespace video {
       return;
     }
 
-    std::chrono::steady_clock::time_point last_frame_timestamp;
+    std::chrono::steady_clock::time_point next_frame_start;
 
     while (true) {
       // Break out of the encoding loop if any of the following are true:
@@ -1977,7 +1973,7 @@ namespace video {
         if (auto img = images->pop(minimum_frame_time)) {
           frame_timestamp = img->frame_timestamp;
           // If new frame comes in way too fast, just drop
-          if (*frame_timestamp - last_frame_timestamp < frame_threshold) {
+          if (*frame_timestamp < next_frame_start) {
             continue;
           }
           if (session->convert(*img)) {
@@ -1989,12 +1985,23 @@ namespace video {
         }
       }
 
+      if (frame_timestamp) {
+        auto frame_diff = *frame_timestamp - next_frame_start;
+        if (frame_diff < 2ms) {
+          auto this_frame_timestamp = next_frame_start;
+          next_frame_start = *frame_timestamp;
+          frame_timestamp = this_frame_timestamp;
+        } else if (frame_diff > frame_threshold) {
+          next_frame_start = *frame_timestamp - frame_threshold / 2;
+        }
+
+        next_frame_start += frame_threshold;
+      }
+
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
         BOOST_LOG(error) << "Could not encode video packet"sv;
         break;
       }
-
-      last_frame_timestamp = *frame_timestamp;
 
       session->request_normal_frame();
     }
