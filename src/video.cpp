@@ -1901,7 +1901,7 @@ namespace video {
 
     // set minimum frame time, avoiding violation of client-requested target framerate
     auto minimum_frame_time = std::chrono::milliseconds(1000 / std::min(config.framerate, (config::video.min_fps_factor * 10)));
-    auto frame_threshold = std::chrono::milliseconds(1000 / config.encodingFramerate);
+    auto frame_threshold = std::chrono::microseconds(1000ms * 1000 / config.encodingFramerate);
     BOOST_LOG(debug) << "Minimum frame time set to "sv << minimum_frame_time.count() << "ms, based on min fps factor of "sv << config::video.min_fps_factor << "."sv;
     BOOST_LOG(info) << "Frame threshold: "sv << frame_threshold;
 
@@ -1983,19 +1983,18 @@ namespace video {
         } else if (!images->running()) {
           break;
         }
-      }
 
-      if (frame_timestamp) {
-        auto frame_diff = *frame_timestamp - next_frame_start;
-        if (frame_diff < 2ms) {
-          auto this_frame_timestamp = next_frame_start;
-          next_frame_start = *frame_timestamp;
-          frame_timestamp = this_frame_timestamp;
-        } else if (frame_diff > frame_threshold) {
-          next_frame_start = *frame_timestamp - frame_threshold / 2;
+        if (frame_timestamp) {
+          auto frame_diff = *frame_timestamp - next_frame_start;
+
+          if (frame_diff > frame_threshold) {
+            next_frame_start = *frame_timestamp - frame_threshold / 2;
+          }
+
+          frame_timestamp = next_frame_start;
+
+          next_frame_start += frame_threshold;
         }
-
-        next_frame_start += frame_threshold;
       }
 
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
