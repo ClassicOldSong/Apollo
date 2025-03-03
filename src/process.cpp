@@ -977,17 +977,49 @@ namespace proc {
       // Walk through each app and convert legacy string values.
       for (auto &app : fileTree["apps"]) {
         for (const auto &key : boolean_keys) {
-          if (app.contains(key) && app[key].is_string()) {
-            std::string s = app[key].get<std::string>();
-            app[key] = (s == "true");
+          if (app.contains(key)) {
+            auto& _key = app[key];
+            if (_key.is_string()) {
+              std::string s = _key.get<std::string>();
+              std::transform(s.begin(), s.end(), s.begin(), ::tolower);  // Normalize to lowercase for comparison
+              _key = (s == "true" || s == "on" || s == "yes");
+            } else if (_key.is_array()) {
+              // Check if the array contains at least one item and interpret the first element
+              if (!_key.empty() && _key[0].is_string()) {
+                std::string first = _key[0].get<std::string>();
+                std::transform(first.begin(), first.end(), first.begin(), ::tolower);  // Normalize
+                if (first == "on" || first == "true" || first == "yes") {
+                  _key = true;
+                } else if (first == "off" || first == "false" || first == "no") {
+                  _key = false;
+                } else {
+                  _key = false;  // Default for unknown values
+                }
+              } else {
+                _key = false;  // Treat empty arrays or non-string first elements as false
+              }
+            } else {
+              // Fallback: Treat truthy/falsey cases
+              if (_key.is_boolean()) {
+                // Leave booleans as they are
+              } else if (_key.is_number()) {
+                _key = (_key.get<double>() != 0);  // Non-zero numbers are truthy
+              } else if (_key.is_null()) {
+                _key = false;  // Null is false
+              } else {
+                _key = !_key.empty();  // Non-empty objects/arrays are truthy, empty ones are falsey
+              }
+            }
           }
         }
+
         for (const auto &key : integer_keys) {
           if (app.contains(key) && app[key].is_string()) {
             std::string s = app[key].get<std::string>();
             app[key] = std::stoi(s);
           }
         }
+
         // For each entry in the "prep-cmd" array, convert "elevated" if necessary.
         if (app.contains("prep-cmd") && app["prep-cmd"].is_array()) {
           for (auto &prep : app["prep-cmd"]) {
