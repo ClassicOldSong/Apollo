@@ -382,11 +382,11 @@
     "configuration": "Configuração",
     "home": "Início",
     "password": "Alterar senha",
-    "pin": "Pin",
+    "pin": "PIN",
     "theme_auto": "Automático",
     "theme_dark": "Escuro",
-    "theme_light": "Luz",
-    "toggle_theme": "Tema",
+    "theme_light": "Claro",
+    "toggle_theme": "Alternar Tema",
     "troubleshoot": "Solução de Problemas"
   },
   "password": {
