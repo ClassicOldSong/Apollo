@@ -1987,13 +1987,12 @@ namespace video {
         if (frame_timestamp) {
           auto frame_diff = *frame_timestamp - next_frame_start;
 
-          if (frame_diff > frame_threshold) {
-            next_frame_start = *frame_timestamp - frame_threshold / 2;
+          if (frame_diff > frame_threshold / 2) {
+            next_frame_start = *frame_timestamp + frame_threshold / 2;
+          } else {
+            frame_timestamp = next_frame_start;
+            next_frame_start += frame_threshold;
           }
-
-          frame_timestamp = next_frame_start;
-
-          next_frame_start += frame_threshold;
         }
       }
 
