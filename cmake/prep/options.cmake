@@ -7,8 +7,8 @@ set(SUNSHINE_PUBLISHER_ISSUE_URL "https://github.com/ClassicOldSong/Apollo/issue
         CACHE STRING "The URL of the publisher's support site or issue tracker.
         If you provide a modified version of Sunshine, we kindly request that you use your own url.")
 
-option(BUILD_DOCS "Build documentation" ON)
-option(BUILD_TESTS "Build tests" ON)
+option(BUILD_DOCS "Build documentation" OFF)
+option(BUILD_TESTS "Build tests" OFF)
 option(NPM_OFFLINE "Use offline npm packages. You must ensure packages are in your npm cache." OFF)
 option(TESTS_ENABLE_PYTHON_TESTS "Enable Python tests" ON)
 
