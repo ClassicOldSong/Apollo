@@ -183,10 +183,23 @@
       methods: {
         refreshLogs() {
           fetch("./api/logs", { credentials: 'include' })
-            .then((r) => r.text())
-            .then((r) => {
-              this.logs = r;
-            });
+            .then(response => {
+              // Retrieve the Content-Type header
+              const contentType = response.headers.get("Content-Type") || "";
+              // Attempt to extract charset from the header
+              const charsetMatch = contentType.match(/charset=([^;]+)/i);
+              const charset = charsetMatch ? charsetMatch[1].trim() : "utf-8";
+
+              // Read response as an ArrayBuffer and decode it with the correct charset
+              return response.arrayBuffer().then(buffer => {
+                const decoder = new TextDecoder(charset);
+                return decoder.decode(buffer);
+              });
+            })
+            .then(text => {
+              this.logs = text;
+            })
+            .catch(error => console.error("Error fetching logs:", error));
         },
         closeApp() {
           this.closeAppPressed = true;

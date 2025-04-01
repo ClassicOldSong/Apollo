@@ -1,5 +1,7 @@
 #include "utils.h"
 
+#include <unordered_map>
+
 #include <SetupApi.h>
 
 #include "src/utility.h"
@@ -66,6 +68,46 @@ std::string acpToUtf8(const std::string& origStr) {
 
 	return utf8Str;
 }
+
+std::string currentCodePageToCharset() {
+    // Map of Windows code pages to their corresponding charset strings
+    static const std::unordered_map<int, std::string> codePageCharsetMap = {
+        {65001, "UTF-8"},
+        {1200, "UTF-16LE"},
+        {1201, "UTF-16BE"},
+        {1250, "windows-1250"},
+        {1251, "windows-1251"},
+        {1252, "windows-1252"},
+        {1253, "windows-1253"},
+        {1254, "windows-1254"},
+        {1255, "windows-1255"},
+        {1256, "windows-1256"},
+        {1257, "windows-1257"},
+        {1258, "windows-1258"},
+        {936,  "GBK"},       // Simplified Chinese
+        {949,  "EUC-KR"},    // Korean
+        {950,  "Big5"},      // Traditional Chinese
+        {932,  "Shift_JIS"}  // Japanese
+    };
+
+    static std::string charsetStr;
+
+    if (charsetStr.empty()) {
+        // Get the active Windows code page
+        int codePage = GetACP();
+        // Find the charset in the map
+        auto it = codePageCharsetMap.find(codePage);
+        if (it != codePageCharsetMap.end()) {
+            charsetStr = it->second;
+        } else {
+            // Fallback charset if code page is not found in the map
+            charsetStr = "ISO-8859-1";
+        }
+    }
+
+    return charsetStr;
+}
+
 
 // Modified from https://github.com/FrogTheFrog/Sunshine/blob/b6f8573d35eff7c55da6965dfa317dc9722bd4ef/src/platform/windows/display_device/windows_utils.cpp
 

@@ -1087,7 +1087,11 @@ namespace config {
     }
 
     for (auto &[name, val] : vars) {
-      BOOST_LOG(info) << "config: '"sv << name << "' = "sv << val;
+    #ifdef _WIN32
+      BOOST_LOG(info) << "config: ["sv << name << "] -- ["sv << utf8ToAcp(val) << ']';
+    #else
+      BOOST_LOG(info) << "config: ["sv << name << "] -- ["sv << val << ']';
+    #endif
     }
 
     bool_f(vars, "headless_mode", video.headless_mode);

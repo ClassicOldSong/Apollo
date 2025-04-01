@@ -40,6 +40,10 @@
 #include "uuid.h"
 #include "version.h"
 
+#ifdef _WIN32
+  #include "platform/windows/utils.h"
+#endif
+
 using namespace std::literals;
 
 namespace confighttp {
@@ -943,7 +947,12 @@ namespace confighttp {
     print_req(request);
     std::string content = file_handler::read_file(config::sunshine.log_file.c_str());
     SimpleWeb::CaseInsensitiveMultimap headers;
-    headers.emplace("Content-Type", "text/plain");
+    std::string contentType = "text/plain";
+  #ifdef _WIN32
+    contentType += "; charset=";
+    contentType += currentCodePageToCharset();
+  #endif
+    headers.emplace("Content-Type", contentType);
     response->write(SimpleWeb::StatusCode::success_ok, content, headers);
   }
 
