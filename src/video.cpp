@@ -1930,9 +1930,13 @@ namespace video {
         return;
       }
 
-      shutdown_event->view();
-
-      return;
+      while (true) {
+        if (shutdown_event->peek() || !images->running() || (reinit_event.peek())) {
+          return;
+        } else {
+          std::this_thread::sleep_for(300ms);
+        }
+      }
     }
 
     std::chrono::steady_clock::time_point next_frame_start;
