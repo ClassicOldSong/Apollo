@@ -108,12 +108,16 @@ namespace logging {
     // Check if the log file exists and handle backup
     std::string backup_log_file = log_file + ".backup";
     if (std::filesystem::exists(log_file)) {
-      // If the backup file exists, remove it
-      if (std::filesystem::exists(backup_log_file)) {
-        std::filesystem::remove(backup_log_file);
+      try {
+        // If the backup file exists, remove it
+        if (std::filesystem::exists(backup_log_file)) {
+          std::filesystem::remove(backup_log_file);
+        }
+        // Rename the current log file to the backup name
+        std::filesystem::rename(log_file, backup_log_file);
+      } catch (std::exception& e) {
+        std::cout << "Failed to rotate log file: " << e.what() << std::endl;
       }
-      // Rename the current log file to the backup name
-      std::filesystem::rename(log_file, backup_log_file);
     }
 
     setup_av_logging(min_log_level);
