@@ -7,17 +7,12 @@ rem Note: We use exit code 2 to indicate success because either 0 or 1 may be re
 rem based on the PowerShell version if an exception occurs.
 powershell -c Exit $(if ((Get-Item "$env:SystemRoot\System32\drivers\ViGEmBus.sys").VersionInfo.FileVersion -ge [System.Version]"1.17") { 2 } Else { 1 })
 if %ERRORLEVEL% EQU 2 (
-    goto skip
+    echo "The installed version is 1.17 or later, no update needed. Exiting."
+    exit /b 0
 )
-goto continue
 
-:skip
-echo "The installed version is 1.17 or later, no update needed. Exiting."
-exit /b 0
-
-:continue
 rem Get temp directory
-set temp_dir=%temp%/Sunshine
+set temp_dir=%temp%/Apollo
 
 rem Create temp directory if it doesn't exist
 if not exist "%temp_dir%" mkdir "%temp_dir%"

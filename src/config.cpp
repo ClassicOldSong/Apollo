@@ -665,9 +665,13 @@ namespace config {
     // Lists might contain newlines
     if (*begin_val == '[') {
       endl = skip_list(begin_val + 1, end);
-      if (endl == end) {
-        std::cout << "Warning: Config option ["sv << to_string(begin, end_name) << "] Missing ']'"sv;
 
+      // Check if we reached the end of the file without finding a closing bracket
+      // We know we have a valid closing bracket if:
+      // 1. We didn't reach the end, or
+      // 2. We reached the end but the last character was the matching closing bracket
+      if (endl == end && end == begin_val + 1) {
+        BOOST_LOG(warning) << "config: Missing ']' in config option: " << to_string(begin, end_name);
         return std::make_pair(endl, std::nullopt);
       }
     }
@@ -1027,7 +1031,7 @@ namespace config {
 
     // The list needs to be a multiple of 2
     if (list.size() % 2) {
-      std::cout << "Warning: expected "sv << name << " to have a multiple of two elements --> not "sv << list.size() << std::endl;
+      BOOST_LOG(warning) << "config: expected "sv << name << " to have a multiple of two elements --> not "sv << list.size();
       return;
     }
 
@@ -1057,7 +1061,7 @@ namespace config {
           config::sunshine.flags[config::flag::UPNP].flip();
           break;
         default:
-          std::cout << "Warning: Unrecognized flag: ["sv << *line << ']' << std::endl;
+          BOOST_LOG(warning) << "config: Unrecognized flag: ["sv << *line << ']' << std::endl;
           ret = -1;
       }
 
@@ -1083,11 +1087,7 @@ namespace config {
     }
 
     for (auto &[name, val] : vars) {
-    #ifdef _WIN32
-      std::cout << "["sv << name << "] -- ["sv << utf8ToAcp(val) << ']' << std::endl;
-    #else
-      std::cout << "["sv << name << "] -- ["sv << val << ']' << std::endl;
-    #endif
+      BOOST_LOG(info) << "config: '"sv << name << "' = "sv << val;
     }
 
     bool_f(vars, "headless_mode", video.headless_mode);
@@ -1485,7 +1485,7 @@ namespace config {
         shell_exec_info.nShow = SW_NORMAL;
         if (!ShellExecuteExW(&shell_exec_info)) {
           auto winerr = GetLastError();
-          std::cout << "Error: ShellExecuteEx() failed:"sv << winerr << std::endl;
+          BOOST_LOG(error) << "Failed executing shell command: " << winerr << std::endl;
           return 1;
         }
 
