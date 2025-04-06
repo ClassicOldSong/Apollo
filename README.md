@@ -77,7 +77,7 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
 
 ## Stuttering Clinic
 
-Here're some common causes and solutions for stutters.
+Here're some common causes and solutions for stutters. Future updates about stuttering research will be added in [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic). 
 
 - **Periodic micro stutters**
   + Usually caused by frame rate mismatch, like requested 60fps but the client is only 59.94hz.
