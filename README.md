@@ -75,6 +75,30 @@ SDR actually provides much more stable color accuracy, and are widely supported 
 
 Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
 
+## Stuttering Clinic
+
+Here're some common causes and solutions for stutters.
+
+- **Periodic micro stutters**
+  + Usually caused by frame rate mismatch, like requested 60fps but the client is only 59.94hz.
+  + Checkout [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Display-Mode-Override) for instructions on how to override the requested frame rate in Apollo.
+  + When the frame rate actually matches, you might need to enable VSync or limit frame rate of the game to the same as the requested refresh rate on your host. Client side VSync not that important then, the decoding latency won't go up for VSync if host side and client side matched exactly.
+- **Periodic hiccups**
+  + Check your monitor/display cable. Some monitors/fiber HDMI cables/HDMI switches probe connections actively, they'll cause the GPU to reinitialize context every time they do so, and stream will be renintialized as well causing a big hiccup.
+  + To fix the problem, leave the problematic display open during stream seems always work but it's not ideal.
+  + You can also try truning off the problematic display physically, or pull their cable off **from the GPU side**.
+  + Some monitors can get the behavior turned off: https://www.reddit.com/r/MoonlightStreaming/comments/1hw5ukh/comment/mjcnlsi
+    > One of my monitors has a setting to "Auto Detect Input" and when I turned this off the stuttering is now gone! Even when the monitor is disconnected via software (Windows Display Settings)
+- **Random "Slow Network" warnings**
+  + Commonly seen on SteamDeck, turn off power saving on the WiFi card seems to be fixing the issue.
+  + If still not working, toggle your WiFi connection may fix it temporarily.
+- **Stutter when image starts moving, then gets fine**
+  + Power saving issue on WiFi cards as well. Typically seen on MTK cards, their default behavior saves power aggressively.
+  + Go to Device Manager, find your WiFi adapter, right click, select `Properties`, find `Power Saving` related options and turn them off.
+- **Other weird uncatagorized symptons**
+  + AMD CPUs paired with Nvidia GPUs sometimes don't work so well. No exact cause found, nor proper solutions to this problem. Workaround is enable "Double refresh rate" mode in `Audio/Video` tab, and limit your game to the requested refresh rate using RTSS or NVCP.
+  + [TBD]
+
 ## FAQ
 
 - **No virtual display added**
@@ -116,8 +140,6 @@ Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/w
     This will clear your monitor configuration cache.
 
     Then you're good to go!
-- **Stuttery video stream on some clients**
-  - Checkout [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Display-Mode-Override)
 - **I would like to capture sound from only one app.**
   - Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
 
