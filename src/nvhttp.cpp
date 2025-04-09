@@ -424,7 +424,10 @@ namespace nvhttp {
       }
       if (x == 2) {
         auto fps = atof(segment.c_str());
-        launch_session->fps = (int)(fps * 1000);
+        if (fps < 1000) {
+          fps *= 1000;
+        };
+        launch_session->fps = (int)fps;
         break;
       }
       x++;
@@ -435,10 +438,6 @@ namespace nvhttp {
       launch_session->width = 1920;
       launch_session->height = 1080;
       launch_session->fps = 60000; // 60fps * 1000 denominator
-    }
-
-    if (launch_session->fps < 1000) {
-      launch_session->fps *= 1000;
     }
 
     launch_session->device_name = named_cert_p->name.empty() ? "ApolloDisplay"s : named_cert_p->name;
