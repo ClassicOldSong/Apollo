@@ -1092,6 +1092,7 @@ namespace config {
     #else
       BOOST_LOG(info) << "config: ["sv << name << "] -- ["sv << val << ']';
     #endif
+      modified_config_settings[name] = val;
     }
 
     bool_f(vars, "headless_mode", video.headless_mode);
