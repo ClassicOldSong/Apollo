@@ -98,6 +98,7 @@ dependencies=(
   "mingw-w64-ucrt-x86_64-openssl"
   "mingw-w64-ucrt-x86_64-opus"
   "mingw-w64-ucrt-x86_64-toolchain"
+  "mingw-w64-ucrt-x86_64-nlohmann_json"
 )
 pacman -S "${dependencies[@]}"
 ```
