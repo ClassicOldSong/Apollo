@@ -98,6 +98,7 @@ dependencies=(
   "mingw-w64-ucrt-x86_64-openssl"
   "mingw-w64-ucrt-x86_64-opus"
   "mingw-w64-ucrt-x86_64-toolchain"
+  "mingw-w64-ucrt-x86_64-nlohmann_json"
 )
 pacman -S "${dependencies[@]}"
 ```
@@ -106,8 +107,8 @@ pacman -S "${dependencies[@]}"
 Ensure [git](https://git-scm.com) is installed on your system, then clone the repository using the following command:
 
 ```bash
-git clone https://github.com/lizardbyte/sunshine.git --recurse-submodules
-cd sunshine
+git clone https://github.com/ClassicOldSong/Apollo.git --recurse-submodules
+cd Apollo
 mkdir build
 ```
 
