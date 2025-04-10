@@ -2,9 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 project(sunshine_tools)
 
-include_directories("${CMAKE_SOURCE_DIR}"
-		"${CMAKE_SOURCE_DIR}/build/_deps/json-src/include"
-		)
+include_directories("${CMAKE_SOURCE_DIR}")
 
 add_executable(dxgi-info dxgi.cpp)
 set_target_properties(dxgi-info PROPERTIES CXX_STANDARD 20)
