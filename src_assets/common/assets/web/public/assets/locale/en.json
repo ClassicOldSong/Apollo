@@ -229,6 +229,8 @@
     "double_refreshrate_desc": "Double the requested refresh rate when creating virtual displays, streamed refresh rate still remain the same. Can potentially improve stutter problem on some systems.",
     "ds4_back_as_touchpad_click": "Map Back/Select to Touchpad Click",
     "ds4_back_as_touchpad_click_desc": "When forcing DS4 emulation, map Back/Select to Touchpad Click",
+    "enable_discovery": "Enable Auto Discovery",
+    "enable_discovery_desc": "When disabled, you'll need to manually enter host IP on the client to pair.",
     "enable_input_only_mode": "Enable Input Only Mode",
     "enable_input_only_mode_desc": "Add an Input Only app entry. When enabled, the app list will only show the current running app and the Input Only entry when streaming. The Input Only entry will not receive any image or audio. Useful for operating the desktop on TV or connecting peripherals which the TV doesn't support with a phone.",
     "enable_pairing": "Enable Pairing",

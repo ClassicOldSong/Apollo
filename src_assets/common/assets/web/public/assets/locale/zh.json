@@ -224,6 +224,8 @@
     "double_refreshrate_desc": "创建虚拟显示器时刷新率翻倍，串流的视频刷新率不受影响。可能可以缓解某些电脑上出现的画面卡顿现象。",
     "ds4_back_as_touchpad_click": "映射回/选择触摸板点击",
     "ds4_back_as_touchpad_click_desc": "强制使用 DS4 模拟时，将“返回”/“选择”映射到触摸板点击",
+    "enable_discovery": "启用自动发现",
+    "enable_discovery_desc": "禁用后，你将只能通过输入服务端 IP 进行配对。",
     "enable_input_only_mode": "启用仅输入模式",
     "enable_input_only_mode_desc": "新增一个仅输入APP。启用时，应用列表在串流时将只显示当前正在运行的APP和仅输入APP。仅输入APP不会接收到任何画面/音频。可以用于用手机更方便地操作电视大屏串流或连接电视不支持的外设。",
     "enable_pairing": "启用配对",

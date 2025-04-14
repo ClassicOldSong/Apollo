@@ -325,7 +325,9 @@ int main(int argc, char *argv[]) {
 
   std::unique_ptr<platf::deinit_t> mDNS;
   auto sync_mDNS = std::async(std::launch::async, [&mDNS]() {
-    mDNS = platf::publish::start();
+    if (config::sunshine.enable_discovery) {
+      mDNS = platf::publish::start();
+    }
   });
 
   std::unique_ptr<platf::deinit_t> upnp_unmap;

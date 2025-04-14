@@ -254,6 +254,7 @@ namespace config {
   struct sunshine_t {
     bool hide_tray_controls;
     bool enable_pairing;
+    bool enable_discovery;
     std::string locale;
     int min_log_level;
     std::bitset<flag::FLAG_SIZE> flags;

@@ -201,6 +201,14 @@ onMounted(() => {
               default="true"
     ></Checkbox>
 
+    <!-- Enable Discovery -->
+    <Checkbox class="mb-3"
+              id="enable_discovery"
+              locale-prefix="config"
+              v-model="config.enable_discovery"
+              default="true"
+    ></Checkbox>
+
     <!-- Hide Tray Controls -->
     <Checkbox class="mb-3"
               id="hide_tray_controls"
