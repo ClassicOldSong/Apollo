@@ -9,6 +9,8 @@
                     {{ $t('resource_card.lizardbyte_website') }}</a> -->
                 <a class="btn btn-secondary m-1" href="https://github.com/ClassicOldSong/Apollo/discussions" target="_blank">
                     <i class="fab fa-fw fa-github"></i> {{ $t('resource_card.github_discussions') }}</a>
+                <a class="btn btn-secondary m-1" href="https://github.com/ClassicOldSong/Apollo/wiki" target="_blank">
+                    <i class="fab fa-fw fa-github"></i> {{ $t('resource_card.github_wiki') }}</a>
             </div>
         </div>
     </div>

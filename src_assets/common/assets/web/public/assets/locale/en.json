@@ -510,6 +510,7 @@
   },
   "resource_card": {
     "github_discussions": "GitHub Discussions",
+    "github_wiki": "GitHub WiKi",
     "legal": "Legal",
     "legal_desc": "By continuing to use this software you agree to the terms and conditions in the following documents.",
     "license": "License",
