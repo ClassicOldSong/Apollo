@@ -1711,8 +1711,7 @@ namespace video {
         }
       }
 
-      auto bitrate = ((config::video.max_bitrate > 0) ? std::min(config.bitrate, config::video.max_bitrate) : config.bitrate) * 1000;
-      BOOST_LOG(info) << "Streaming bitrate is " << bitrate;
+      auto bitrate = config.bitrate * 1000;
       ctx->rc_max_rate = bitrate;
       ctx->bit_rate = bitrate;
 

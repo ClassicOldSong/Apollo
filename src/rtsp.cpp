@@ -1007,12 +1007,44 @@ namespace rtsp_stream {
       if (config::video.limit_framerate) {
         config.monitor.encodingFramerate = session.fps;
       } else {
-        config.monitor.encodingFramerate = config.monitor.framerate * 1000;
+        if (config.monitor.framerate > 1000) {
+          config.monitor.encodingFramerate = config.monitor.framerate;
+        } else {
+          config.monitor.encodingFramerate = config.monitor.framerate * 1000;
+        }
+      }
+
+      // When fractional refresh rate requested from client side, it should be well above 1000fps
+      // 4000fps is when Warp2 Mode is enabled on the client, requested framerate can be actual * 4
+      if (config.monitor.framerate > 4000) {
+        config.monitor.framerate = std::round((float)config.monitor.framerate / 1000);
       }
 
       config.monitor.input_only = session.input_only;
 
       configuredBitrateKbps = util::from_view(args.at("x-ml-video.configuredBitrateKbps"sv));
+
+      if (!configuredBitrateKbps) {
+        configuredBitrateKbps = config.monitor.bitrate;
+      }
+
+      BOOST_LOG(info) << "Client Requested bitrate is [" << configuredBitrateKbps << "kbps]";
+
+      if (config::video.max_bitrate > 0) {
+        if (config::video.max_bitrate < configuredBitrateKbps) {
+          configuredBitrateKbps = config::video.max_bitrate;
+        }
+      }
+
+      BOOST_LOG(info) << "Host Streaming bitrate is [" << configuredBitrateKbps << "kbps]";
+
+      // Hack: Restore bitrate for warp mode
+      size_t warp_factor = std::round((float)config.monitor.framerate * 1000 / session.fps);
+      if (config::video.limit_framerate && warp_factor >= 2) {
+        configuredBitrateKbps *= warp_factor;
+        BOOST_LOG(info) << "Warp factor [" << warp_factor << "] engaged";
+      }
+
     } catch (std::out_of_range &) {
       respond(sock, session, &option, 400, "BAD REQUEST", req->sequenceNumber, {});
       return;
