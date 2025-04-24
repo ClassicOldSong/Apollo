@@ -13,6 +13,7 @@ namespace {
   using device_prep_t = display_device::SingleDisplayConfiguration::DevicePreparation;
 
   using hdr_option_e = config::video_t::dd_t::hdr_option_e;
+  using isolated_virtual_display_option_e = config::video_t::dd_t::isolated_virtual_display_option_e;
   using hdr_state_e = display_device::HdrState;
 
   using resolution_option_e = config::video_t::dd_t::resolution_option_e;

@@ -408,6 +408,19 @@ namespace config {
       return video_t::dd_t::hdr_option_e::disabled;  // Default to this if value is invalid
     }
 
+    video_t::dd_t::isolated_virtual_display_option_e isolated_virtual_display_option_from_view(const std::string_view value) {
+#define _CONVERT_2_ARG_(str, val) \
+  if (value == #str##sv) \
+  return video_t::dd_t::isolated_virtual_display_option_e::val
+#define _CONVERT_(x) _CONVERT_2_ARG_(x, x)
+      _CONVERT_(disabled);
+      _CONVERT_(enabled);
+#undef _CONVERT_
+#undef _CONVERT_2_ARG_
+      return video_t::dd_t::isolated_virtual_display_option_e::disabled;  // Default to this if value is invalid
+    }
+
+
     video_t::dd_t::mode_remapping_t mode_remapping_from_view(const std::string_view value) {
       const auto parse_entry_list {[](const auto &entry_list, auto &output_field) {
         for (auto &[_, entry] : entry_list) {
@@ -508,6 +521,7 @@ namespace config {
       video_t::dd_t::refresh_rate_option_e::automatic,  // refresh_rate_option
       {},  // manual_refresh_rate
       video_t::dd_t::hdr_option_e::automatic,  // hdr_option
+	  video_t::dd_t::isolated_virtual_display_option_e::disabled,
       3s,  // config_revert_delay
       {},  // config_revert_on_disconnect
       {},  // mode_remapping
@@ -1178,6 +1192,8 @@ namespace config {
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);
     string_f(vars, "dd_manual_resolution", video.dd.manual_resolution);
     generic_f(vars, "dd_refresh_rate_option", video.dd.refresh_rate_option, dd::refresh_rate_option_from_view);
+	generic_f(vars, "dd_isolated_virtual_display_option", video.dd.isolated_virtual_display_option, dd::isolated_virtual_display_option_from_view);
+	
     string_f(vars, "dd_manual_refresh_rate", video.dd.manual_refresh_rate);
     generic_f(vars, "dd_hdr_option", video.dd.hdr_option, dd::hdr_option_from_view);
     {

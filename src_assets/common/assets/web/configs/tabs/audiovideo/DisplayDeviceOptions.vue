@@ -123,7 +123,7 @@ function addRemappingEntry() {
                          v-model="config.dd_manual_refresh_rate" />
                 </div>
               </div>
-
+			  			  
               <!-- HDR option -->
               <div class="mb-3">
                 <label for="dd_hdr_option" class="form-label">
@@ -238,6 +238,18 @@ function addRemappingEntry() {
                   &plus; {{ $t('config.dd_mode_remapping_add') }}
                 </button>
               </div>
+			  
+			  <!-- Isolated Virtual Display -->
+              <div class="mb-3" v-if="config.dd_configuration_option !== 'disabled'">
+                <label for="dd_isolated_virtual_display_option" class="form-label">
+                  {{ $t('config.dd_isolated_virtual_display_option') }}
+                </label>
+                <select id="dd_isolated_virtual_display_option" class="form-select" v-model="config.dd_isolated_virtual_display_option">
+                  <option value="disabled">{{ $t('config.dd_isolated_virtual_display_option_disabled') }}</option>
+                  <option value="enabled">{{ $t('config.dd_isolated_virtual_display_option_enabled') }}</option>
+                </select>
+              </div>
+			  
             </div>
           </div>
         </div>
