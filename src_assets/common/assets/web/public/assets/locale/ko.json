@@ -51,7 +51,7 @@
     "env_app_name": "앱 이름",
     "env_client_audio_config": "클라이언트가 요청한 오디오 구성(2.0/5.1/7.1)",
     "env_client_enable_sops": "클라이언트가 최적의 스트리밍을 위해 게임 최적화 옵션을 요청했습니다(참/거짓).",
-    "env_client_fps": "클라이언트가 요청한 FPS * 1000 (int)",
+    "env_client_fps": "클라이언트가 요청한 FPS (float)",
     "env_client_gcmap": "요청된 게임패드 마스크, 비트셋/비트필드 형식(int)",
     "env_client_hdr": "클라이언트가 HDR을 활성화합니다(참/거짓).",
     "env_client_height": "클라이언트가 요청한 높이(int)",

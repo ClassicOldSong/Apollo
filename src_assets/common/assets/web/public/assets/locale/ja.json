@@ -51,7 +51,7 @@
     "env_app_name": "アプリ名",
     "env_client_audio_config": "クライアントから要求されたオーディオ設定 (2.0/5.1/7.1)",
     "env_client_enable_sops": "クライアントは最適なストリーミングのためにゲームを最適化するオプションを要求しています (true/false)",
-    "env_client_fps": "クライアントから要求された FPS (整数)",
+    "env_client_fps": "クライアントから要求された FPS (float)",
     "env_client_gcmap": "要求されたゲームパッドマスク、ビットセット/ビットフィールド形式にて指定 (int)",
     "env_client_hdr": "HDR はクライアントによって有効になっています (true/false)",
     "env_client_height": "クライアントから要求された高さ (整数)",

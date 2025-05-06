@@ -51,7 +51,7 @@
     "env_app_name": "Nazwa aplikacji",
     "env_client_audio_config": "Konfiguracja audio wymagana przez klienta (2.0/5.1/7.1)",
     "env_client_enable_sops": "Klient zażądał opcji optymalizacji gry pod kątem optymalnego strumienia (prawda/fałsz)",
-    "env_client_fps": "FPS żądane przez klienta (liczba całkowita)",
+    "env_client_fps": "FPS żądane przez klienta (float)",
     "env_client_gcmap": "Żądana maska kontrolera w formacie zestawu bitów/pola bitów (liczba całkowita)",
     "env_client_hdr": "HDR jest włączony przez klienta (prawda/fałsz)",
     "env_client_height": "Wysokość żądana przez klienta (liczba całkowita)",

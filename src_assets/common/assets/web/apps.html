@@ -333,62 +333,62 @@
               <td><b></b></td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_APP_ID</td>
+              <td style="font-family: monospace">APOLLO_APP_ID</td>
               <td>{{ $t('apps.env_app_id') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_APP_NAME</td>
+              <td style="font-family: monospace">APOLLO_APP_NAME</td>
               <td>{{ $t('apps.env_app_name') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_UID</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_UID</td>
               <td>{{ $t('apps.env_client_uid') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_NAME</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_NAME</td>
               <td>{{ $t('apps.env_client_name') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_WIDTH</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_WIDTH</td>
               <td>{{ $t('apps.env_client_width') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_HEIGHT</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_HEIGHT</td>
               <td>{{ $t('apps.env_client_height') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_FPS</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_FPS</td>
               <td>{{ $t('apps.env_client_fps') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_HDR</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_HDR</td>
               <td>{{ $t('apps.env_client_hdr') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_GCMAP</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_GCMAP</td>
               <td>{{ $t('apps.env_client_gcmap') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_HOST_AUDIO</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_HOST_AUDIO</td>
               <td>{{ $t('apps.env_client_host_audio') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_ENABLE_SOPS</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_ENABLE_SOPS</td>
               <td>{{ $t('apps.env_client_enable_sops') }}</td>
             </tr>
             <tr>
-              <td style="font-family: monospace">SUNSHINE_CLIENT_AUDIO_CONFIGURATION</td>
+              <td style="font-family: monospace">APOLLO_CLIENT_AUDIO_CONFIGURATION</td>
               <td>{{ $t('apps.env_client_audio_config') }}</td>
             </tr>
           </table>
           <div class="form-text" v-if="platform === 'windows'"><b>{{ $t('apps.env_qres_example') }}</b>
-            <pre>cmd /C &lt;{{ $t('apps.env_qres_path') }}&gt;\QRes.exe /X:%SUNSHINE_CLIENT_WIDTH% /Y:%SUNSHINE_CLIENT_HEIGHT% /R:%SUNSHINE_CLIENT_FPS%</pre>
+            <pre>cmd /C &lt;{{ $t('apps.env_qres_path') }}&gt;\QRes.exe /X:%APOLLO_CLIENT_WIDTH% /Y:%APOLLO_CLIENT_HEIGHT% /R:%APOLLO_CLIENT_FPS%</pre>
           </div>
           <div class="form-text" v-else-if="platform === 'linux'"><b>{{ $t('apps.env_xrandr_example') }}</b>
-            <pre>sh -c "xrandr --output HDMI-1 --mode \"${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT}\" --rate ${SUNSHINE_CLIENT_FPS}"</pre>
+            <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>
           </div>
           <div class="form-text" v-else-if="platform === 'macos'"><b>{{ $t('apps.env_displayplacer_example') }}</b>
-            <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHINE_CLIENT_HEIGHT} hz:${SUNSHINE_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
+            <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT} hz:${APOLLO_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
           </div>
           <div class="form-text"><a
               href="https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2app__examples.html"

@@ -51,7 +51,7 @@
     "env_app_name": "Nom de l'application",
     "env_client_audio_config": "La configuration audio demandée par le client (2.0/5.1/7.1)",
     "env_client_enable_sops": "Le client a activé l'option pour optimiser le jeu pour une diffusion optimale (true/false)",
-    "env_client_fps": "FPS demandé par le client (entier)",
+    "env_client_fps": "FPS demandé par le client (float)",
     "env_client_gcmap": "Le masque de manette demandé, au format bitset/bitfield (entier)",
     "env_client_hdr": "Le HDR est activé par le client (true/false)",
     "env_client_height": "La hauteur demandée par le client (entier)",

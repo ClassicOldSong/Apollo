@@ -325,7 +325,13 @@ namespace proc {
       return 503;
     }
 
+    std::string fps_str;
+    char fps_buf[8];
+    snprintf(fps_buf, sizeof(fps_buf), "%.3f", (float)launch_session->fps / 1000.0f);
+    fps_str = fps_buf;
+
     // Add Stream-specific environment variables
+    // Sunshine Compatibility
     _env["SUNSHINE_APP_ID"] = _app.id;
     _env["SUNSHINE_APP_NAME"] = _app.name;
     _env["SUNSHINE_CLIENT_UID"] = launch_session->unique_id;
@@ -335,11 +341,27 @@ namespace proc {
     _env["SUNSHINE_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
     _env["SUNSHINE_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
     _env["SUNSHINE_CLIENT_SCALE_FACTOR"] = std::to_string(scale_factor);
-    _env["SUNSHINE_CLIENT_FPS"] = std::to_string(launch_session->fps);
+    _env["SUNSHINE_CLIENT_FPS"] = fps_str;
     _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
     _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
     _env["SUNSHINE_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
     _env["SUNSHINE_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
+
+    _env["APOLLO_APP_ID"] = _app.id;
+    _env["APOLLO_APP_NAME"] = _app.name;
+    _env["APOLLO_CLIENT_UID"] = launch_session->unique_id;
+    _env["APOLLO_CLIENT_NAME"] = launch_session->device_name;
+    _env["APOLLO_CLIENT_WIDTH"] = std::to_string(render_width);
+    _env["APOLLO_CLIENT_HEIGHT"] = std::to_string(render_height);
+    _env["APOLLO_CLIENT_RENDER_WIDTH"] = std::to_string(launch_session->width);
+    _env["APOLLO_CLIENT_RENDER_HEIGHT"] = std::to_string(launch_session->height);
+    _env["APOLLO_CLIENT_SCALE_FACTOR"] = std::to_string(scale_factor);
+    _env["APOLLO_CLIENT_FPS"] = fps_str;
+    _env["APOLLO_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
+    _env["APOLLO_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
+    _env["APOLLO_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
+    _env["APOLLO_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
+
     int channelCount = launch_session->surround_info & (65535);
     switch (channelCount) {
       case 2:

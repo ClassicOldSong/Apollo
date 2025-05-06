@@ -51,7 +51,7 @@
     "env_app_name": "Nome app",
     "env_client_audio_config": "La configurazione audio richiesta dal client (2.0/5.1/7.1)",
     "env_client_enable_sops": "Se il client ha richiesto l'opzione \"Ottimizza le impostazioni del gioco per lo streaming\" (TRUE o FALSE)",
-    "env_client_fps": "FPS richiesti dal client * 1000 (int)",
+    "env_client_fps": "FPS richiesti dal client (float)",
     "env_client_gcmap": "La maschera del gamepad richiesta, in formato bitset/bitfield (int)",
     "env_client_hdr": "Se L'HDR è abilitato dal client (TRUE o FALSE)",
     "env_client_height": "L'altezza richiesta dal client (int)",

@@ -60,7 +60,7 @@
     "env_app_name": "Appens namn",
     "env_client_audio_config": "Ljudkonfigurationen begärd av klienten (2.0/5.1/7.1)",
     "env_client_enable_sops": "Klienten har begärt möjligheten att optimera spelet för optimal steaming\n(sant/falskt)",
-    "env_client_fps": "FPS begärd av klienten * 1000 (int)",
+    "env_client_fps": "FPS begärd av klienten (float)",
     "env_client_gcmap": "Den begärda gamepad masken, i bitset/bitfield format (int)",
     "env_client_hdr": "HDR är aktiverat av klienten (true/false)",
     "env_client_height": "Höjd som begärts av klienten (int)",

@@ -51,7 +51,7 @@
     "env_app_name": "Uygulama Adı",
     "env_client_audio_config": "İstemci tarafından talep edilen Ses Yapılandırması (2.0/5.1/7.1)",
     "env_client_enable_sops": "İstemci, oyunu optimum akış için optimize etme seçeneğini talep etti (doğru/yanlış)",
-    "env_client_fps": "İstemci tarafından talep edilen FPS * 1000 (int)",
+    "env_client_fps": "İstemci tarafından talep edilen FPS (float)",
     "env_client_gcmap": "İstenen kontrolcü maskesi, bit kümesi/bit alanı biçiminde (int)",
     "env_client_hdr": "HDR istemci tarafından etkinleştirildi (true/false)",
     "env_client_height": "İstemci tarafından talep edilen Yükseklik (int)",

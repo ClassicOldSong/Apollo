@@ -60,7 +60,7 @@
     "env_app_name": "Nome do Aplicativo",
     "env_client_audio_config": "A Configuração de Áudio solicitada pelo cliente (2.0/5.1/7.1)",
     "env_client_enable_sops": "O cliente solicitou a opção de otimizar o jogo para otimizar a transmissão (verdadeiro/falso)",
-    "env_client_fps": "O FPS solicitado pelo cliente * 1000 (inteiro)",
+    "env_client_fps": "O FPS solicitado pelo cliente (float)",
     "env_client_gcmap": "A máscara de gamepad solicitada, em um formato de campo de bits (inteiro)",
     "env_client_hdr": "O cliente solicita a ativação do HDR (verdadeiro/falso)",
     "env_client_height": "A Altura da tela solicitada pelo cliente (inteiro)",
