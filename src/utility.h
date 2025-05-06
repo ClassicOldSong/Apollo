@@ -377,7 +377,7 @@ namespace util {
         return (std::uint8_t) ch - '0';
       }
 
-      return (std::uint8_t)(ch | (char) 32) - 'a' + (char) 10;
+      return (std::uint8_t) (ch | (char) 32) - 'a' + (char) 10;
     };
 
     std::fill_n(buf + buf_size, padding, 0);
@@ -431,7 +431,7 @@ namespace util {
         return (std::uint8_t) ch - '0';
       }
 
-      return (std::uint8_t)(ch | (char) 32) - 'a' + (char) 10;
+      return (std::uint8_t) (ch | (char) 32) - 'a' + (char) 10;
     };
 
     for (auto &el : buf) {
@@ -509,12 +509,12 @@ namespace util {
     std::int64_t res {};
     std::int64_t mul = 1;
     while (begin != --end) {
-      res += (std::int64_t)(*end - '0') * mul;
+      res += (std::int64_t) (*end - '0') * mul;
 
       mul *= 10;
     }
 
-    return *begin != '-' ? res + (std::int64_t)(*begin - '0') * mul : -res;
+    return *begin != '-' ? res + (std::int64_t) (*begin - '0') * mul : -res;
   }
 
   inline std::int64_t from_view(const std::string_view &number) {
@@ -981,7 +981,7 @@ namespace util {
 
   template<class It>
   std::string_view view(It begin, It end) {
-    return std::string_view {(const char *) begin, (std::size_t)(end - begin)};
+    return std::string_view {(const char *) begin, (std::size_t) (end - begin)};
   }
 
   template<class T>
