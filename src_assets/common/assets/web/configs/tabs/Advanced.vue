@@ -43,6 +43,14 @@ const config = ref(props.config)
               default="true"
     ></Checkbox>
 
+    <!-- ENVVAR compatibility mode -->
+    <Checkbox class="mb-3"
+              id="envvar_compatibility_mode"
+              locale-prefix="config"
+              v-model="config.envvar_compatibility_mode"
+              default="false"
+    ></Checkbox>
+
     <!-- HEVC Support -->
     <div class="mb-3">
       <label for="hevc_mode" class="form-label">{{ $t('config.hevc_mode') }}</label>

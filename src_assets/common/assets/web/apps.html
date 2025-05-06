@@ -381,8 +381,13 @@
               <td>{{ $t('apps.env_client_audio_config') }}</td>
             </tr>
           </table>
-          <div class="form-text" v-if="platform === 'windows'"><b>{{ $t('apps.env_qres_example') }}</b>
-            <pre>cmd /C &lt;{{ $t('apps.env_qres_path') }}&gt;\QRes.exe /X:%APOLLO_CLIENT_WIDTH% /Y:%APOLLO_CLIENT_HEIGHT% /R:%APOLLO_CLIENT_FPS%</pre>
+
+          <div class="alert alert-info">
+            <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('apps.env_sunshine_compatibility') }}
+          </div>
+
+          <div class="form-text" v-if="platform === 'windows'"><b>{{ $t('apps.env_rtss_cli_example') }}</b>
+            <pre>cmd /C \path\to\rtss-cli.exe limit:set %APOLLO_CLIENT_FPS%</pre>
           </div>
           <div class="form-text" v-else-if="platform === 'linux'"><b>{{ $t('apps.env_xrandr_example') }}</b>
             <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>

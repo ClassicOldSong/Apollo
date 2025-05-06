@@ -577,6 +577,7 @@ namespace config {
     false, // hide_tray_controls
     true, // enable_pairing
     true, // enable_discovery
+    false, // envvar_compatibility_mode
     "en",  // locale
     2,  // min_log_level
     0,  // flags
@@ -1279,6 +1280,7 @@ namespace config {
     bool_f(vars, "hide_tray_controls", sunshine.hide_tray_controls);
     bool_f(vars, "enable_pairing", sunshine.enable_pairing);
     bool_f(vars, "enable_discovery", sunshine.enable_discovery);
+    bool_f(vars, "envvar_compatibility_mode", sunshine.envvar_compatibility_mode);
     bool_f(vars, "notify_pre_releases", sunshine.notify_pre_releases);
 
     int port = sunshine.port;
