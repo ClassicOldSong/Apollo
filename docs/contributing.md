@@ -16,7 +16,7 @@ Read our contribution guide in our organization level
 * [EJS](https://www.npmjs.com/package/vite-plugin-ejs) is used as a templating system for the pages
   (check `template_header.html` and `template_header_main.html`).
 * The Style System is provided by [Bootstrap](https://getbootstrap.com).
-* The JS framework used by the more interactive pages is [Vus.js](https://vuejs.org).
+* The JS framework used by the more interactive pages is [Vue.js](https://vuejs.org).
 
 #### Building
 

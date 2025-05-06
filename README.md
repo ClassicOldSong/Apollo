@@ -75,73 +75,15 @@ SDR actually provides much more stable color accuracy, and are widely supported 
 
 Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
 
-## Stuttering Clinic
-
-Here're some common causes and solutions for stutters. Future updates about stuttering research will be added in [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic). 
-
-- **Periodic micro stutters**
-  + Usually caused by frame rate mismatch, like requested 60fps but the client is only 59.94hz.
-  + Checkout [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Display-Mode-Override) for instructions on how to override the requested frame rate in Apollo.
-  + When the frame rate actually matches, you might need to enable VSync or limit frame rate of the game to the same as the requested refresh rate on your host. Client side VSync not that important then, the decoding latency won't go up for VSync if host side and client side matched exactly.
-- **Periodic hiccups**
-  + Check your monitor/display cable. Some monitors/fiber HDMI cables/HDMI switches probe connections actively, they'll cause the GPU to reinitialize context every time they do so, and stream will be renintialized as well causing a big hiccup.
-  + To fix the problem, leave the problematic display open during stream seems always work but it's not ideal.
-  + You can also try truning off the problematic display physically, or pull their cable off **from the GPU side**.
-  + Some monitors can get the behavior turned off: https://www.reddit.com/r/MoonlightStreaming/comments/1hw5ukh/comment/mjcnlsi
-    > One of my monitors has a setting to "Auto Detect Input" and when I turned this off the stuttering is now gone! Even when the monitor is disconnected via software (Windows Display Settings)
-- **Random "Slow Network" warnings**
-  + Commonly seen on SteamDeck, turn off power saving on the WiFi card seems to be fixing the issue.
-  + If still not working, toggle your WiFi connection may fix it temporarily.
-- **Stutter when image starts moving, then gets fine**
-  + Power saving issue on WiFi cards as well. Typically seen on MTK cards, their default behavior saves power aggressively.
-  + Go to Device Manager, find your WiFi adapter, right click, select `Properties`, find `Power Saving` related options and turn them off.
-- **Other weird uncatagorized symptons**
-  + AMD CPUs paired with Nvidia GPUs sometimes don't work so well. No exact cause found, nor proper solutions to this problem. Workaround is enable "Double refresh rate" mode in `Audio/Video` tab, and limit your game to the requested refresh rate using RTSS or NVCP.
-  + [TBD]
-
 ## FAQ
+Moved to [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/FAQ)
 
-- **No virtual display added**
-  - Ensure the SudoVDA driver is installed
-- **Shows the same screen as main screen**
-  - If you're using an external display for the first time, Windows might configure it as "Mirror mode" by default. Press <kbd>Meta + P</kbd> (or known as <kbd>Win + P</kbd>) and select "Extended", then **exit the app** (not only the stream) and start the app again. You only need to do this once.
-- **Apps still launch on physical display.**
-  - If you don't need to set resolution on your physical display, you can disable the whole advanced config. Then exit Apollo, check if there's a file named "display_device.state", if so remove it, then start Apollo again.
+## Stuttering Clinic
+Here're some common causes and solutions for stutters: [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic).
 
-    Then when you stream just disable the physical display in Windows settings. It'll then be managed by Windows.
-  - Or you can go to `Audio/Video` tab, in `Advanced display device options` section, set `Device configuration` to `Activate the display automatically and make it a primary display`. Also make sure the app has set preferred display to `None` or `Auto`. This method is not recommended though, as it may fail due to misterious reasons and are sure can mess up your configs.
-- **Primary display changed to the virtual display after connection. I don't want that.**
-  - Go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Disabled` or `Verify that display is enabled` or `Activate the display automatically`. Then go to Windows display settings and set your desired display to primary.
-- **I want to turn off the physical monitor when streaming**
-  - The first time you stream with virtual display, go to Windows settings and disable the physical monitor. The next time you start streaming it will turn off automatically.
-  - Or, go to `Audio/Video` tab, in `Advanced display device option`s section, set `Devce configuration` to `Deactivate other displays and activate only the specified display`.
-- **I want all apps to start in virtual display**
-  - Simply enable `Headless Mode` in `Audio/Video` tab. Make sure you have set the encoder capability manually in `Advanced` tab.
-- **Client says Host doesn't support HDR/444 but it actually does**
-  - This only happens when you enabled `Headless Mode`. The initial capability probing is skipped during startup and is performed on the first connection.
-  - If you don't mind, quit and enter the stream again should fix the problem, or just go to `Advanced` tab and set the advertised capability to `Always advertise` based on the actual capability of your GPU in use.
-- **Virtual Display entry does not run any commands**
-  - The Virtual Display entry also acts as a safe mode entry, so all commands and customizations are disabled for it.
-  - If you want specific app to use virtual display, just enable `Always use Virtual Display` option for it.
-- **HDR isn't enabled when using battery**
-  - Check out [To play HDR content when running on battery](https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6)
-  - [Archive](https://web.archive.org/web/20240828044038/https://support.microsoft.com/en-us/windows/hdr-settings-in-windows-2d767185-38ec-7fdc-6f97-bbc6c5ef24e6) to the above link in case M$ remove it unexpectedly someday
-- **Resolution can't match client side request anymore**
-  - ***NEVER*** set screen rotation on virtual displays! Apollo can handle vertical display normally, there's no need to manually set screen rotation if you're using [Artemis](https://github.com/ClassicOldSong/moonlight-android) with Apollo.
-  - If you happen messed up with your monitor config:
-    1. Disconnect ALL Artemis/Moonlight sessions
-    2. Quit Apollo
-    3. <kbd>Meta(Win) + R</kbd>, then type `regedit`, hit enter
-    4. Delete ALL entries under
-        - `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\Configuration`
-        - `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\Connectivity`
-        - `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GraphicsDrivers\ScaleFactors`
-
-    This will clear your monitor configuration cache.
-
-    Then you're good to go!
-- **I would like to capture sound from only one app.**
-  - Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Stream-audio-from-only-one-app)
+## Device specific setups
+- Pixel devices might not be able to use native resolution:
+  - Change the device resolution to High: https://github.com/ClassicOldSong/Apollo/issues/700
 
 ## System Requirements
 
