@@ -66,7 +66,7 @@
     "env_client_height": "Höjd som begärts av klienten (int)",
     "env_client_host_audio": "Klienten har begärt värdljud (true/false)",
     "env_client_width": "Bredden begärd av klienten (int)",
-    "env_client_uid": "UID för klienten som startar strömmen (int)",
+    "env_client_uuid": "UID för klienten som startar strömmen (int)",
     "env_client_name": "Namn på klienten som startar strömmen (string)",
     "env_displayplacer_example": "Exempel - en displayplacer för automatiserad upplösning:",
     "env_qres_example": "Exempel - QRes för upplösningsautomatisering:",

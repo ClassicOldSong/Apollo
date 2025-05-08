@@ -66,7 +66,7 @@
     "env_client_height": "A Altura da tela solicitada pelo cliente (inteiro)",
     "env_client_host_audio": "O cliente solicitou o áudio do servidor (verdadeiro/falso)",
     "env_client_width": "A Largura da tela solicitada pelo cliente (inteiro)",
-    "env_client_uid": "UID do cliente iniciando a transmissão (texto)",
+    "env_client_uuid": "UID do cliente iniciando a transmissão (texto)",
     "env_client_name": "Nome do cliente iniciando a transmissão (texto)",
     "env_displayplacer_example": "Exemplo - displayplacer para Automação de Resolução:",
     "env_qres_example": "Exemplo - QRes para Automação de Resolução:",
