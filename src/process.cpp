@@ -344,6 +344,7 @@ namespace proc {
 
     _env["APOLLO_APP_ID"] = _app.id;
     _env["APOLLO_APP_NAME"] = _app.name;
+    _env["APOLLO_APP_UUID"] = _app.uuid;
     _env["APOLLO_CLIENT_UUID"] = launch_session->unique_id;
     _env["APOLLO_CLIENT_NAME"] = launch_session->device_name;
     _env["APOLLO_CLIENT_WIDTH"] = std::to_string(render_width);

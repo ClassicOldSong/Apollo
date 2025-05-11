@@ -58,6 +58,7 @@
     "edit": "Edit",
     "env_app_id": "App ID",
     "env_app_name": "App Name",
+    "env_app_uuid": "App UUID",
     "env_client_audio_config": "The Audio Configuration requested by the client (2.0/5.1/7.1)",
     "env_client_enable_sops": "The client has requested the option to optimize the game for optimal streaming (true/false)",
     "env_client_fps": "The FPS requested by the client (float)",
