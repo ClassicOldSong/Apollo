@@ -350,6 +350,12 @@ namespace video {
   bool validate_encoder(encoder_t &encoder, bool expect_failure);
 
   /**
+   * @brief Check if we can allow probing for the encoders.
+   * @return True if there should be no issues with the probing, false if we should prevent it.
+   */
+  bool allow_encoder_probing();
+
+  /**
    * @brief Probe encoders and select the preferred encoder.
    * This is called once at startup and each time a stream is launched to
    * ensure the best encoder is selected. Encoder availability can change

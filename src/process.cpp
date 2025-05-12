@@ -223,7 +223,12 @@ namespace proc {
     });
 
 #ifdef _WIN32
-    if (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display) {
+    if (
+      config::video.headless_mode        // Headless mode
+      || launch_session->virtual_display // User requested virtual display
+      || _app.virtual_display            // App is configured to use virtual display
+      || !video::allow_encoder_probing() // No active display presents
+    ) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
         initVDisplayDriver();
