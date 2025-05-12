@@ -56,7 +56,7 @@
     "detached_cmds_desc": "A list of commands to be run in the background.",
     "detached_cmds_note": "If the path to the command executable contains spaces, you must enclose it in quotes.",
     "edit": "Edit",
-    "env_app_id": "App ID",
+    "env_app_id": "App ID (legacy)",
     "env_app_name": "App Name",
     "env_app_uuid": "App UUID",
     "env_client_audio_config": "The Audio Configuration requested by the client (2.0/5.1/7.1)",

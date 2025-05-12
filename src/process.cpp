@@ -44,8 +44,9 @@
 #endif
 
 #define DEFAULT_APP_IMAGE_PATH SUNSHINE_ASSETS_DIR "/box.png"
-#define REMOTE_INPUT_UUID "8CB5C136-DA67-4F99-B4A1-F9CD35005CF4"
 #define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
+#define FALLBACK_DESKTOP_UUID "EAAC6159-089A-46A9-9E24-6436885F6610"
+#define REMOTE_INPUT_UUID "8CB5C136-DA67-4F99-B4A1-F9CD35005CF4"
 #define TERMINATE_APP_UUID "E16CBE1B-295D-4632-9A76-EC4180C857D3"
 
 namespace proc {
@@ -1075,14 +1076,6 @@ namespace proc {
   }
 
   std::optional<proc::proc_t> parse(const std::string &file_name) {
-    static uint8_t fail_count = 0;
-
-    fail_count += 1;
-
-    if (fail_count > 3) {
-      BOOST_LOG(warning) << "Couldn't parse/migrate apps.json properly! Apps will not be loaded."sv;
-      return std::nullopt;
-    }
 
     // Prepare environment variables.
     auto this_env = boost::this_process::environment();
@@ -1090,6 +1083,211 @@ namespace proc {
     std::set<std::string> ids;
     std::vector<proc::ctx_t> apps;
     int i = 0;
+
+    size_t fail_count = 0;
+    do {
+      // Virtual Display entry
+    #ifdef _WIN32
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        proc::ctx_t ctx;
+        ctx.uuid = VIRTUAL_DISPLAY_UUID;
+        ctx.name = "Virtual Display";
+        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+        ctx.virtual_display = true;
+        ctx.scale_factor = 100;
+        ctx.use_app_identity = false;
+        ctx.per_client_app_identity = false;
+        ctx.allow_client_commands = false;
+
+        ctx.elevated = false;
+        ctx.auto_detach = true;
+        ctx.wait_all = false;
+        ctx.exit_timeout = 5s;
+
+        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+        if (ids.count(std::get<0>(possible_ids)) == 0) {
+          // Avoid using index to generate id if possible
+          ctx.id = std::get<0>(possible_ids);
+        }
+        else {
+          // Fallback to include index on collision
+          ctx.id = std::get<1>(possible_ids);
+        }
+        ids.insert(ctx.id);
+
+        apps.emplace_back(std::move(ctx));
+      }
+    #endif
+
+      // Read the JSON file into a tree.
+      nlohmann::json tree;
+      try {
+        std::string content = file_handler::read_file(file_name.c_str());
+        tree = nlohmann::json::parse(content);
+      } catch (const std::exception& e) {
+        BOOST_LOG(warning) << "Couldn't read apps.json properly! Apps will not be loaded."sv;
+        break;
+      }
+
+      try {
+        migrate(tree, file_name);
+
+        if (tree.contains("env") && tree["env"].is_object()) {
+          for (auto &item : tree["env"].items()) {
+            this_env[item.key()] = parse_env_val(this_env, item.value().get<std::string>());
+          }
+        }
+
+        // Ensure the "apps" array exists.
+        if (!tree.contains("apps") || !tree["apps"].is_array()) {
+          BOOST_LOG(warning) << "No apps were defined in apps.json!!!"sv;
+          break;
+        }
+
+        // Iterate over each application in the "apps" array.
+        for (auto &app_node : tree["apps"]) {
+          proc::ctx_t ctx;
+          ctx.uuid = app_node.at("uuid");
+
+          // Build the list of preparation commands.
+          std::vector<proc::cmd_t> prep_cmds;
+          bool exclude_global_prep = app_node.value("exclude-global-prep-cmd", false);
+          if (!exclude_global_prep) {
+            prep_cmds.reserve(config::sunshine.prep_cmds.size());
+            for (auto &prep_cmd : config::sunshine.prep_cmds) {
+              auto do_cmd = parse_env_val(this_env, prep_cmd.do_cmd);
+              auto undo_cmd = parse_env_val(this_env, prep_cmd.undo_cmd);
+              prep_cmds.emplace_back(
+                std::move(do_cmd),
+                std::move(undo_cmd),
+                std::move(prep_cmd.elevated)
+              );
+            }
+          }
+          if (app_node.contains("prep-cmd") && app_node["prep-cmd"].is_array()) {
+            for (auto &prep_node : app_node["prep-cmd"]) {
+              std::string do_cmd = parse_env_val(this_env, prep_node.value("do", ""));
+              std::string undo_cmd = parse_env_val(this_env, prep_node.value("undo", ""));
+              bool elevated = prep_node.value("elevated", false);
+              prep_cmds.emplace_back(
+                std::move(do_cmd),
+                std::move(undo_cmd),
+                std::move(elevated)
+              );
+            }
+          }
+
+          // Build the list of detached commands.
+          std::vector<std::string> detached;
+          if (app_node.contains("detached") && app_node["detached"].is_array()) {
+            for (auto &detached_val : app_node["detached"]) {
+              detached.emplace_back(parse_env_val(this_env, detached_val.get<std::string>()));
+            }
+          }
+
+          // Process other fields.
+          if (app_node.contains("output"))
+            ctx.output = parse_env_val(this_env, app_node.value("output", ""));
+          std::string name = parse_env_val(this_env, app_node.value("name", ""));
+          if (app_node.contains("cmd"))
+            ctx.cmd = parse_env_val(this_env, app_node.value("cmd", ""));
+          if (app_node.contains("working-dir")) {
+            ctx.working_dir = parse_env_val(this_env, app_node.value("working-dir", ""));
+    #ifdef _WIN32
+            // The working directory, unlike the command itself, should not be quoted.
+            boost::erase_all(ctx.working_dir, "\"");
+            ctx.working_dir += '\\';
+    #endif
+          }
+          if (app_node.contains("image-path"))
+            ctx.image_path = parse_env_val(this_env, app_node.value("image-path", ""));
+
+          ctx.elevated = app_node.value("elevated", false);
+          ctx.auto_detach = app_node.value("auto-detach", true);
+          ctx.wait_all = app_node.value("wait-all", true);
+          ctx.exit_timeout = std::chrono::seconds { app_node.value("exit-timeout", 5) };
+          ctx.virtual_display = app_node.value("virtual-display", false);
+          ctx.scale_factor = app_node.value("scale-factor", 100);
+          ctx.use_app_identity = app_node.value("use-app-identity", false);
+          ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
+          ctx.allow_client_commands = app_node.value("allow-client-commands", true);
+
+          // Calculate a unique application id.
+          auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
+          if (ids.count(std::get<0>(possible_ids)) == 0) {
+            ctx.id = std::get<0>(possible_ids);
+          } else {
+            ctx.id = std::get<1>(possible_ids);
+          }
+          ids.insert(ctx.id);
+
+          ctx.name = std::move(name);
+          ctx.prep_cmds = std::move(prep_cmds);
+          ctx.detached = std::move(detached);
+
+          apps.emplace_back(std::move(ctx));
+        }
+
+        fail_count = 0;
+      } catch (std::exception &e) {
+        BOOST_LOG(error) << "Error happened during app loading: "sv << e.what();
+
+        fail_count += 1;
+
+        if (fail_count >= 3) {
+          // No hope for recovering
+          BOOST_LOG(warning) << "Couldn't parse/migrate apps.json properly! Apps will not be loaded."sv;
+          break;
+        }
+
+        BOOST_LOG(warning) << "App format is still invalid! Trying to re-migrate the app list..."sv;
+
+        // Always try migrating from scratch when error happened
+        tree["version"] = 0;
+
+        try {
+          migrate(tree, file_name);
+        } catch (std::exception &e) {
+          BOOST_LOG(error) << "Error happened during migration: "sv << e.what();
+          break;
+        }
+
+        continue;
+      }
+
+      break;
+    } while (fail_count < 3);
+
+    if (fail_count > 0) {
+      BOOST_LOG(warning) << "No applications configured, adding fallback Desktop entry.";
+      proc::ctx_t ctx;
+      ctx.uuid = FALLBACK_DESKTOP_UUID; // Placeholder UUID
+      ctx.name = "Desktop (fallback)";
+      ctx.image_path = parse_env_val(this_env, "desktop-alt.png");
+      ctx.virtual_display = false;
+      ctx.scale_factor = 100;
+      ctx.use_app_identity = false;
+      ctx.per_client_app_identity = false;
+      ctx.allow_client_commands = false;
+
+      ctx.elevated = false;
+      ctx.auto_detach = true;
+      ctx.wait_all = false; // Desktop doesn't have a specific command to wait for
+      ctx.exit_timeout = 5s;
+
+      // Calculate unique ID
+      auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+      if (ids.count(std::get<0>(possible_ids)) == 0) {
+        // Avoid using index to generate id if possible
+        ctx.id = std::get<0>(possible_ids);
+      } else {
+        // Fallback to include index on collision
+        ctx.id = std::get<1>(possible_ids);
+      }
+      ids.insert(ctx.id);
+
+      apps.emplace_back(std::move(ctx));
+    }
 
     if (config::input.enable_input_only_mode) {
       // Input Only entry
@@ -1161,160 +1359,6 @@ namespace proc {
       }
     }
 
-    // Virtual Display entry
-  #ifdef _WIN32
-    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
-      proc::ctx_t ctx;
-      ctx.uuid = VIRTUAL_DISPLAY_UUID;
-      ctx.name = "Virtual Display";
-      ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
-      ctx.virtual_display = true;
-      ctx.scale_factor = 100;
-      ctx.use_app_identity = false;
-      ctx.per_client_app_identity = false;
-      ctx.allow_client_commands = false;
-
-      ctx.elevated = false;
-      ctx.auto_detach = true;
-      ctx.wait_all = true;
-      ctx.exit_timeout = 5s;
-
-      auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-      if (ids.count(std::get<0>(possible_ids)) == 0) {
-        // Avoid using index to generate id if possible
-        ctx.id = std::get<0>(possible_ids);
-      }
-      else {
-        // Fallback to include index on collision
-        ctx.id = std::get<1>(possible_ids);
-      }
-      ids.insert(ctx.id);
-
-      apps.emplace_back(std::move(ctx));
-    }
-  #endif
-
-    // Read the JSON file into a tree.
-    nlohmann::json tree;
-    try {
-      std::string content = file_handler::read_file(file_name.c_str());
-      tree = nlohmann::json::parse(content);
-    } catch (const std::exception& e) {
-      BOOST_LOG(warning) << "Couldn't read apps.json properly! Apps will not be loaded."sv;
-      return std::nullopt;
-    }
-
-    try {
-      migrate(tree, file_name);
-
-      if (tree.contains("env") && tree["env"].is_object()) {
-        for (auto &item : tree["env"].items()) {
-          this_env[item.key()] = parse_env_val(this_env, item.value().get<std::string>());
-        }
-      }
-
-      // Ensure the "apps" array exists.
-      if (!tree.contains("apps") || !tree["apps"].is_array()) {
-        BOOST_LOG(warning) << "No apps were defined in apps.json!!!"sv;
-        return std::nullopt;
-      }
-
-      // Iterate over each application in the "apps" array.
-      for (auto &app_node : tree["apps"]) {
-        proc::ctx_t ctx;
-        ctx.uuid = app_node.at("uuid");
-
-        // Build the list of preparation commands.
-        std::vector<proc::cmd_t> prep_cmds;
-        bool exclude_global_prep = app_node.value("exclude-global-prep-cmd", false);
-        if (!exclude_global_prep) {
-          prep_cmds.reserve(config::sunshine.prep_cmds.size());
-          for (auto &prep_cmd : config::sunshine.prep_cmds) {
-            auto do_cmd = parse_env_val(this_env, prep_cmd.do_cmd);
-            auto undo_cmd = parse_env_val(this_env, prep_cmd.undo_cmd);
-            prep_cmds.emplace_back(
-              std::move(do_cmd),
-              std::move(undo_cmd),
-              std::move(prep_cmd.elevated)
-            );
-          }
-        }
-        if (app_node.contains("prep-cmd") && app_node["prep-cmd"].is_array()) {
-          for (auto &prep_node : app_node["prep-cmd"]) {
-            std::string do_cmd = parse_env_val(this_env, prep_node.value("do", ""));
-            std::string undo_cmd = parse_env_val(this_env, prep_node.value("undo", ""));
-            bool elevated = prep_node.value("elevated", false);
-            prep_cmds.emplace_back(
-              std::move(do_cmd),
-              std::move(undo_cmd),
-              std::move(elevated)
-            );
-          }
-        }
-
-        // Build the list of detached commands.
-        std::vector<std::string> detached;
-        if (app_node.contains("detached") && app_node["detached"].is_array()) {
-          for (auto &detached_val : app_node["detached"]) {
-            detached.emplace_back(parse_env_val(this_env, detached_val.get<std::string>()));
-          }
-        }
-
-        // Process other fields.
-        if (app_node.contains("output"))
-          ctx.output = parse_env_val(this_env, app_node.value("output", ""));
-        std::string name = parse_env_val(this_env, app_node.value("name", ""));
-        if (app_node.contains("cmd"))
-          ctx.cmd = parse_env_val(this_env, app_node.value("cmd", ""));
-        if (app_node.contains("working-dir")) {
-          ctx.working_dir = parse_env_val(this_env, app_node.value("working-dir", ""));
-  #ifdef _WIN32
-          // The working directory, unlike the command itself, should not be quoted.
-          boost::erase_all(ctx.working_dir, "\"");
-          ctx.working_dir += '\\';
-  #endif
-        }
-        if (app_node.contains("image-path"))
-          ctx.image_path = parse_env_val(this_env, app_node.value("image-path", ""));
-
-        ctx.elevated = app_node.value("elevated", false);
-        ctx.auto_detach = app_node.value("auto-detach", true);
-        ctx.wait_all = app_node.value("wait-all", true);
-        ctx.exit_timeout = std::chrono::seconds { app_node.value("exit-timeout", 5) };
-        ctx.virtual_display = app_node.value("virtual-display", false);
-        ctx.scale_factor = app_node.value("scale-factor", 100);
-        ctx.use_app_identity = app_node.value("use-app-identity", false);
-        ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
-        ctx.allow_client_commands = app_node.value("allow-client-commands", true);
-
-        // Calculate a unique application id.
-        auto possible_ids = calculate_app_id(name, ctx.image_path, i++);
-        if (ids.count(std::get<0>(possible_ids)) == 0) {
-          ctx.id = std::get<0>(possible_ids);
-        } else {
-          ctx.id = std::get<1>(possible_ids);
-        }
-        ids.insert(ctx.id);
-
-        ctx.name = std::move(name);
-        ctx.prep_cmds = std::move(prep_cmds);
-        ctx.detached = std::move(detached);
-
-        apps.emplace_back(std::move(ctx));
-      }
-    } catch (std::exception &e) {
-      BOOST_LOG(error) << "Error happened during app loading: "sv << e.what();
-
-      BOOST_LOG(warning) << "App format is still invalid! Trying to re-migrate the app list..."sv;
-      fail_count += 1;
-      tree["version"] = 0;
-      migrate(tree, file_name);
-
-      return parse(file_name);
-    }
-
-    fail_count = 0;
-
     return proc::proc_t {
       std::move(this_env),
       std::move(apps)
@@ -1323,9 +1367,17 @@ namespace proc {
 
   void refresh(const std::string &file_name) {
     proc.terminate();
+
   #ifdef _WIN32
-    if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
+    size_t fail_count = 0;
+    while (fail_count < 5 && vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
       initVDisplayDriver();
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        break;
+      }
+
+      fail_count += 1;
+      std::this_thread::sleep_for(1s);
     }
   #endif
 

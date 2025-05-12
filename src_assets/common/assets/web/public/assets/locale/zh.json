@@ -56,7 +56,7 @@
     "detached_cmds_desc": "要在后台运行的命令列表。",
     "detached_cmds_note": "如果命令可执行文件的路径包含空格，您必须在引号里将其贴出。",
     "edit": "编辑",
-    "env_app_id": "应用 ID",
+    "env_app_id": "应用 ID (已弃用)",
     "env_app_name": "应用名称",
     "env_app_uuid": "应用 UUID",
     "env_client_audio_config": "客户端请求的音频配置 (2.0/5.1/7.1)",
