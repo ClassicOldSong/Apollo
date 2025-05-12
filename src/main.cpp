@@ -20,8 +20,15 @@
 #include "process.h"
 #include "system_tray.h"
 #include "upnp.h"
+#include "uuid.h"
 #include "version.h"
 #include "video.h"
+
+#ifdef _WIN32
+  #include "platform/windows/virtual_display.h"
+#endif
+
+#define PROBE_DISPLAY_UUID "38F72B96-B00C-4F21-8B6C-E1BFF1602B0E"
 
 extern "C" {
 #include "rswrapper.h"
@@ -307,9 +314,35 @@ int main(int argc, char *argv[]) {
     BOOST_LOG(warning) << "No gamepad input is available"sv;
   }
 
-  // Do not probe encoders on startup if headless mode is enabled
-  if (!config::video.headless_mode && video::probe_encoders()) {
+  if (video::probe_encoders()) {
+#ifdef _WIN32
+    // Create a temporary virtual display for encoder capability probing if no active display was found
+    if (!video::allow_encoder_probing() && proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+      std::string probe_uuid_str = PROBE_DISPLAY_UUID;
+      auto probe_uuid = uuid_util::uuid_t::parse(probe_uuid_str);
+      auto* probe_guid = (GUID*)(void*)&probe_uuid;
+
+      VDISPLAY::createVirtualDisplay(
+        probe_uuid_str.c_str(),
+        "Probe",
+        800,
+        600,
+        60,
+        *probe_guid
+      );
+
+      // Probe again anyways
+      if (video::probe_encoders()) {
+        BOOST_LOG(error) << "Video failed to find working encoder"sv;
+      }
+
+      VDISPLAY::removeVirtualDisplay(*probe_guid);
+    } else {
+      BOOST_LOG(error) << "Video failed to find working encoder"sv;
+    }
+#else
     BOOST_LOG(error) << "Video failed to find working encoder"sv;
+#endif
   }
 
   if (http::init()) {
