@@ -25,6 +25,7 @@
 #include "video.h"
 
 #ifdef _WIN32
+  #include "platform/windows/misc.h"
   #include "platform/windows/virtual_display.h"
 #endif
 
@@ -321,6 +322,12 @@ int main(int argc, char *argv[]) {
       std::string probe_uuid_str = PROBE_DISPLAY_UUID;
       auto probe_uuid = uuid_util::uuid_t::parse(probe_uuid_str);
       auto* probe_guid = (GUID*)(void*)&probe_uuid;
+
+      BOOST_LOG(info) << "Creating a temporary virtual display to probe for encoders..."sv;
+
+      if (!config::video.adapter_name.empty()) {
+        VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
+      }
 
       VDISPLAY::createVirtualDisplay(
         probe_uuid_str.c_str(),
