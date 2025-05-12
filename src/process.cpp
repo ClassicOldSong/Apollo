@@ -286,6 +286,10 @@ namespace proc {
           target_fps *= 2;
         }
 
+        // No matter we get the display name or not, the virtual display might still be created.
+        // We need to track it properly to remove the display when the session terminates.
+        launch_session->virtual_display = true;
+
         if (!vdisplayName.empty()) {
           BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
 
@@ -304,8 +308,11 @@ namespace proc {
 
           config::video.output_name = display_device::map_display_name(this->display_name);
         } else {
-          BOOST_LOG(warning) << "Virtual Display creation failed!";
+          BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
         }
+      } else {
+        // Driver isn't working so we don't need to track virtual display.
+        launch_session->virtual_display = false;
       }
     }
 
@@ -620,12 +627,14 @@ namespace proc {
       }
     }
 
-    bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && this->virtual_display;
+    bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && _launch_session->virtual_display;
     if (used_virtual_display) {
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
         BOOST_LOG(info) << "Virtual Display removed successfully";
+      } else if (this->virtual_display) {
+        BOOST_LOG(warning) << "Virtual Display remove failed";
       } else {
-        BOOST_LOG(info) << "Virtual Display remove failed";
+        BOOST_LOG(warning) << "Virtual Display remove failed, but it seems it was not created correctly either.";
       }
     }
 
