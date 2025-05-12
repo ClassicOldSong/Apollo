@@ -1089,6 +1089,7 @@ namespace nvhttp {
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
         app_node.put("AppTitle"s, app.name);
         app_node.put("UUID", app.uuid);
+        app_node.put("IDX", app.idx);
         app_node.put("ID", app.id);
 
         apps.push_back(std::make_pair("App", std::move(app_node)));
@@ -1101,6 +1102,7 @@ namespace nvhttp {
       app_node.put("IsHdrSupported"s, 0);
       app_node.put("AppTitle"s, "Permission Denied");
       app_node.put("UUID", "");
+      app_node.put("IDX", "0");
       app_node.put("ID", "114514");
 
       apps.push_back(std::make_pair("App", std::move(app_node)));

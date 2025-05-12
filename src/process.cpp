@@ -1100,39 +1100,6 @@ namespace proc {
 
     size_t fail_count = 0;
     do {
-      // Virtual Display entry
-    #ifdef _WIN32
-      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
-        proc::ctx_t ctx;
-        ctx.uuid = VIRTUAL_DISPLAY_UUID;
-        ctx.name = "Virtual Display";
-        ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
-        ctx.virtual_display = true;
-        ctx.scale_factor = 100;
-        ctx.use_app_identity = false;
-        ctx.per_client_app_identity = false;
-        ctx.allow_client_commands = false;
-
-        ctx.elevated = false;
-        ctx.auto_detach = true;
-        ctx.wait_all = false;
-        ctx.exit_timeout = 5s;
-
-        auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
-        if (ids.count(std::get<0>(possible_ids)) == 0) {
-          // Avoid using index to generate id if possible
-          ctx.id = std::get<0>(possible_ids);
-        }
-        else {
-          // Fallback to include index on collision
-          ctx.id = std::get<1>(possible_ids);
-        }
-        ids.insert(ctx.id);
-
-        apps.emplace_back(std::move(ctx));
-      }
-    #endif
-
       // Read the JSON file into a tree.
       nlohmann::json tree;
       try {
@@ -1161,6 +1128,7 @@ namespace proc {
         // Iterate over each application in the "apps" array.
         for (auto &app_node : tree["apps"]) {
           proc::ctx_t ctx;
+          ctx.idx = std::to_string(i);
           ctx.uuid = app_node.at("uuid");
 
           // Build the list of preparation commands.
@@ -1266,6 +1234,11 @@ namespace proc {
           break;
         }
 
+        this_env = boost::this_process::environment();
+        ids.clear();
+        apps.clear();
+        i = 0;
+
         continue;
       }
 
@@ -1275,6 +1248,7 @@ namespace proc {
     if (fail_count > 0) {
       BOOST_LOG(warning) << "No applications configured, adding fallback Desktop entry.";
       proc::ctx_t ctx;
+      ctx.idx = std::to_string(i);
       ctx.uuid = FALLBACK_DESKTOP_UUID; // Placeholder UUID
       ctx.name = "Desktop (fallback)";
       ctx.image_path = parse_env_val(this_env, "desktop-alt.png");
@@ -1303,10 +1277,47 @@ namespace proc {
       apps.emplace_back(std::move(ctx));
     }
 
+    // Virtual Display entry
+  #ifdef _WIN32
+    if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+      proc::ctx_t ctx;
+      ctx.idx = std::to_string(i);
+      ctx.uuid = VIRTUAL_DISPLAY_UUID;
+      ctx.name = "Virtual Display";
+      ctx.image_path = parse_env_val(this_env, "virtual_desktop.png");
+      ctx.virtual_display = true;
+      ctx.scale_factor = 100;
+      ctx.use_app_identity = false;
+      ctx.per_client_app_identity = false;
+      ctx.allow_client_commands = false;
+
+      ctx.elevated = false;
+      ctx.auto_detach = true;
+      ctx.wait_all = false;
+      ctx.exit_timeout = 5s;
+
+      auto possible_ids = calculate_app_id(ctx.name, ctx.image_path, i++);
+      if (ids.count(std::get<0>(possible_ids)) == 0) {
+        // Avoid using index to generate id if possible
+        ctx.id = std::get<0>(possible_ids);
+      }
+      else {
+        // Fallback to include index on collision
+        ctx.id = std::get<1>(possible_ids);
+      }
+      ids.insert(ctx.id);
+
+      BOOST_LOG(info) << "VIRTUAL DISPLAY APP ID::: " << ctx.id;
+
+      apps.emplace_back(std::move(ctx));
+    }
+  #endif
+
     if (config::input.enable_input_only_mode) {
       // Input Only entry
       {
         proc::ctx_t ctx;
+        ctx.idx = std::to_string(i);
         ctx.uuid = REMOTE_INPUT_UUID;
         ctx.name = "Remote Input";
         ctx.image_path = parse_env_val(this_env, "input_only.png");
@@ -1341,6 +1352,7 @@ namespace proc {
       // Terminate entry
       {
         proc::ctx_t ctx;
+        ctx.idx = std::to_string(i);
         ctx.uuid = TERMINATE_APP_UUID;
         ctx.name = "Terminate";
         ctx.image_path = parse_env_val(this_env, "terminate.png");
@@ -1364,7 +1376,7 @@ namespace proc {
           // Fallback to include index on collision
           ctx.id = std::get<1>(possible_ids);
         }
-        ids.insert(ctx.id);
+        // ids.insert(ctx.id);
 
         terminate_app_id_str = ctx.id;
         terminate_app_id = util::from_view(ctx.id);

@@ -65,6 +65,7 @@ namespace proc {
      */
     std::vector<std::string> detached;
 
+    std::string idx;
     std::string uuid;
     std::string name;
     std::string cmd;
