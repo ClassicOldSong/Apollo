@@ -10,6 +10,7 @@
 #include <dxgi.h>
 #include <highlevelmonitorconfigurationapi.h>
 #include <physicalmonitorenumerationapi.h>
+#include <dxgi1_6.h>
 
 #include "virtual_display.h"
 
@@ -263,18 +264,97 @@ bool findDisplayIds(const wchar_t* displayName, LUID& adapterId, uint32_t& targe
 	return true;
 }
 
-bool getDisplayHDR(const LUID& adapterId, const uint32_t& targetId) {
-	DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO hdrInfo = {};
-	hdrInfo.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
-	hdrInfo.header.size = sizeof(hdrInfo);
-	hdrInfo.header.adapterId = adapterId;
-	hdrInfo.header.id = targetId;
-
-	if (DisplayConfigGetDeviceInfo(&hdrInfo.header) != ERROR_SUCCESS) {
+bool getDisplayHDR(const LUID& adapterLuid, const wchar_t* displayName) {
+	Microsoft::WRL::ComPtr<IDXGIFactory1> dxgiFactory;
+	HRESULT hr = CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory));
+	if (FAILED(hr)) {
+		wprintf(L"[SUDOVDA] CreateDXGIFactory1 failed in getDisplayHDR! hr=0x%lx\n", hr);
 		return false;
 	}
 
-	return hdrInfo.advancedColorSupported && hdrInfo.advancedColorEnabled;
+	for (UINT adapterIdx = 0; ; ++adapterIdx) {
+		Microsoft::WRL::ComPtr<IDXGIAdapter1> currentAdapter;
+		hr = dxgiFactory->EnumAdapters1(adapterIdx, currentAdapter.ReleaseAndGetAddressOf());
+
+		if (hr == DXGI_ERROR_NOT_FOUND) {
+			break; // No more adapters
+		}
+		if (FAILED(hr)) {
+			wprintf(L"[SUDOVDA] EnumAdapters1 failed for index %u in getDisplayHDR! hr=0x%lx\n", adapterIdx, hr);
+			break;
+		}
+
+		DXGI_ADAPTER_DESC1 adapterDesc;
+		hr = currentAdapter->GetDesc1(&adapterDesc);
+		if (FAILED(hr)) {
+			wprintf(L"[SUDOVDA] GetDesc1 (Adapter) failed for index %u in getDisplayHDR! hr=0x%lx\n", adapterIdx, hr);
+			continue;
+		}
+
+		if (adapterDesc.AdapterLuid.LowPart == adapterLuid.LowPart &&
+			adapterDesc.AdapterLuid.HighPart == adapterLuid.HighPart) {
+
+			std::wstring_view displayName_view{displayName};
+
+			// Adapter found. Now iterate its outputs and match against targetGdiDeviceName.
+			for (UINT outputIdx = 0; ; ++outputIdx) {
+				Microsoft::WRL::ComPtr<IDXGIOutput> dxgiOutput;
+				hr = currentAdapter->EnumOutputs(outputIdx, dxgiOutput.ReleaseAndGetAddressOf());
+
+				if (hr == DXGI_ERROR_NOT_FOUND) {
+					wprintf(L"[SUDOVDA] No more DXGI outputs on matched adapter for GDI name %ls.\n", displayName);
+					break; // No more outputs on this adapter
+				}
+				if (FAILED(hr) || !dxgiOutput) {
+					continue; // Error, try next output
+				}
+
+				DXGI_OUTPUT_DESC dxgiOutputDesc;
+				hr = dxgiOutput->GetDesc(&dxgiOutputDesc);
+				if (FAILED(hr)) {
+					continue;
+				}
+
+				MONITORINFOEXW monitorInfoEx = {};
+				monitorInfoEx.cbSize = sizeof(MONITORINFOEXW);
+				if (GetMonitorInfoW(dxgiOutputDesc.Monitor, &monitorInfoEx)) {
+					if (displayName_view == monitorInfoEx.szDevice) {
+						// This is the correct output!
+						wprintf(L"[SUDOVDA] Matched DXGI output GDI name: %ls\n", monitorInfoEx.szDevice);
+						Microsoft::WRL::ComPtr<IDXGIOutput6> dxgiOutput6;
+						hr = dxgiOutput.As(&dxgiOutput6);
+
+						if (SUCCEEDED(hr) && dxgiOutput6) {
+							DXGI_OUTPUT_DESC1 outputDesc1;
+							hr = dxgiOutput6->GetDesc1(&outputDesc1);
+							if (SUCCEEDED(hr)) {
+								if (outputDesc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020) {
+									return true; // HDR Active
+								}
+							} else {
+								wprintf(L"[SUDOVDA] GetDesc1 (Output) failed for %ls. hr=0x%lx\n", monitorInfoEx.szDevice, hr);
+							}
+						} else {
+							wprintf(L"[SUDOVDA] QueryInterface for IDXGIOutput6 failed for %ls. hr=0x%lx. HDR check method not available or output not capable.\n", monitorInfoEx.szDevice, hr);
+						}
+						// Matched the output, checked HDR (it was false or error). This is the only output we care about for this adapter.
+						return false; // Return false as HDR not active or error for this specific display
+					}
+				} else {
+					DWORD lastError = GetLastError();
+					wprintf(L"[SUDOVDA] GetMonitorInfoW failed for HMONITOR 0x%p from DXGI output %ls. Error: %lu\n", dxgiOutputDesc.Monitor, dxgiOutputDesc.DeviceName, lastError);
+				}
+			} // end output enumeration loop for the matched adapter
+
+			// If output loop completes, the targetGdiDeviceName was not found among this adapter's DXGI outputs.
+			wprintf(L"[SUDOVDA] Target GDI name %ls not found among DXGI outputs of the matched adapter.\n", displayName);
+			return false;
+		}
+	} // end adapter enumeration loop
+
+	// If adapter loop completes without finding the adapterLuidFromCaller
+	wprintf(L"[SUDOVDA] Target adapter LUID {%lx-%lx} not found via DXGI.\n", adapterLuid.HighPart, adapterLuid.LowPart);
+	return false;
 }
 
 bool setDisplayHDR(const LUID& adapterId, const uint32_t& targetId, bool enableAdvancedColor) {
@@ -293,10 +373,11 @@ bool getDisplayHDRByName(const wchar_t* displayName) {
 	uint32_t targetId;
 
 	if (!findDisplayIds(displayName, adapterId, targetId)) {
+		wprintf(L"[SUDOVDA] Failed to find display IDs for %ls!\n", displayName);
 		return false;
 	}
 
-	return getDisplayHDR(adapterId, targetId);
+	return getDisplayHDR(adapterId, displayName);
 }
 
 bool setDisplayHDRByName(const wchar_t* displayName, bool enableAdvancedColor) {

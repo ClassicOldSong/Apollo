@@ -492,26 +492,26 @@ namespace proc {
 
       // We should have got the actual streaming display by now
       std::string currentDisplay = this->display_name;
-      auto currentDisplayW = platf::from_utf8(currentDisplay).c_str();
+      auto currentDisplayW = platf::from_utf8(currentDisplay);
 
-      initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW);
+      initial_hdr = VDISPLAY::getDisplayHDRByName(currentDisplayW.c_str());
 
       if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
         mode_changed_display = currentDisplay;
 
-        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW, false)) {
+        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), false)) {
           return;
         }
 
         if (enable_hdr) {
-          if (VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+          if (VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), true)) {
             BOOST_LOG(info) << "HDR enabled for display " << currentDisplay;
           } else {
             BOOST_LOG(info) << "HDR enable failed for display " << currentDisplay;
           }
         }
       } else if (initial_hdr) {
-        if (VDISPLAY::setDisplayHDRByName(currentDisplayW, false) && VDISPLAY::setDisplayHDRByName(currentDisplayW, true)) {
+        if (VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), false) && VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), true)) {
           BOOST_LOG(info) << "HDR toggled successfully for display " << currentDisplay;
         } else {
           BOOST_LOG(info) << "HDR toggle failed for display " << currentDisplay;
