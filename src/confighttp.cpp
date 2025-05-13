@@ -620,6 +620,120 @@ namespace confighttp {
   }
 
   /**
+   * @brief Reorder applications.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   *
+   * @api_examples{/api/apps/reorder| POST| {"order": ["aaaa-bbbb", "cccc-dddd"]}}
+   */
+  void reorderApps(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) {
+      return;
+    }
+
+    print_req(request);
+
+    try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+
+      nlohmann::json input_tree = nlohmann::json::parse(ss.str());
+      nlohmann::json output_tree;
+
+      // Read the existing apps file.
+      std::string content = file_handler::read_file(config::stream.file_apps.c_str());
+      nlohmann::json fileTree = nlohmann::json::parse(content);
+
+      // Get the desired order of UUIDs from the request.
+      if (!input_tree.contains("order") || !input_tree["order"].is_array()) {
+        throw std::runtime_error("Missing or invalid 'order' array in request body");
+      }
+      const auto& order_uuids_json = input_tree["order"];
+
+      // Get the original apps array from the fileTree.
+      // Default to an empty array if "apps" key is missing or if it's present but not an array (after logging an error).
+      nlohmann::json original_apps_list = nlohmann::json::array();
+      if (fileTree.contains("apps")) {
+        if (fileTree["apps"].is_array()) {
+          original_apps_list = fileTree["apps"];
+        } else {
+          // "apps" key exists but is not an array. This is a malformed state.
+          BOOST_LOG(error) << "ReorderApps: 'apps' key in apps configuration file ('" << config::stream.file_apps
+                           << "') is present but not an array.";
+          throw std::runtime_error("'apps' in file is not an array, cannot reorder.");
+        }
+      } else {
+        // "apps" key is missing. Treat as an empty list. Reordering an empty list is valid.
+        BOOST_LOG(debug) << "ReorderApps: 'apps' key missing in apps configuration file ('" << config::stream.file_apps
+                         << "'). Treating as an empty list for reordering.";
+        // original_apps_list is already an empty array, so no specific action needed here.
+      }
+
+      nlohmann::json reordered_apps_list = nlohmann::json::array();
+      std::vector<bool> item_moved(original_apps_list.size(), false);
+
+      // Phase 1: Place apps according to the 'order' array from the request.
+      // Iterate through the desired order of UUIDs.
+      for (const auto& uuid_json_value : order_uuids_json) {
+        if (!uuid_json_value.is_string()) {
+          BOOST_LOG(warning) << "ReorderApps: Encountered a non-string UUID in the 'order' array. Skipping this entry.";
+          continue;
+        }
+        std::string target_uuid = uuid_json_value.get<std::string>();
+        bool found_match_for_ordered_uuid = false;
+
+        // Find the first unmoved app in the original list that matches the current target_uuid.
+        for (size_t i = 0; i < original_apps_list.size(); ++i) {
+          if (item_moved[i]) {
+            continue; // This specific app object has already been placed.
+          }
+
+          const auto& app_item = original_apps_list[i];
+          // Ensure the app item is an object and has a UUID to match against.
+          if (app_item.is_object() && app_item.contains("uuid") && app_item["uuid"].is_string()) {
+            if (app_item["uuid"].get<std::string>() == target_uuid) {
+              reordered_apps_list.push_back(app_item); // Add the found app object to the new list.
+              item_moved[i] = true;                    // Mark this specific object as moved.
+              found_match_for_ordered_uuid = true;
+              break; // Found an app for this UUID, move to the next UUID in the 'order' array.
+            }
+          }
+        }
+
+        if (!found_match_for_ordered_uuid) {
+          // This means a UUID specified in the 'order' array was not found in the original_apps_list
+          // among the currently available (unmoved) app objects.
+          // Per instruction "If the uuid is missing from the original json file, omit it."
+          BOOST_LOG(debug) << "ReorderApps: UUID '" << target_uuid << "' from 'order' array not found in available apps list or its matching app was already processed. Omitting.";
+        }
+      }
+
+      // Phase 2: Append any remaining apps from the original list that were not explicitly ordered.
+      // These are app objects that were not marked 'item_moved' in Phase 1.
+      for (size_t i = 0; i < original_apps_list.size(); ++i) {
+        if (!item_moved[i]) {
+          reordered_apps_list.push_back(original_apps_list[i]);
+        }
+      }
+
+      // Update the fileTree with the new, reordered list of apps.
+      fileTree["apps"] = reordered_apps_list;
+
+      // Write the modified fileTree back to the apps configuration file.
+      file_handler::write_file(config::stream.file_apps.c_str(), fileTree.dump(4));
+
+      // Notify relevant parts of the system that the apps configuration has changed.
+      proc::refresh(config::stream.file_apps);
+
+      output_tree["status"] = true;
+      send_response(response, output_tree);
+    } catch (std::exception &e) {
+      BOOST_LOG(warning) << "ReorderApps: "sv << e.what();
+      bad_request(response, request, e.what());
+    }
+  }
+
+  /**
    * @brief Delete an application.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
@@ -1320,6 +1434,7 @@ namespace confighttp {
     server.resource["^/api/otp$"]["GET"] = getOTP;
     server.resource["^/api/apps$"]["GET"] = getApps;
     server.resource["^/api/apps$"]["POST"] = saveApp;
+    server.resource["^/api/apps/reorder$"]["POST"] = reorderApps;
     server.resource["^/api/apps/delete$"]["POST"] = deleteApp;
     server.resource["^/api/apps/launch$"]["POST"] = launchApp;
     server.resource["^/api/apps/close$"]["POST"] = closeApp;

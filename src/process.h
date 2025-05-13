@@ -100,6 +100,7 @@ namespace proc {
     bool initial_hdr;
     bool virtual_display;
     bool allow_client_commands;
+    bool refreshing;
 
 
     proc_t(

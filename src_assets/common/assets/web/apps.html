@@ -67,6 +67,10 @@
           border-bottom: rgba(0, 0, 0, 0.25) 1px solid;
           vertical-align: top;
         }
+
+        .dragover {
+          border-top: 2px solid #ffc400;
+        }
       </style>
 </head>
 
@@ -74,8 +78,9 @@
   <Navbar></Navbar>
   <div class="container">
     <div class="my-4">
-      <h1>{{ $t('apps.applications_title') }}</h1>
-      <div>{{ $t('apps.applications_desc') }}</div>
+        <h1>{{ $t('apps.applications_title') }}</h1>
+        <div>{{ $t('apps.applications_desc') }}</div>
+        <div>{{ $t('apps.applications_reorder_desc') }}</div>
     </div>
     <div class="card p-4">
       <table class="table">
@@ -86,9 +91,20 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(app,i) in apps" :key="app.uuid">
-            <td>{{app.name}}</td>
-            <td>
+          <tr
+            v-for="(app,i) in apps"
+            :key="app.uuid"
+            :class="{dragover: app.dragover}"
+            draggable="true"
+            @dragstart="onDragStart(i)"
+            @dragenter="onDragEnter($event, app)"
+            @dragover="onDragOver($event)"
+            @dragleave="onDragLeave(app)"
+            @dragend="onDragEnd()"
+            @drop="onDrop($event, app, i)"
+          >
+            <td>{{app.name || ' '}}</td>
+            <td v-if="app.uuid">
               <button class="btn btn-primary me-2" :disabled="actionDisabled" @click="editApp(app)">
                 <i class="fas fa-edit"></i> {{ $t('apps.edit') }}
               </button>
@@ -102,6 +118,7 @@
                 <i class="fas fa-play"></i> {{ $t('apps.launch') }}
               </button>
             </td>
+            <td v-else></td>
           </tr>
         </tbody>
       </table>
@@ -461,7 +478,8 @@
         coverFinderBusy: false,
         coverCandidates: [],
         platform: "",
-        currentApp: ""
+        currentApp: "",
+        draggingApp: -1
       };
     },
     created() {
@@ -474,13 +492,77 @@
         .then(r => this.platform = r.platform);
     },
     methods: {
+      onDragStart(idx) {
+        this.draggingApp = idx;
+        this.apps.push({})
+      },
+      onDragEnter(e, app) {
+        if (this.draggingApp < 0) {
+          return;
+        }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        app.dragover = true;
+      },
+      onDragOver(e) {
+        if (this.draggingApp < 0) {
+          return;
+        }
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      },
+      onDragLeave(app) {
+        app.dragover = false;
+      },
+      onDragEnd() {
+        this.draggingApp = -1;
+        this.apps.pop();
+      },
+      onDrop(e, app, idx) {
+        app.dragover = false;
+        if (this.draggingApp < 0) {
+          return;
+        }
+        e.preventDefault();
+
+        if (idx === this.draggingApp || idx - 1 === this.draggingApp) {
+          return;
+        }
+
+        const draggedApp = this.apps[this.draggingApp];
+        this.apps.splice(this.draggingApp, 1);
+
+        if (idx > this.draggingApp) {
+          idx -= 1;
+        }
+
+        this.apps.splice(idx, 0, draggedApp);
+
+        const reorderedUUIDs = this.apps.map(i => i.uuid);
+        reorderedUUIDs.pop();
+
+        fetch("./api/apps/reorder", {
+          credentials: 'include',
+          method: "POST",
+          body: JSON.stringify({order: reorderedUUIDs})
+        })
+        .then(r => r.json())
+        .then((r) => {
+          if (!r.status) {
+            alert(this.$t("apps.reorder_failed") + r.error);
+          }
+        })
+        .finally(() => {
+          this.loadApps();
+        });
+      },
       loadApps() {
         fetch("./api/apps", {
           credentials: 'include'
         })
           .then(r => r.json())
           .then(r => {
-            this.apps = r.apps.map(i => ({...i, launching: false}));
+            this.apps = r.apps.map(i => ({...i, launching: false, dragover: false}));
             this.currentApp = r.current_app;
           });
       },
@@ -666,7 +748,9 @@
         this.editForm["exit-timeout"] = parseInt(this.editForm["exit-timeout"]) || 5
         this.editForm["scale-factor"] = parseInt(this.editForm["scale-factor"]) || 100
         this.editForm["image-path"] = this.editForm["image-path"].toString().trim().replace(/"/g, '');
-        delete this.editForm["id"];
+        delete this.editForm.id;
+        delete this.editForm.launching;
+        delete this.editForm.dragover;
         fetch("./api/apps", {
           credentials: 'include',
           method: "POST",
@@ -675,9 +759,10 @@
         .then((r) => {
           if (!r.status) {
             alert(this.$t('apps.save_failed') + r.error);
+            throw new Error(`App save failed: ${r.error}`);
           }
         })
-        .finally(() => {
+        .then(() => {
           this.showEditForm = false;
           this.loadApps();
         });

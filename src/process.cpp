@@ -670,6 +670,14 @@ namespace proc {
     _launch_session.reset();
     virtual_display = false;
     allow_client_commands = false;
+
+    if (refreshing) {
+      return;
+    }
+
+    refreshing = true;
+    refresh(config::stream.file_apps);
+    refreshing = false;
   }
 
   const std::vector<ctx_t> &proc_t::get_apps() const {
@@ -1303,8 +1311,6 @@ namespace proc {
       }
       ids.insert(ctx.id);
 
-      BOOST_LOG(info) << "VIRTUAL DISPLAY APP ID::: " << ctx.id;
-
       apps.emplace_back(std::move(ctx));
     }
   #endif
@@ -1388,7 +1394,11 @@ namespace proc {
   }
 
   void refresh(const std::string &file_name) {
-    proc.terminate();
+    if (!proc.refreshing) {
+      proc.refreshing = true;
+      proc.terminate();
+      proc.refreshing = false;
+    }
 
   #ifdef _WIN32
     size_t fail_count = 0;
