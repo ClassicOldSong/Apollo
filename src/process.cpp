@@ -44,10 +44,6 @@
 #endif
 
 #define DEFAULT_APP_IMAGE_PATH SUNSHINE_ASSETS_DIR "/box.png"
-#define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
-#define FALLBACK_DESKTOP_UUID "EAAC6159-089A-46A9-9E24-6436885F6610"
-#define REMOTE_INPUT_UUID "8CB5C136-DA67-4F99-B4A1-F9CD35005CF4"
-#define TERMINATE_APP_UUID "E16CBE1B-295D-4632-9A76-EC4180C857D3"
 
 namespace proc {
   using namespace std::literals;
@@ -174,7 +170,7 @@ namespace proc {
 #endif
   }
 
-  int proc_t::execute(int app_id, const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
+  int proc_t::execute(const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     if (_app_id == input_only_app_id) {
       terminate();
       std::this_thread::sleep_for(1s);
@@ -184,7 +180,7 @@ namespace proc {
     }
 
     _app = app;
-    _app_id = app_id;
+    _app_id = util::from_view(app.id);
     _app_name = app.name;
     _launch_session = launch_session;
     allow_client_commands = app.allow_client_commands;
@@ -454,7 +450,7 @@ namespace proc {
     }
 
     if (_app.cmd.empty()) {
-      BOOST_LOG(info) << "Executing [Desktop]"sv;
+      BOOST_LOG(info) << "No commands configured, showing desktop..."sv;
       placebo = true;
     } else {
       boost::filesystem::path working_dir = _app.working_dir.empty() ?

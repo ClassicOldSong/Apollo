@@ -70,7 +70,7 @@ namespace nvhttp {
   extract_command_entries(const nlohmann::json& j, const std::string& key);
 
   std::shared_ptr<rtsp_stream::launch_session_t>
-  make_launch_session(bool host_audio, bool input_only, int appid, const args_t &args, const crypto::named_cert_t* named_cert_p);
+  make_launch_session(bool host_audio, bool input_only, const args_t &args, const crypto::named_cert_t* named_cert_p);
 
   /**
    * @brief Setup the nvhttp server.

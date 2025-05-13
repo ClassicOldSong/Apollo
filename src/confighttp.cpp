@@ -1190,15 +1190,14 @@ namespace confighttp {
     const auto &apps = proc::proc.get_apps();
     for (auto &app : apps) {
       if (app.uuid == uuid) {
-        auto appid = util::from_view(app.id);
         crypto::named_cert_t named_cert {
           .name = "",
           .uuid = http::unique_id,
           .perm = crypto::PERM::_all,
         };
         BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
-        auto launch_session = nvhttp::make_launch_session(true, false, appid, args, &named_cert);
-        auto err = proc::proc.execute(appid, app, launch_session);
+        auto launch_session = nvhttp::make_launch_session(true, false, args, &named_cert);
+        auto err = proc::proc.execute(app, launch_session);
         if (err) {
           bad_request(response, request, err == 503 ?
                       "Failed to initialize video capture/encoding. Is a display connected and turned on?" :
