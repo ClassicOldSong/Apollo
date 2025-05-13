@@ -1137,6 +1137,9 @@ namespace nvhttp {
     auto named_cert_p = get_verified_cert(request);
     auto perm = PERM::launch;
 
+    BOOST_LOG(verbose) << "Launching app [" << appid_str << "] with UUID [" << appuuid_str << "]";
+    // BOOST_LOG(verbose) << "QS: " << request->query_string;
+
     // If we have already launched an app, we should allow clients with view permission to join the input only or current app's session.
     if (
       current_appid > 0
@@ -1232,6 +1235,9 @@ namespace nvhttp {
     } else if (appid > 0 || !appuuid_str.empty()) {
       if (appid == current_appid || (!appuuid_str.empty() && appuuid_str == current_app_uuid)) {
         // We're basically resuming the same app
+
+        BOOST_LOG(debug) << "Resuming app [" << proc::proc.get_last_run_app_name() << "] from launch app path...";
+
         if (!proc::proc.allow_client_commands) {
           launch_session->client_do_cmds.clear();
           launch_session->client_undo_cmds.clear();
