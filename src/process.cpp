@@ -172,11 +172,11 @@ namespace proc {
 
   int proc_t::execute(const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     if (_app_id == input_only_app_id) {
-      terminate();
+      terminate(false, false);
       std::this_thread::sleep_for(1s);
     } else {
       // Ensure starting from a clean slate
-      terminate();
+      terminate(false, false);
     }
 
     _app = app;
@@ -572,7 +572,7 @@ namespace proc {
     return 0;
   }
 
-  void proc_t::terminate(bool immediate) {
+  void proc_t::terminate(bool immediate, bool needs_refresh) {
     std::error_code ec;
     placebo = false;
 
@@ -671,13 +671,9 @@ namespace proc {
     virtual_display = false;
     allow_client_commands = false;
 
-    if (refreshing) {
-      return;
+    if (needs_refresh) {
+      refresh(config::stream.file_apps, false);
     }
-
-    refreshing = true;
-    refresh(config::stream.file_apps);
-    refreshing = false;
   }
 
   const std::vector<ctx_t> &proc_t::get_apps() const {
@@ -1393,11 +1389,9 @@ namespace proc {
     };
   }
 
-  void refresh(const std::string &file_name) {
-    if (!proc.refreshing) {
-      proc.refreshing = true;
-      proc.terminate();
-      proc.refreshing = false;
+  void refresh(const std::string &file_name, bool needs_terminate) {
+    if (needs_terminate) {
+      proc.terminate(false, false);
     }
 
   #ifdef _WIN32

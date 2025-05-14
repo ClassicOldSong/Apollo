@@ -100,8 +100,6 @@ namespace proc {
     bool initial_hdr;
     bool virtual_display;
     bool allow_client_commands;
-    bool refreshing;
-
 
     proc_t(
       boost::process::v1::environment &&env,
@@ -129,7 +127,7 @@ namespace proc {
     std::string get_last_run_app_name();
     std::string get_running_app_uuid();
     boost::process::environment get_env();
-    void terminate(bool immediate = false);
+    void terminate(bool immediate = false, bool needs_refresh = true);
 
   private:
     int _app_id;
@@ -164,7 +162,7 @@ namespace proc {
   std::tuple<std::string, std::string> calculate_app_id(const std::string &app_name, std::string app_image_path, int index);
 
   std::string validate_app_image_path(std::string app_image_path);
-  void refresh(const std::string &file_name);
+  void refresh(const std::string &file_name, bool needs_terminate = true);
   void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p);
   std::optional<proc::proc_t> parse(const std::string &file_name);
 
