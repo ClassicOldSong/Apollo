@@ -562,7 +562,7 @@
         })
           .then(r => r.json())
           .then(r => {
-            this.apps = r.apps.map(i => ({...i, launching: false, dragover: false}));
+            this.apps = r.apps.filter(i => i.uuid).map(i => ({...i, launching: false, dragover: false}));
             this.currentApp = r.current_app;
           });
       },
