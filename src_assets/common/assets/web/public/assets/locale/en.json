@@ -538,7 +538,7 @@
     "dd_reset_error": "Error while resetting persistence!",
     "dd_reset_success": "Success resetting persistence!",
     "force_close": "Force Close",
-    "force_close_desc": "If Moonlight complains about an app currently running, force closing the app should fix the issue.",
+    "force_close_desc": "If Moonlight complains about an app currently running, force closing the app should fix the issue. This will also reload the App list.",
     "force_close_error": "Error while closing Application",
     "force_close_success": "Application Closed Successfully!",
     "logs": "Logs",

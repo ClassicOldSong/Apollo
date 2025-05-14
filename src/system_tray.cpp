@@ -27,7 +27,7 @@
     #include <dispatch/dispatch.h>
   #endif
 
-  #define TRAY_MSG_NO_APP_RUNNING "[No app is running]"
+  #define TRAY_MSG_NO_APP_RUNNING "Reload Apps"
 
   // standard includes
   #include <csignal>
