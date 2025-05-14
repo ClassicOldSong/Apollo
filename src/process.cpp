@@ -290,7 +290,7 @@ namespace proc {
           }
 		  
 		  // Check the ISOLATED DISPLAY configuration setting and rearrange the displays
-		  if (config::video.dd.isolated_virtual_display_option == config::video_t::dd_t::isolated_virtual_display_option_e::enabled) {
+		  if (config::video.isolated_virtual_display_option == true) {
 			  // Apply the isolated display settings
 			  VDISPLAY::changeDisplaySettings2(vdisplayName.c_str(), render_width, render_height, target_fps, true);
 		  }

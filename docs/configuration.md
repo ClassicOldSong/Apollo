@@ -962,6 +962,27 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### isolated_virtual_display_option
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Isolates the virtual display.
+            @note{Applies to Windows only.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}disabled@endcode</td>
+    </tr>
+    <tr>
+        <td>enabled</td>
+        <td>Change the position of the virtual display (and other displays if there is a hole)</td>
+    </tr>
+</table>
+
+
 ### dd_configuration_option
 
 <table>
@@ -1065,27 +1086,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
 </table>
-
-### dd_isolated_virtual_display_option
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Isolates the virtual display.
-            @note{Applies to Windows only.}
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}disabled@endcode</td>
-    </tr>
-    <tr>
-        <td>enabled</td>
-        <td>Change the position of the virtual display (and other displays if there is a hole)</td>
-    </tr>
-</table>
-
 
 ### dd_refresh_rate_option
 

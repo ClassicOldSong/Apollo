@@ -113,11 +113,6 @@ namespace config {
         manual  ///< Change refresh rate and use the manually provided one.
       };
 	  
-	  enum class isolated_virtual_display_option_e {
-        disabled,  ///< Do not reposition the virtual display or any displays.
-        enabled   ///< Change the virtual display to the lower right corner and rearrange other displays as necessary.
-      };	  
-
       enum class hdr_option_e {
         disabled,  ///< Do not change HDR settings.
         automatic  ///< Change HDR settings and use the state requested by Moonlight.
@@ -142,7 +137,6 @@ namespace config {
       refresh_rate_option_e refresh_rate_option;
       std::string manual_refresh_rate;  ///< Manual refresh rate in case `refresh_rate_option == refresh_rate_option_e::manual`.
       hdr_option_e hdr_option;
-	  isolated_virtual_display_option_e isolated_virtual_display_option;
       std::chrono::milliseconds config_revert_delay;  ///< Time to wait until settings are reverted (after stream ends/app exists).
       bool config_revert_on_disconnect;  ///< Specify whether to revert display configuration on client disconnect.
       mode_remapping_t mode_remapping;
@@ -153,6 +147,7 @@ namespace config {
     int max_bitrate;  // Maximum bitrate, sets ceiling in kbps for bitrate requested from client
 
     std::string fallback_mode;
+	bool isolated_virtual_display_option;
   };
 
   struct audio_t {
