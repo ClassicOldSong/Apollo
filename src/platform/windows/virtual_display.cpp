@@ -150,16 +150,31 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 
         displayArray = rearrangeVirtualDisplayForLowerRight(displayArray);
 
-        sDisplayOutput = "";
+        sDisplayOutput += "";
         sDisplayOutput += "After: \n";
         sDisplayOutput += printAllDisplays(displayArray);
 
-        // Update the real vector for the system call
         int iIndex;
+		int xdifference, ydifference = 0;
         for (iIndex = 0; iIndex < displayArray.size(); iIndex += 1)
         {
-            modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.x = displayArray[iIndex]->position.x;
-            modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.y = displayArray[iIndex]->position.y;
+			
+			// Find the primary display and get the offset to apply to all of the displays to keep the same primary
+			if( modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.x == 0 &&
+			    modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.y == 0 )
+				{
+					xdifference = (displayArray[iIndex]->position.x) * -1;
+					ydifference = (displayArray[iIndex]->position.y) * -1;
+					break;
+				}
+		}
+		
+		// Set all of the OS Displays to their new locations; Do not change the primary
+        // Update the real vector for the system call
+        for (iIndex = 0; iIndex < displayArray.size(); iIndex += 1)
+        {
+            modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.x = displayArray[iIndex]->position.x + xdifference;
+            modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.y = displayArray[iIndex]->position.y + ydifference;
             modeArray[(displayArray[iIndex]->modeindex)].sourceMode.height = displayArray[iIndex]->height;
             modeArray[(displayArray[iIndex]->modeindex)].sourceMode.width = displayArray[iIndex]->width;
         }
@@ -189,9 +204,9 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
             }
             displayArray.clear();
         }
-        return status;
     }
-    if (bApplyIsolated == false)
+
+    if ( true )
     {
         for (UINT32 i = 0; i < pathCount; i++) {
             DISPLAYCONFIG_SOURCE_DEVICE_NAME sourceName = {};
