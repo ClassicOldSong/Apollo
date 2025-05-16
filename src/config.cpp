@@ -407,7 +407,6 @@ namespace config {
 #undef _CONVERT_2_ARG_
       return video_t::dd_t::hdr_option_e::disabled;  // Default to this if value is invalid
     }
-
     video_t::dd_t::mode_remapping_t mode_remapping_from_view(const std::string_view value) {
       const auto parse_entry_list {[](const auto &entry_list, auto &output_field) {
         for (auto &[_, entry] : entry_list) {
@@ -513,6 +512,7 @@ namespace config {
     0,  // max_bitrate
 
     "1920x1080x60",  // fallback_mode
+	false, // isolated Display
   };
 
   audio_t audio {
@@ -1175,6 +1175,7 @@ namespace config {
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);
     string_f(vars, "dd_manual_resolution", video.dd.manual_resolution);
     generic_f(vars, "dd_refresh_rate_option", video.dd.refresh_rate_option, dd::refresh_rate_option_from_view);
+	
     string_f(vars, "dd_manual_refresh_rate", video.dd.manual_refresh_rate);
     generic_f(vars, "dd_hdr_option", video.dd.hdr_option, dd::hdr_option_from_view);
     {
@@ -1195,6 +1196,10 @@ namespace config {
     int_between_f(vars, "min_fps_factor", video.min_fps_factor, {1, 3});
     int_f(vars, "max_bitrate", video.max_bitrate);
     string_f(vars, "fallback_mode", video.fallback_mode);
+    bool_f(vars, "isolated_virtual_display_option", video.isolated_virtual_display_option);
+	
+//	generic_f(vars, "isolated_virtual_display_option", video.isolated_virtual_display_option, video::isolated_virtual_display_option_from_view);
+
 
     path_f(vars, "pkey", nvhttp.pkey);
     path_f(vars, "cert", nvhttp.cert);
