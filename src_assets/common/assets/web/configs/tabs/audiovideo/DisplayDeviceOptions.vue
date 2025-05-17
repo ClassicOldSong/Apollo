@@ -123,7 +123,7 @@ function addRemappingEntry() {
                          v-model="config.dd_manual_refresh_rate" />
                 </div>
               </div>
-			  			  
+
               <!-- HDR option -->
               <div class="mb-3">
                 <label for="dd_hdr_option" class="form-label">
@@ -238,7 +238,6 @@ function addRemappingEntry() {
                   &plus; {{ $t('config.dd_mode_remapping_add') }}
                 </button>
               </div>
-			  
             </div>
           </div>
         </div>
