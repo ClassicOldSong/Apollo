@@ -52,7 +52,7 @@ std::vector <std::wstring> matchDisplay(std::wstring sMatch);
 std::vector< struct positionwidthheight*>rearrangeVirtualDisplayForLowerRight(std::vector< struct positionwidthheight*> displays);
 std::string printAllDisplays(std::vector< struct positionwidthheight*> displays);
 std::vector < struct coordinates > moveToBeConnected(std::vector < struct coordinates > unknown, std::vector< struct coordinates> connected);
-std::vector< struct positionwidthheight*>getTestIsolatedDisplays(int iMode = 0);
+
 // END ISOLATED DISPLAY DECLARATIONS
 
 LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode) {
@@ -63,7 +63,6 @@ LONG getDeviceSettings(const wchar_t* deviceName, DEVMODEW& devMode) {
 LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, int refresh_rate, bool bApplyIsolated) {
 	UINT32 pathCount = 0;
 	UINT32 modeCount = 0;
-
 	if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &pathCount, &modeCount)) {
 		wprintf(L"[SUDOVDA] Failed to query display configuration size.\n");
 		return ERROR_INVALID_PARAMETER;
@@ -76,7 +75,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 
 	if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &pathCount, pathArray.data(), &modeCount, modeArray.data(), nullptr) != ERROR_SUCCESS) {
 		wprintf(L"[SUDOVDA] Failed to query display configuration.\n");
-	return ERROR_INVALID_PARAMETER;
+		return ERROR_INVALID_PARAMETER;
 	}
 
 	bool bAtVirtualDisplay;
@@ -222,7 +221,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 					modeArray[j].adapterId.HighPart == sourceInfo->adapterId.HighPart &&
 					modeArray[j].adapterId.LowPart == sourceInfo->adapterId.LowPart &&
 					modeArray[j].id == sourceInfo->id
-					) {
+				) {
 					auto* sourceMode = &modeArray[j].sourceMode;
 
 					wprintf(L"[SUDOVDA] Current mode found: [%dx%dx%d]\n", sourceMode->width, sourceMode->height, targetInfo->refreshRate);
@@ -230,7 +229,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 					sourceMode->width = width;
 					sourceMode->height = height;
 
-					targetInfo->refreshRate = { (UINT32)refresh_rate, 1000 };
+					targetInfo->refreshRate = {(UINT32)refresh_rate, 1000 };
 
 					// Apply the changes
 					LONG status = SetDisplayConfig(
@@ -256,7 +255,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 			return ERROR_INVALID_PARAMETER;
 		}
 	}
-		
+
 	wprintf(L"[SUDOVDA] Display not found: %ls\n", deviceName);
 	return ERROR_DEVICE_NOT_CONNECTED;
 }
@@ -306,6 +305,7 @@ LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int
 	// Use new method to set refresh rate if fine tuned
 	return changeDisplaySettings2(deviceName, width, height, refresh_rate);
 }
+
 
 std::wstring getPrimaryDisplay() {
 	DISPLAY_DEVICEW displayDevice;
@@ -620,7 +620,6 @@ bool removeVirtualDisplay(const GUID& guid) {
 }
 
 // START ISOLATED DISPLAY METHODS
-// Helper method for testing
 // Shows the coordinates/height/width for the displays in the vector structure
 std::string printAllDisplays(std::vector< struct positionwidthheight*> displays) {
 	int iIndex;
