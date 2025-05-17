@@ -274,8 +274,6 @@
     "high_resolution_scrolling_desc": "När aktiverad kommer Apollo att hantera högupplösta scroll-händelser från Moonlight klienter. Detta kan vara användbart att inaktivera för äldre program som bläddrar för snabbt med högupplösta scroll-händelser.",
     "install_steam_audio_drivers": "Installera Steam ljud-drivrutiner",
     "install_steam_audio_drivers_desc": "Om Steam är installerat kommer detta automatiskt installera drivrutinen Steam Streaming Speakers för att stödja 5.1/7.1 surroundljud och avstängning av värdljud.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "keep_sink_default": "Behåll virtuell ljudmottagare som standard",
     "keep_sink_default_desc": "Huruvida vald virtuell ljudmottagare ska tvingas vara standard (gäller när värdljudutgång är inaktiverad).",
     "key_repeat_delay": "Tangentupprepningsfördröjning",

@@ -226,8 +226,6 @@
     "high_resolution_scrolling_desc": "Lorsque cette option est activée, Apollo passera par les événements de défilement haute résolution des clients Moonlight. Cela peut être utile pour désactiver pour les anciennes applications qui font défiler trop vite avec des événements de défilement haute résolution.",
     "install_steam_audio_drivers": "Installer les pilotes audio Steam",
     "install_steam_audio_drivers_desc": "Si Steam est installé, cela installera automatiquement le pilote Steam Streaming Speakers pour prendre en charge le son surround 5.1/7.1 et rendre muet l'audio de l'hôte.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",
     "key_repeat_delay": "Délai de répétition de la clé",
     "key_repeat_delay_desc": "Contrôle la vitesse à laquelle les clés se répètent. Le délai initial en millisecondes avant de répéter les clés.",
     "key_repeat_frequency": "Fréquence de répétition des touches",

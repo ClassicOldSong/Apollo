@@ -226,8 +226,6 @@
     "high_resolution_scrolling_desc": "Quando habilitado, o Apollo irá passar através de eventos de rolagem de alta resolução a partir de clientes de luz Lunar. Isso pode ser útil para desativar para aplicativos mais antigos que rolam muito rápido com eventos de rolagem de alta resolução.",
     "install_steam_audio_drivers": "Instalar drivers de áudio Steam",
     "install_steam_audio_drivers_desc": "Se o Steam estiver instalado, isso irá instalar automaticamente o driver de Alto-falantes de Streaming do Steam para suportar o som Surround 5.1/7.1 e silenciar o áudio do host.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "key_repeat_delay": "Atraso da repetição da chave",
     "key_repeat_delay_desc": "Controla a rapidez com que as teclas se irão repetir. O atraso inicial em milissegundos antes de repetir as chaves.",
     "key_repeat_frequency": "Frequência de repetição de chave",

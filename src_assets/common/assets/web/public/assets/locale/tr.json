@@ -226,8 +226,6 @@
     "high_resolution_scrolling_desc": "Etkinleştirildiğinde Apollo, Moonlight istemcilerinden gelen yüksek çözünürlüklü kaydırma olaylarını geçirir. Bu, yüksek çözünürlüklü kaydırma olaylarıyla çok hızlı kaydırma yapan eski uygulamalar için devre dışı bırakmak için yararlı olabilir.",
     "install_steam_audio_drivers": "Steam Ses Sürücülerini Yükleyin",
     "install_steam_audio_drivers_desc": "Steam yüklüyse, 5.1/7.1 surround sesi desteklemek ve ana bilgisayar sesini kapatmak için Steam Streaming Speakers sürücüsünü otomatik olarak yükleyecektir.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",
     "key_repeat_delay": "Tuş Tekrarlama Gecikmesi",
     "key_repeat_delay_desc": "Tuşların kendilerini ne kadar hızlı tekrarlayacaklarını kontrol edin. Tuşları tekrarlamadan önce milisaniye cinsinden ilk gecikme.",
     "key_repeat_frequency": "Anahtar Tekrarlama Sıklığı",

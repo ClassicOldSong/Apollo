@@ -226,8 +226,6 @@
     "high_resolution_scrolling_desc": "Cuando está activado, Apollo pasará a través de eventos de desplazamiento de alta resolución desde clientes de Moonlight. Esto puede ser útil para aplicaciones antiguas que se desplazan demasiado rápido con eventos de desplazamiento de alta resolución.",
     "install_steam_audio_drivers": "Instalar los controladores de audio de Steam",
     "install_steam_audio_drivers_desc": "Si Steam está instalado, automáticamente instalará el controlador de altavoces de Steam Streaming para soportar sonido envolvente 5.1/7.1 y silenciar audio del host.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "key_repeat_delay": "Retardo de repetición de Clave",
     "key_repeat_delay_desc": "Controla cómo se repetirán las teclas rápidas. El retardo inicial en milisegundos antes de repetir las teclas.",
     "key_repeat_frequency": "Frecuencia de repetición de clave",

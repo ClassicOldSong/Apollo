@@ -226,8 +226,6 @@
     "high_resolution_scrolling_desc": "有効にすると、ApolloはMoonlightのクライアントから高解像度スクロールイベントを通過します。 これは、高解像度スクロールイベントで高速にスクロールする古いアプリケーションでは無効にすることができます。",
     "install_steam_audio_drivers": "Steam オーディオドライバをインストール",
     "install_steam_audio_drivers_desc": "Steamがインストールされている場合、Steam Streaming Speakersドライバが自動的にインストールされ、5.1/7.1 サラウンドサウンドとホストオーディオのミュートがサポートされます。",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "key_repeat_delay": "Key Repeat Delay",
     "key_repeat_delay_desc": "キーを繰り返す速度を制御します。キーを繰り返すまでの時間をミリ秒単位で設定します。",
     "key_repeat_frequency": "キーの繰り返し周波数",

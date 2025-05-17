@@ -225,8 +225,6 @@
     "high_resolution_scrolling_desc": "이 옵션을 활성화하면 Apollo은 Moonlight 클라이언트의 고해상도 스크롤 이벤트를 통과합니다. 고해상도 스크롤 이벤트로 너무 빠르게 스크롤하는 구형 애플리케이션의 경우 이 옵션을 비활성화하면 유용할 수 있습니다.",
     "install_steam_audio_drivers": "Steam 오디오 드라이버 설치",
     "install_steam_audio_drivers_desc": "Steam이 설치되어 있으면 5.1/7.1 서라운드 사운드와 호스트 오디오 음소거를 지원하는 Steam Streaming Speakers 드라이버가 자동으로 설치됩니다.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "key_repeat_delay": "키 반복 지연",
     "key_repeat_delay_desc": "키가 반복되는 속도를 제어합니다. 키가 반복되기 전 초기 지연 시간 (ms) 입니다.",
     "key_repeat_frequency": "키 반복 빈도",

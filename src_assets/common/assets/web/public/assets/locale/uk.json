@@ -225,8 +225,6 @@
     "high_resolution_scrolling_desc": "Якщо увімкнено, Apollo пропускатиме події прокрутки з високою роздільною здатністю від клієнтів Moonlight. Вимкнення цього може бути корисним для старих програм, які прокручують вміст занадто швидко за допомогою подій прокрутки у високій роздільній здатності.",
     "install_steam_audio_drivers": "Встановити звукові Steam драйвери",
     "install_steam_audio_drivers_desc": "Якщо Steam інстальовано, це автоматично інсталює драйвер Steam Streaming Speakers для підтримки об'ємного звуку 5.1/7.1 і вимкнення звуку хост-комп'ютера.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",
     "key_repeat_delay": "Затримка повтору клавіш",
     "key_repeat_delay_desc": "Керування швидкістю повторення клавіш. Початкова затримка у мілісекундах перед повторенням натискання.",
     "key_repeat_frequency": "Частота повторення клавіш",

@@ -274,8 +274,6 @@
     "high_resolution_scrolling_desc": "Quando ativado, o Apollo transmitirá os eventos de rolagem de alta resolução dos clientes Moonlight. Isso pode ser útil desativar para aplicativos mais antigos que rolam muito rápido com eventos de rolagem de alta resolução.",
     "install_steam_audio_drivers": "Instalar os drivers de áudio do Steam",
     "install_steam_audio_drivers_desc": "Se o Steam estiver instalado, isso instalará automaticamente o driver Steam Streaming Speakers para oferecer suporte a som surround 5.1/7.1 e silenciar o áudio do servidor.",
-    "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
-    "isolated_virtual_display_option_desc": "This makes the display isolated from all other display and contains mouse movements to the virtual screen. This reorganizes the displays such that the all other displays are to the left of the virtual display.",	
     "keep_sink_default": "Manter saída de áudio virtual como padrão",
     "keep_sink_default_desc": "Se o uso da saída de áudio virtual será forçada como padrão (útil quando a saída de áudio do servidor está desabilitado)",
     "key_repeat_delay": "Atraso de repetição de tecla",
