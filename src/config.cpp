@@ -407,7 +407,7 @@ namespace config {
 #undef _CONVERT_2_ARG_
       return video_t::dd_t::hdr_option_e::disabled;  // Default to this if value is invalid
     }
-	
+
     video_t::dd_t::mode_remapping_t mode_remapping_from_view(const std::string_view value) {
       const auto parse_entry_list {[](const auto &entry_list, auto &output_field) {
         for (auto &[_, entry] : entry_list) {
