@@ -112,7 +112,7 @@ namespace config {
         automatic,  ///< Change refresh rate and use the one received from Moonlight.
         manual  ///< Change refresh rate and use the manually provided one.
       };
-	  
+
       enum class hdr_option_e {
         disabled,  ///< Do not change HDR settings.
         automatic  ///< Change HDR settings and use the state requested by Moonlight.
@@ -147,7 +147,7 @@ namespace config {
     int max_bitrate;  // Maximum bitrate, sets ceiling in kbps for bitrate requested from client
 
     std::string fallback_mode;
-	bool isolated_virtual_display_option;
+    bool isolated_virtual_display_option;
   };
 
   struct audio_t {
