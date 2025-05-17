@@ -229,7 +229,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 					sourceMode->width = width;
 					sourceMode->height = height;
 
-					targetInfo->refreshRate = {(UINT32)refresh_rate, 1000 };
+					targetInfo->refreshRate = {(UINT32)refresh_rate, 1000};
 
 					// Apply the changes
 					LONG status = SetDisplayConfig(
