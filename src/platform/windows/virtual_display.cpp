@@ -172,22 +172,23 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 			modeArray[(displayArray[iIndex]->modeindex)].sourceMode.width = displayArray[iIndex]->width;
 		}
 
-		// Apply the changes
-		LONG status = SetDisplayConfig(
-			pathCount,
-			pathArray.data(),
-			modeCount,
-			modeArray.data(),
-			SDC_APPLY
-			| SDC_USE_SUPPLIED_DISPLAY_CONFIG
-			| SDC_SAVE_TO_DATABASE
-		);
-		if (status != ERROR_SUCCESS) {
-			wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
-		} else {
-			wprintf(L"[SUDOVDA] Display settings updated successfully.\n");
+		// Apply the changes only if the virtual display was found
+		if( bVirtualDisplayAlreadyAdded == true ) {
+			LONG status = SetDisplayConfig(
+				pathCount,
+				pathArray.data(),
+				modeCount,
+				modeArray.data(),
+				SDC_APPLY
+				| SDC_USE_SUPPLIED_DISPLAY_CONFIG
+				| SDC_SAVE_TO_DATABASE
+			);
+			if (status != ERROR_SUCCESS) {
+				wprintf(L"[SUDOVDA] Failed to apply display settings.\n");
+			} else {
+				wprintf(L"[SUDOVDA] Display settings updated successfully.\n");
+			}
 		}
-
 		for (iIndex = 0; iIndex < displayArray.size(); iIndex += 1)
 		{
 			if (displayArray[iIndex] != nullptr)
