@@ -164,11 +164,35 @@
           </div>
           <div id="appNameHelp" class="form-text">{{ $t('apps.app_name_desc') }}</div>
         </div>
+        <!-- Application Image -->
         <div class="mb-3">
           <label for="appImagePath" class="form-label">{{ $t('apps.image') }}</label>
           <input type="text" class="form-control monospace" id="appImagePath" aria-describedby="appImagePathHelp"
             v-model="editForm['image-path']" />
           <div id="appImagePathHelp" class="form-text">{{ $t('apps.image_desc') }}</div>
+        </div>
+        <!-- gamepad override -->
+        <div class="mb-3" v-if="platform !== 'macos'">
+          <label for="gamepad" class="form-label">{{ $t('config.gamepad') }}</label>
+          <select id="gamepad" class="form-select" v-model="editForm.gamepad">
+            <option value="">{{ $t('_common.default_global') }}</option>
+            <option value="disabled">{{ $t('_common.disabled') }}</option>
+            <option value="auto">{{ $t('_common.auto') }}</option>
+
+            <Platformlayout :platform="platform">
+              <template #linux>
+                <option value="ds5">{{ $t("config.gamepad_ds5") }}</option>
+                <option value="switch">{{ $t("config.gamepad_switch") }}</option>
+                <option value="xone">{{ $t("config.gamepad_xone") }}</option>
+              </template>
+
+              <template #windows>
+                <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
+                <option value="x360">{{ $t('config.gamepad_x360') }}</option>
+              </template>
+            </Platformlayout>
+          </select>
+          <div class="form-text">{{ $t('config.gamepad_desc') }}</div>
         </div>
         <!-- allow client commands -->
         <Checkbox class="mb-3"
@@ -301,6 +325,13 @@
                   v-model="editForm['wait-all']"
                   default="true"
         ></Checkbox>
+        <!-- exit timeout -->
+        <div class="mb-3">
+          <label for="exitTimeout" class="form-label">{{ $t('apps.exit_timeout') }}</label>
+          <input type="number" class="form-control monospace" id="exitTimeout" aria-describedby="exitTimeoutHelp"
+                 v-model="editForm['exit-timeout']" min="0" placeholder="5" />
+          <div id="exitTimeoutHelp" class="form-text">{{ $t('apps.exit_timeout_desc') }}</div>
+        </div>
         <!-- use virtual display -->
         <Checkbox class="mb-3"
                   id="virtualDisplay"
@@ -317,7 +348,7 @@
                   v-model="editForm['use-app-identity']"
                   default="false"
         ></Checkbox>
-        <!-- use app identity -->
+        <!-- per-client app identity -->
         <Checkbox class="mb-3"
                   v-if="editForm['use-app-identity']"
                   id="perClientAppIdentity"
@@ -331,13 +362,6 @@
           <label for="resolutionScaleFactor" class="form-label">{{ $t('apps.resolution_scale_factor') }}: {{editForm['scale-factor']}}%</label>
           <input type="range" step="1" min="20" max="200" class="form-range" id="resolutionScaleFactor" v-model="editForm['scale-factor']"/>
           <div class="form-text">{{ $t('apps.resolution_scale_factor_desc') }}</div>
-        </div>
-        <!-- exit timeout -->
-        <div class="mb-3">
-          <label for="exitTimeout" class="form-label">{{ $t('apps.exit_timeout') }}</label>
-          <input type="number" class="form-control monospace" id="exitTimeout" aria-describedby="exitTimeoutHelp"
-                 v-model="editForm['exit-timeout']" min="0" placeholder="5" />
-          <div id="exitTimeoutHelp" class="form-text">{{ $t('apps.exit_timeout_desc') }}</div>
         </div>
         <div class="env-hint alert alert-info overflow-auto">
           <div class="form-text">
@@ -407,15 +431,23 @@
             <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('apps.env_sunshine_compatibility') }}
           </div>
 
-          <div class="form-text" v-if="platform === 'windows'"><b>{{ $t('apps.env_rtss_cli_example') }}</b>
-            <pre>cmd /C \path\to\rtss-cli.exe limit:set %APOLLO_CLIENT_FPS%</pre>
-          </div>
-          <div class="form-text" v-else-if="platform === 'linux'"><b>{{ $t('apps.env_xrandr_example') }}</b>
-            <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>
-          </div>
-          <div class="form-text" v-else-if="platform === 'macos'"><b>{{ $t('apps.env_displayplacer_example') }}</b>
-            <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT} hz:${APOLLO_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
-          </div>
+          <Platformlayout v-bind:platform="platform">
+            <template #windows>
+              <div class="form-text"><b>{{ $t('apps.env_rtss_cli_example') }}</b>
+                <pre>cmd /C \path\to\rtss-cli.exe limit:set %APOLLO_CLIENT_FPS%</pre>
+              </div>
+            </template>
+            <template #linux>
+              <div class="form-text"><b>{{ $t('apps.env_xrandr_example') }}</b>
+                <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>
+              </div>
+            </template>
+            <template #macos>
+              <div class="form-text"><b>{{ $t('apps.env_displayplacer_example') }}</b>
+                <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT} hz:${APOLLO_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
+              </div>
+            </template>
+          </Platformlayout>
           <div class="form-text"><a
               href="https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2app__examples.html"
               target="_blank">{{ $t('_common.see_more') }}</a></div>
@@ -441,6 +473,7 @@
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
   import Checkbox from './Checkbox.vue'
+  import Platformlayout from './PlatformLayout.vue'
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
   const newApp = {
@@ -460,12 +493,16 @@
     "per-client-app-identity": false,
     "allow-client-commands": true,
     "virtual-display": false,
+    "gamepad": ""
   }
+
+  console.log(Platformlayout)
 
   const app = createApp({
     components: {
       Navbar,
-      Checkbox
+      Checkbox,
+      Platformlayout
     },
     data() {
       return {

@@ -44,7 +44,6 @@ namespace rtsp_stream {
     int height;
     int fps;
     int gcmap;
-    int appid;
     int surround_info;
     std::string surround_params;
     bool enable_hdr;

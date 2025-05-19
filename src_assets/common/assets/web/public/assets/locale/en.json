@@ -7,6 +7,8 @@
     "cancel": "Cancel",
     "cmd_name": "Command Name",
     "cmd_val": "Command Value",
+    "default": "Default",
+    "default_global": "Default (Global)",
     "disabled": "Disabled",
     "disabled_def": "Disabled (default)",
     "disabled_def_cbox": "Default: unchecked",

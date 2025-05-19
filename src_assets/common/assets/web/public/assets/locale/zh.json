@@ -7,6 +7,8 @@
     "cancel": "取消",
     "cmd_name": "命令名称",
     "cmd_val": "命令值",
+    "default": "默认",
+    "default_global": "默认（全局）",
     "disabled": "禁用",
     "disabled_def": "禁用（默认）",
     "disabled_def_cbox": "默认值：未选",

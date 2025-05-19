@@ -218,6 +218,16 @@ namespace proc {
       display_device::revert_configuration();
     });
 
+    if (!app.gamepad.empty()) {
+      _saved_input_config = std::make_shared<config::input_t>(config::input);
+      if (app.gamepad == "disabled") {
+        config::input.controller = false;
+      } else {
+        config::input.controller = true;
+        config::input.gamepad = app.gamepad;
+      }
+    }
+
 #ifdef _WIN32
     if (
       config::video.headless_mode        // Headless mode
@@ -670,6 +680,11 @@ namespace proc {
     _launch_session.reset();
     virtual_display = false;
     allow_client_commands = false;
+
+    if (_saved_input_config) {
+      config::input = *_saved_input_config;
+      _saved_input_config.reset();
+    }
 
     if (needs_refresh) {
       refresh(config::stream.file_apps, false);
@@ -1193,6 +1208,7 @@ namespace proc {
           ctx.use_app_identity = app_node.value("use-app-identity", false);
           ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
           ctx.allow_client_commands = app_node.value("allow-client-commands", true);
+          ctx.gamepad = app_node.value("gamepad", "");
 
           // Calculate a unique application id.
           auto possible_ids = calculate_app_id(name, ctx.image_path, i++);

@@ -78,6 +78,7 @@ namespace proc {
     std::string output;
     std::string image_path;
     std::string id;
+    std::string gamepad;
     bool elevated;
     bool auto_detach;
     bool wait_all;
@@ -136,6 +137,7 @@ namespace proc {
     boost::process::v1::environment _env;
 
     std::shared_ptr<rtsp_stream::launch_session_t> _launch_session;
+    std::shared_ptr<config::input_t> _saved_input_config;
 
     std::vector<ctx_t> _apps;
     ctx_t _app;
