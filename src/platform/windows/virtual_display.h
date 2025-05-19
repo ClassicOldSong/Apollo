@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <vector>
 
 #ifndef FILE_DEVICE_UNKNOWN
 #define FILE_DEVICE_UNKNOWN 0x00000022
@@ -42,4 +43,6 @@ namespace VDISPLAY {
 		const GUID& guid
 	);
 	bool removeVirtualDisplay(const GUID& guid);
+
+	std::vector<std::wstring> matchDisplay(std::wstring sMatch);
 }
