@@ -10,7 +10,6 @@ set(SUNSHINE_PUBLISHER_ISSUE_URL "https://github.com/ClassicOldSong/Apollo/issue
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTS "Build tests" OFF)
 option(NPM_OFFLINE "Use offline npm packages. You must ensure packages are in your npm cache." OFF)
-option(TESTS_ENABLE_PYTHON_TESTS "Enable Python tests" ON)
 
 option(BUILD_WERROR "Enable -Werror flag." OFF)
 
