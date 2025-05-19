@@ -161,6 +161,15 @@ const validateFallbackMode = (event) => {
               v-if="platform === 'windows'"
     ></Checkbox>
 
+    <!-- Isolated Virtual Display -->
+    <Checkbox class="mb-3"
+              id="isolated_virtual_display_option"
+              locale-prefix="config"
+              v-model="config.isolated_virtual_display_option"
+              default="false"
+              v-if="platform === 'windows'"
+    ></Checkbox>
+
     <!-- SudoVDA Driver Status -->
     <div class="alert" :class="[vdisplay ? 'alert-warning' : 'alert-success']" v-if="platform === 'windows'">
       <i class="fa-solid fa-xl fa-circle-info"></i> SudoVDA Driver status: {{currentDriverStatus}}
