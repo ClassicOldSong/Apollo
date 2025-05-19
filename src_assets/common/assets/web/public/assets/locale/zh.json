@@ -271,6 +271,8 @@
     "high_resolution_scrolling_desc": "启用后，Apollo 将透传来自 Moonlight 客户端的高分辨率滚动事件。对于那些使用高分辨率滚动事件时滚动速度过快的旧版应用程序来说，禁用此功能非常有用。",
     "install_steam_audio_drivers": "安装 Steam 音频驱动程序",
     "install_steam_audio_drivers_desc": "如果安装了 Steam，则会自动安装 Steam Streaming Speakers 驱动程序，以支持 5.1/7.1 环绕声和主机音频静音。",
+    "isolated_virtual_display_option": "将虚拟显示器移动到显示布局的右下角",
+    "isolated_virtual_display_option_desc": "将使虚拟显示器与其他显示器隔离，并将鼠标限制在虚拟屏幕中。这将重新排列显示器，使所有其他显示器位于虚拟显示器的左侧。",
     "keep_sink_default": "保持虚拟音频输出设备为默认设备",
     "keep_sink_default_desc": "是否强制保持虚拟音频输出设备为默认设备（当客户端设置禁止在PC上播放声音时有效）",
     "key_repeat_delay": "按键重复延迟",

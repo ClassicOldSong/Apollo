@@ -518,7 +518,7 @@ namespace config {
     0,  // max_bitrate
 
     "1920x1080x60",  // fallback_mode
-	false, // isolated Display
+    false, // isolated Display
   };
 
   audio_t audio {
