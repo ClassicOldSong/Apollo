@@ -126,6 +126,7 @@ onMounted(() => {
             <Checkbox :id="'prep-cmd-admin-' + i"
                       label="_common.elevated"
                       desc=""
+                      default="false"
                       v-model="c.elevated"
             ></Checkbox>
           </td>

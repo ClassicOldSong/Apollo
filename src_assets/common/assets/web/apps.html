@@ -96,7 +96,7 @@
             :key="app.uuid"
             :class="{dragover: app.dragover}"
             draggable="true"
-            @dragstart="onDragStart(i)"
+            @dragstart="onDragStart($event, i)"
             @dragenter="onDragEnter($event, app)"
             @dragover="onDragOver($event)"
             @dragleave="onDragLeave(app)"
@@ -179,18 +179,17 @@
             <option value="disabled">{{ $t('_common.disabled') }}</option>
             <option value="auto">{{ $t('_common.auto') }}</option>
 
-            <Platformlayout :platform="platform">
-              <template #linux>
-                <option value="ds5">{{ $t("config.gamepad_ds5") }}</option>
-                <option value="switch">{{ $t("config.gamepad_switch") }}</option>
-                <option value="xone">{{ $t("config.gamepad_xone") }}</option>
-              </template>
+            <template v-if="platform === 'linux'">
+              <option value="ds5">{{ $t("config.gamepad_ds5") }}</option>
+              <option value="switch">{{ $t("config.gamepad_switch") }}</option>
+              <option value="xone">{{ $t("config.gamepad_xone") }}</option>
+            </template>
 
-              <template #windows>
-                <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
-                <option value="x360">{{ $t('config.gamepad_x360') }}</option>
-              </template>
-            </Platformlayout>
+            <template v-if="platform === 'windows'">
+              <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
+              <option value="x360">{{ $t('config.gamepad_x360') }}</option>
+            </template>
+
           </select>
           <div class="form-text">{{ $t('config.gamepad_desc') }}</div>
         </div>
@@ -427,43 +426,52 @@
             </tr>
           </table>
 
-          <div class="alert alert-info">
-            <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('apps.env_sunshine_compatibility') }}
-          </div>
+          <template v-if="platform === 'windows'">
+            <div class="form-text"><b>{{ $t('apps.env_rtss_cli_example') }}</b>
+              <pre>cmd /C \path\to\rtss-cli.exe limit:set %APOLLO_CLIENT_FPS%</pre>
+            </div>
+          </template>
+          <template v-if="platform === 'linux'">
+            <div class="form-text"><b>{{ $t('apps.env_xrandr_example') }}</b>
+              <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>
+            </div>
+          </template>
+          <template v-if="platform === 'macos'">
+            <div class="form-text"><b>{{ $t('apps.env_displayplacer_example') }}</b>
+              <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT} hz:${APOLLO_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
+            </div>
+          </template>
 
-          <Platformlayout v-bind:platform="platform">
-            <template #windows>
-              <div class="form-text"><b>{{ $t('apps.env_rtss_cli_example') }}</b>
-                <pre>cmd /C \path\to\rtss-cli.exe limit:set %APOLLO_CLIENT_FPS%</pre>
-              </div>
-            </template>
-            <template #linux>
-              <div class="form-text"><b>{{ $t('apps.env_xrandr_example') }}</b>
-                <pre>sh -c "xrandr --output HDMI-1 --mode \"${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT}\" --rate ${APOLLO_CLIENT_FPS}"</pre>
-              </div>
-            </template>
-            <template #macos>
-              <div class="form-text"><b>{{ $t('apps.env_displayplacer_example') }}</b>
-                <pre>sh -c "displayplacer "id:&lt;screenId&gt; res:${APOLLO_CLIENT_WIDTH}x${APOLLO_CLIENT_HEIGHT} hz:${APOLLO_CLIENT_FPS} scaling:on origin:(0,0) degree:0""</pre>
-              </div>
-            </template>
-          </Platformlayout>
-          <div class="form-text"><a
+          <div class="form-text">
+            <a
               href="https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2app__examples.html"
-              target="_blank">{{ $t('_common.see_more') }}</a></div>
+              target="_blank"
+              class="text-decoration-none"
+            >
+              {{ $t('_common.see_more') }}
+            </a>
+          </div>
         </div>
+
+        <div class="alert alert-info">
+          <i class="fa-solid fa-xl fa-circle-info"></i> {{ $t('apps.env_sunshine_compatibility') }}
+        </div>
+
         <!-- Save buttons -->
         <div class="d-flex">
           <button @click="showEditForm = false" class="btn btn-secondary m-2">
             {{ $t('_common.cancel') }}
           </button>
-          <button class="btn btn-primary m-2" :disabled="!editForm.name.trim()" @click="save">{{ $t('_common.save') }}</button>
+          <button class="btn btn-primary m-2" :disabled="actionDisabled || !editForm.name.trim()" @click="save">{{ $t('_common.save') }}</button>
         </div>
       </div>
     </div>
     <div class="mt-2" v-else>
-      <button class="btn btn-primary" @click="newApp">
+      <button class="btn btn-primary" @click="newApp" :disabled="actionDisabled">
         <i class="fas fa-plus"></i> {{ $t('apps.add_new') }}
+      </button>
+      <button class="btn btn-warning float-end" @click="saveOrder" :disabled="actionDisabled" v-if="listReordered">
+        <i class="fas fa-floppy-disk"></i> {{ $t('apps.save_order') }}
       </button>
     </div>
   </div>
@@ -473,7 +481,6 @@
   import { initApp } from './init'
   import Navbar from './Navbar.vue'
   import Checkbox from './Checkbox.vue'
-  import Platformlayout from './PlatformLayout.vue'
   import { Dropdown } from 'bootstrap/dist/js/bootstrap'
 
   const newApp = {
@@ -496,13 +503,10 @@
     "gamepad": ""
   }
 
-  console.log(Platformlayout)
-
   const app = createApp({
     components: {
       Navbar,
-      Checkbox,
-      Platformlayout
+      Checkbox
     },
     data() {
       return {
@@ -516,7 +520,8 @@
         coverCandidates: [],
         platform: "",
         currentApp: "",
-        draggingApp: -1
+        draggingApp: -1,
+        listReordered: false
       };
     },
     created() {
@@ -529,7 +534,12 @@
         .then(r => this.platform = r.platform);
     },
     methods: {
-      onDragStart(idx) {
+      onDragStart(e, idx) {
+        if (this.showEditForm) {
+          e.preventDefault();
+          return;
+        }
+
         this.draggingApp = idx;
         this.apps.push({})
       },
@@ -575,8 +585,17 @@
 
         this.apps.splice(idx, 0, draggedApp);
 
-        const reorderedUUIDs = this.apps.map(i => i.uuid);
-        reorderedUUIDs.pop();
+        this.listReordered = true;
+      },
+      saveOrder() {
+        this.actionDisabled = true;
+
+        const reorderedUUIDs = this.apps.reduce((reordered, i) => {
+          if (i.uuid) {
+            reordered.push(i.uuid)
+          }
+          return reordered
+        }, [])
 
         fetch("./api/apps/reorder", {
           credentials: 'include',
@@ -590,18 +609,23 @@
           }
         })
         .finally(() => {
-          this.loadApps();
-        });
+          return this.loadApps();
+        })
+        .finally(() => {
+          this.actionDisabled = false;
+        })
+
       },
       loadApps() {
-        fetch("./api/apps", {
+        return fetch("./api/apps", {
           credentials: 'include'
         })
-          .then(r => r.json())
-          .then(r => {
-            this.apps = r.apps.filter(i => i.uuid).map(i => ({...i, launching: false, dragover: false}));
-            this.currentApp = r.current_app;
-          });
+        .then(r => r.json())
+        .then(r => {
+          this.apps = r.apps.filter(i => i.uuid).map(i => ({...i, launching: false, dragover: false}));
+          this.currentApp = r.current_app;
+          this.listReordered = false;
+        });
       },
       newApp() {
         this.editForm = Object.assign({}, newApp);

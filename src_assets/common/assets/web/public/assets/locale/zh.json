@@ -103,6 +103,7 @@
     "resolution_scale_factor_desc": "基于此比例缩放客户端请求的分辨率。例如 2000x1000 缩放 120% 将变成 2400x1200。当此项为非 100% 时覆盖客户端请求的缩放比例。此选项不会影响客户端请求的串流分辨率。",
     "run_as_desc": "这可能是某些需要管理员权限才能正常运行的应用程序所必需的。可能会导致 URL schemes 无法正常启动。",
     "save_failed": "保存APP失败：",
+    "save_order": "保存排序",
     "use_app_identity": "使用 App 身份",
     "use_app_identity_desc": "在创建虚拟显示器时使用 App 自身的身份，而非客户端的。这样可以针对 APP 进行单独的显示器组合配置。",
     "virtual_display": "总是使用虚拟显示器",
