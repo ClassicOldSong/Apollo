@@ -9,6 +9,7 @@ set_target_properties(dxgi-info PROPERTIES CXX_STANDARD 20)
 target_link_libraries(dxgi-info
         ${CMAKE_THREAD_LIBS_INIT}
         dxgi
+        nlohmann_json::nlohmann_json # headers-only
         ${PLATFORM_LIBRARIES})
 target_compile_options(dxgi-info PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
 
@@ -17,6 +18,7 @@ set_target_properties(audio-info PROPERTIES CXX_STANDARD 20)
 target_link_libraries(audio-info
         ${CMAKE_THREAD_LIBS_INIT}
         ksuser
+        nlohmann_json::nlohmann_json # headers-only
         ${PLATFORM_LIBRARIES})
 target_compile_options(audio-info PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
 

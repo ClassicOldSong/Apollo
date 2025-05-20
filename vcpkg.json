@@ -1,0 +1,18 @@
+{
+  "dependencies": [
+    "curl",
+    "minhook",
+    {
+      "name": "miniupnpc",
+      "version>=": "2.3.2"
+    },
+    "nlohmann-json",
+    "openssl"
+  ],
+  "overrides": [
+    {
+      "name": "nlohmann-json",
+      "version": "3.12.0"
+    }
+  ]
+}

@@ -87,9 +87,14 @@ else()
 endif()
 
 # src/upnp
+if (NOT MSVC)
+    set(UPNP_COMPILE_OPTIONS -Wno-pedantic)
+else()
+    set(UPNP_COMPILE_OPTIONS /wd4101)
+endif()
 set_source_files_properties("${CMAKE_SOURCE_DIR}/src/upnp.cpp"
         DIRECTORY "${CMAKE_SOURCE_DIR}" "${TEST_DIR}"
-        PROPERTIES COMPILE_FLAGS -Wno-pedantic)
+        PROPERTIES COMPILE_FLAGS ${UPNP_COMPILE_OPTIONS})
 
 # third-party/nanors
 set_source_files_properties("${CMAKE_SOURCE_DIR}/src/rswrapper.c"

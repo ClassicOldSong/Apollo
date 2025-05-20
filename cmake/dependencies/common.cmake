@@ -19,6 +19,16 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/libdisplaydevice")
 include("${CMAKE_MODULE_PATH}/dependencies/nlohmann_json.cmake")
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
+find_package(DEPcurl REQUIRED)
+
+# miniupnp
+find_package(DEPminiupnpc REQUIRED)
+
+# use the ffmpeg compiled by the MSVC from the VCPKG
+if(DEFINED CMAKE_TOOLCHAIN_FILE)
+    find_package(ffmpeg REQUIRED)
+    set(FFMPEG_PREPARED_BINARIES ON)
+endif()
 
 # ffmpeg pre-compiled binaries
 if(NOT DEFINED FFMPEG_PREPARED_BINARIES)
