@@ -18,13 +18,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/libdisplaydevice")
 # common dependencies
 include("${CMAKE_MODULE_PATH}/dependencies/nlohmann_json.cmake")
 find_package(OpenSSL REQUIRED)
-find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
-pkg_check_modules(CURL REQUIRED libcurl)
-
-# miniupnp
-pkg_check_modules(MINIUPNP miniupnpc REQUIRED)
-include_directories(SYSTEM ${MINIUPNP_INCLUDE_DIRS})
 
 # ffmpeg pre-compiled binaries
 if(NOT DEFINED FFMPEG_PREPARED_BINARIES)
