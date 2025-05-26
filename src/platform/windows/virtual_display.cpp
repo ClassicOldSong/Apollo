@@ -18,7 +18,7 @@ using namespace SUDOVDA;
 
 namespace VDISPLAY {
 // {dff7fd29-5b75-41d1-9731-b32a17a17104}
-static const GUID DEFAULT_DISPLAY_GUID = { 0xdff7fd29, 0x5b75, 0x41d1, { 0x97, 0x31, 0xb3, 0x2a, 0x17, 0xa1, 0x71, 0x04 } };
+// static const GUID DEFAULT_DISPLAY_GUID = { 0xdff7fd29, 0x5b75, 0x41d1, { 0x97, 0x31, 0xb3, 0x2a, 0x17, 0xa1, 0x71, 0x04 } };
 
 HANDLE SUDOVDA_DRIVER_HANDLE = INVALID_HANDLE_VALUE;
 
@@ -91,7 +91,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 			sourceName.header.size = sizeof(sourceName);
 			sourceName.header.adapterId = pathArray[i].sourceInfo.adapterId;
 			sourceName.header.id = pathArray[i].sourceInfo.id;
-			bAtVirtualDisplay = false;                
+			bAtVirtualDisplay = false;
 
 			if (DisplayConfigGetDeviceInfo(&sourceName.header) != ERROR_SUCCESS) {
 				continue;
@@ -116,7 +116,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 						auto* sourceMode = &modeArray[j].sourceMode;
 
 						wprintf(L"[SUDOVDA] Current mode found: [%dx%dx%d]\n", sourceMode->width, sourceMode->height, targetInfo->refreshRate);
-						
+
 						pCurrentElement = new (struct positionwidthheight);
 
 						pCurrentElement->position.x = modeArray[j].sourceMode.position.x;
@@ -152,7 +152,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 		int xdifference, ydifference = 0;
 		for (iIndex = 0; iIndex < displayArray.size(); iIndex += 1)
 		{
-			
+
 			// Find the primary display and get the offset to apply to all of the displays to keep the same primary
 			if( modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.x == 0 &&
 			    modeArray[(displayArray[iIndex]->modeindex)].sourceMode.position.y == 0 )
@@ -162,7 +162,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 					break;
 				}
 		}
-		
+
 		// Set all of the OS Displays to their new locations; Do not change the primary
 		// Update the real vector for the system call
 		for (iIndex = 0; iIndex < displayArray.size(); iIndex += 1)
@@ -263,7 +263,7 @@ LONG changeDisplaySettings2(const wchar_t* deviceName, int width, int height, in
 }
 
 LONG changeDisplaySettings(const wchar_t* deviceName, int width, int height, int refresh_rate) {
-	DEVMODEW devMode = {0};
+	DEVMODEW devMode = {};
 	devMode.dmSize = sizeof(devMode);
 
 	// Old method to set at least baseline refresh rate
@@ -725,7 +725,7 @@ std::string printAllDisplays(std::vector< struct positionwidthheight*> displays)
 	return sOutput;
 }
 
-// Helper method for the rearrangeVirtualDisplayForLowerRight() method to move the unknown unconnected display to be connected to the 
+// Helper method for the rearrangeVirtualDisplayForLowerRight() method to move the unknown unconnected display to be connected to the
 // second display which is assumed to be already connected
 //
 // It will return the move that the unknown display would need to perform
@@ -914,7 +914,7 @@ std::vector < struct coordinates > moveToBeConnected(std::vector < struct coordi
 std::vector< struct positionwidthheight*>rearrangeVirtualDisplayForLowerRight(std::vector< struct positionwidthheight*> displays) {
 
 	// Make a temporary connected List based on the current Displays
-	// Here connected means that the displays are "touching" by either the 
+	// Here connected means that the displays are "touching" by either the
 	// vertical axis or a horizontal axis or a corner.
 	int count = displays.size();
 	std::vector< int > vConnected(count, 0);
@@ -969,7 +969,7 @@ std::vector< struct positionwidthheight*>rearrangeVirtualDisplayForLowerRight(st
 		}
 	}
 
-	// Get the location, width and height of the window that is moving   
+	// Get the location, width and height of the window that is moving
 	// Make sure the correct display is set to 0,0.
 	for (int index = 0; index < count; index++) {
 			if (index == changeIndex) {
@@ -1068,7 +1068,7 @@ std::vector< struct positionwidthheight*>rearrangeVirtualDisplayForLowerRight(st
 						// The result of this may not be used as there may be a closer display when we go through the list
 						std::vector < struct coordinates > sToMove = moveToBeConnected(secondboxpoints, connectedboxpoints);
 
-						// No movement necessary 
+						// No movement necessary
 						if (sToMove[0].x == 0 && sToMove[0].y == 0) {
 							vConnected[secondboxindex] = 1;
 

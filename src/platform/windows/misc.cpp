@@ -1744,7 +1744,7 @@ namespace platf {
     return {};
   }
 
-  std::wstring from_utf8(const std::string &string) {
+  std::wstring from_utf8(const std::string_view &string) {
     // No conversion needed if the string is empty
     if (string.empty()) {
       return {};
@@ -1770,7 +1770,7 @@ namespace platf {
     return output;
   }
 
-  std::string to_utf8(const std::wstring &string) {
+  std::string to_utf8(const std::wstring_view &string) {
     // No conversion needed if the string is empty
     if (string.empty()) {
       return {};

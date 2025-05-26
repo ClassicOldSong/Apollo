@@ -5,11 +5,6 @@
 // platform includes
 #include <dxgi1_2.h>
 
-// local includes
-#include "display.h"
-#include "misc.h"
-#include "src/logging.h"
-
 // Gross hack to work around MINGW-packages#22160
 #define ____FIReference_1_boolean_INTERFACE_DEFINED__
 
@@ -17,6 +12,11 @@
 #include <winrt/windows.foundation.h>
 #include <winrt/windows.foundation.metadata.h>
 #include <winrt/windows.graphics.directx.direct3d11.h>
+
+// local includes
+#include "display.h"
+#include "misc.h"
+#include "src/logging.h"
 
 namespace platf {
   using namespace std::literals;

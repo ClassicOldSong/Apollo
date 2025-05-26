@@ -4,6 +4,7 @@
  */
 #define INITGUID
 #include "src/utility.h"
+#include "utils.h"
 
 #include <audioclient.h>
 #include <codecvt>
@@ -45,8 +46,6 @@ namespace audio {
   using wstring_t = util::safe_ptr<WCHAR, co_task_free<WCHAR>>;
 
   using handle_t = util::safe_ptr_v2<void, BOOL, CloseHandle>;
-
-  static std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>, wchar_t> converter;
 
   class prop_var_t {
   public:
@@ -206,7 +205,7 @@ namespace audio {
       // so we can take the first match as the current format to display.
       auto audio_client = make_audio_client(device, format);
       if (audio_client) {
-        current_format = converter.from_bytes(format.name.data());
+        current_format = from_utf8(format.name);
         break;
       }
     }
