@@ -29,6 +29,10 @@
 
   #define TRAY_MSG_NO_APP_RUNNING "Reload Apps"
 
+  #ifndef BOOST_PROCESS_VERSION
+    #define BOOST_PROCESS_VERSION 1
+  #endif
+
   // standard includes
   #include <csignal>
   #include <string>
@@ -417,4 +421,9 @@ namespace system_tray {
   }
 
 }  // namespace system_tray
+
+  #ifdef BOOST_PROCESS_VERSION
+    #undef BOOST_PROCESS_VERSION 1
+  #endif
+
 #endif

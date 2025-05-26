@@ -10,10 +10,16 @@
 #include <set>
 #include <sstream>
 
+#ifndef BOOST_PROCESS_VERSION
+ #define BOOST_PROCESS_VERSION 1
+#endif
+
 // lib includes
 #include <boost/algorithm/string.hpp>
 #include <boost/asio/ip/address.hpp>
-#include <boost/process/v1.hpp>
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/group.hpp>
+#include <boost/process/v1/environment.hpp>
 #include <boost/program_options/parsers.hpp>
 
 // prevent clang format from "optimizing" the header include order
@@ -1949,3 +1955,7 @@ static int setClipboardData(const std::wstring& utf16Str) {
 
   return 0;
 }
+
+#ifdef BOOST_PROCESS_VERSION
+  #undef BOOST_PROCESS_VERSION
+#endif

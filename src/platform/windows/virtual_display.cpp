@@ -1170,9 +1170,9 @@ std::vector< struct positionwidthheight*>rearrangeVirtualDisplayForLowerRight(st
 
 // Utility function to match the DeviceString to the Display Names
 // Typical DeviceStrings are the driver names
-// 
+//
 // Example: matchDisplay(L"SudoMaker Virtual Display Adapter")
-// Result: L"\\\\.\\Display2"     
+// Result: L"\\\\.\\Display2"
 
 std::vector <std::wstring> matchDisplay(std::wstring sMatch) {
 	DISPLAY_DEVICEW displayDevice;

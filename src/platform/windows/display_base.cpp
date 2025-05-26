@@ -11,7 +11,6 @@
 
 // lib includes
 #include <boost/algorithm/string/join.hpp>
-#include <boost/process/v1.hpp>
 #include <MinHook.h>
 
 // We have to include boost/process/v1.hpp before display.h due to WinSock.h,
@@ -41,7 +40,6 @@ namespace platf {
 }
 
 namespace platf::dxgi {
-  namespace bp = boost::process;
 
   /**
    * DDAPI-specific initialization goes here.

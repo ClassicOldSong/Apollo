@@ -8,12 +8,19 @@
   #define __kernel_entry
 #endif
 
+#ifndef BOOST_PROCESS_VERSION
+  #define BOOST_PROCESS_VERSION 1
+#endif
+
 // standard includes
 #include <optional>
 #include <unordered_map>
 
 // lib includes
-#include <boost/process/v1.hpp>
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/group.hpp>
+#include <boost/process/v1/environment.hpp>
+#include <boost/process/v1/search_path.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <nlohmann/json.hpp>
 
@@ -189,3 +196,7 @@ namespace proc {
   extern int terminate_app_id;
   extern std::string terminate_app_id_str;
 }  // namespace proc
+
+#ifdef BOOST_PROCESS_VERSION
+  #undef BOOST_PROCESS_VERSION
+#endif
