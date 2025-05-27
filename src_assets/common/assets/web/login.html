@@ -101,7 +101,7 @@
             const url = new URL(window.location);
             const redirectUrl = url.searchParams.get('redir');
             const hash = url.hash;
-            if (redirectUrl) {
+            if (redirectUrl && redirectUrl.startsWith('.')) {
               location.href = redirectUrl + hash;
             } else {
               location.href = './' + hash;

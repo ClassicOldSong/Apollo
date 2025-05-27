@@ -379,8 +379,20 @@
             });
           });
 
-          this.global_prep_cmd = this.config.global_prep_cmd;
-          this.server_cmd = this.config.server_cmd;
+          if (this.platform === 'windows') {
+            this.global_prep_cmd = this.config.global_prep_cmd.map((i) => {
+              i.elevated = !!i.elevated
+              return i
+            });
+            this.server_cmd = this.config.server_cmd.map((i) => {
+              i.elevated = !!i.elevated
+              return i
+            });
+          } else {
+            this.global_prep_cmd = this.config.global_prep_cmd;
+            this.server_cmd = this.config.server_cmd;
+          }
+
         });
     },
     methods: {

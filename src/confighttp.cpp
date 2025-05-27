@@ -1387,7 +1387,7 @@ namespace confighttp {
       sessionCookie = util::hex(crypto::hash(sessionCookieRaw + config::sunshine.salt)).to_string();
       cookie_creation_time = std::chrono::steady_clock::now();
       const SimpleWeb::CaseInsensitiveMultimap headers {
-        { "Set-Cookie", "auth=" + sessionCookieRaw + "; Secure; Max-Age=2592000; Path=/" }
+        { "Set-Cookie", "auth=" + sessionCookieRaw + "; Secure; SameSite=Strict; Max-Age=2592000; Path=/" }
       };
       response->write(headers);
       fg.disable();
