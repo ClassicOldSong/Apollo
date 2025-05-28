@@ -304,6 +304,8 @@
     "lan_encryption_mode_1": "Enabled for supported clients",
     "lan_encryption_mode_2": "Required for all clients",
     "lan_encryption_mode_desc": "This determines when encryption will be used when streaming over your local network. Encryption can reduce streaming performance, particularly on less powerful hosts and clients.",
+    "legacy_ordering": "App ordering for legacy clients",
+    "legacy_ordering_desc": "Enable ordering support workaround for legacy clients. Can cause issues with clients or scripts that can't handle UTF8 correctly.",
     "limit_framerate": "Limit capture framerate",
     "limit_framerate_desc": "Limit the framerate being captured to client requested framerate. May not run at full framerate if vsync is enabled and display refreshrate does not match requested framerate. Could cause lag on some clients if disabled.",
     "locale": "Locale",

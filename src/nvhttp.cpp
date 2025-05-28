@@ -36,6 +36,7 @@
 #include "utility.h"
 #include "uuid.h"
 #include "video.h"
+#include "zwpad.h"
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
@@ -1069,7 +1070,16 @@ namespace nvhttp {
     if (!!(named_cert_p->perm & PERM::_all_actions)) {
       auto current_appid = proc::proc.running();
       auto should_hide_inactive_apps = config::input.enable_input_only_mode && current_appid > 0 && current_appid != proc::input_only_app_id;
-      for (auto &app : proc::proc.get_apps()) {
+
+      auto app_list = proc::proc.get_apps();
+
+      size_t bits;
+      if (config::sunshine.legacy_ordering) {
+        bits = zwpad::pad_width_for_count(app_list.size());
+      }
+
+      for (size_t i = 0; i < app_list.size(); i++) {
+        auto& app = app_list[i];
         auto appid = util::from_view(app.id);
         if (should_hide_inactive_apps) {
           if (
@@ -1085,10 +1095,15 @@ namespace nvhttp {
           }
         }
 
+        auto app_name = app.name;
+        if (config::sunshine.legacy_ordering) {
+          zwpad::pad_for_ordering(app.name, bits, i);
+        }
+
         pt::ptree app_node;
 
         app_node.put("IsHdrSupported"s, video::active_hevc_mode == 3 ? 1 : 0);
-        app_node.put("AppTitle"s, app.name);
+        app_node.put("AppTitle"s, app_name);
         app_node.put("UUID", app.uuid);
         app_node.put("IDX", app.idx);
         app_node.put("ID", app.id);

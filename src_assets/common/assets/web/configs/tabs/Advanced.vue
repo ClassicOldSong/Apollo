@@ -5,8 +5,7 @@ import Checkbox from "../../Checkbox.vue";
 
 const props = defineProps([
   'platform',
-  'config',
-  'global_prep_cmd'
+  'config'
 ])
 
 const config = ref(props.config)
@@ -48,6 +47,14 @@ const config = ref(props.config)
               id="envvar_compatibility_mode"
               locale-prefix="config"
               v-model="config.envvar_compatibility_mode"
+              default="false"
+    ></Checkbox>
+
+    <!-- Legacy ordering -->
+    <Checkbox class="mb-3"
+              id="legacy_ordering"
+              locale-prefix="config"
+              v-model="config.legacy_ordering"
               default="false"
     ></Checkbox>
 
