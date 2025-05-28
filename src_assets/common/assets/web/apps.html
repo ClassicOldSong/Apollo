@@ -591,8 +591,16 @@
         this.listReordered = true;
       },
       alphabetizeApps() {
-        this.apps.sort((a, b) => a.name.localeCompare(b.name));
-        this.listReordered = true;
+        let orderStat = 0;
+        this.apps.sort((a, b) => {
+          const result = a.name.localeCompare(b.name);
+          orderStat += result;
+          return result;
+        });
+        this.listReordered = orderStat !== this.apps.length - 1;
+        if (!this.listReordered) {
+          alert(this.$t('apps.already_ordered'));
+        }
       },
       saveOrder() {
         this.actionDisabled = true;
