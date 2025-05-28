@@ -393,7 +393,10 @@
         let b = JSON.stringify({pin: pin, name: name});
         fetch("./api/pin", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: b
         })
           .then((response) => response.json())
@@ -537,7 +540,10 @@
         }
         fetch("./api/clients/update", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify(editedClient)
         })
         .catch(err => {
@@ -583,7 +589,10 @@
       disconnectClient(uuid) {
         fetch("./api/clients/disconnect", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify({ uuid })
         }).finally(() => {
           setTimeout(() => {
@@ -595,7 +604,7 @@
         this.unpairAllPressed = true;
         fetch("./api/clients/unpair-all", {
           credentials: 'include',
-          method: "POST"
+          method: 'POST'
         })
           .then((r) => r.json())
           .then((r) => {
@@ -610,7 +619,10 @@
       unpairSingle(uuid) {
         fetch("./api/clients/unpair", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify({ uuid })
         }).then(() => {
           this.showApplyMessage = true;

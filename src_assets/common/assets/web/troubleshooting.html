@@ -205,7 +205,7 @@
           this.closeAppPressed = true;
           fetch("./api/apps/close", {
             credentials: 'include',
-            method: "POST"
+            method: 'POST'
           })
             .then((r) => r.json())
             .then((r) => {
@@ -226,7 +226,7 @@
           }, 5000);
           fetch("./api/restart", {
             credentials: 'include',
-            method: "POST",
+            method: 'POST',
           })
           .then((resp) => {
             if (resp.status !== 200) {
@@ -250,7 +250,7 @@
             this.serverQuitting = true;
             fetch("./api/quit", {
               credentials: 'include',
-              method: "POST",
+              method: 'POST',
             })
             .then(() => {
               this.serverQuitting = false;
@@ -267,7 +267,7 @@
           this.ddResetPressed = true;
           fetch("/api/reset-display-device-persistence", {
             credentials: 'include',
-            method: "POST"
+            method: 'POST'
           })
             .then((r) => r.json())
             .then((r) => {

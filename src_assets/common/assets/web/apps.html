@@ -599,7 +599,10 @@
 
         fetch("./api/apps/reorder", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify({order: reorderedUUIDs})
         })
         .then(r => r.json())
@@ -636,7 +639,7 @@
           this.actionDisabled = true;
           fetch("./api/apps/launch?uuid=" + app.uuid, {
             credentials: 'include',
-            method: "POST",
+            method: 'POST',
           })
           .then(r => r.json())
           .then(r => {
@@ -655,7 +658,7 @@
           this.actionDisabled = true;
           fetch("./api/apps/close", {
             credentials: 'include',
-            method: "POST"
+            method: 'POST',
           })
           .then((r) => r.json())
           .then((r) => {
@@ -681,7 +684,7 @@
           this.actionDisabled = true;
           fetch("./api/apps/delete?uuid=" + app.uuid, {
             credentials: 'include',
-            method: "POST"
+            method: 'POST'
           }).then((r) => r.json())
           .then((r) => {
             if (!r.status) {
@@ -789,7 +792,10 @@
         this.coverFinderBusy = true;
         fetch("./api/covers/upload", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify({
             key: cover.key,
             url: cover.saveUrl,
@@ -814,7 +820,10 @@
         delete this.editForm.dragover;
         fetch("./api/apps", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify(this.editForm),
         }).then((r) => r.json())
         .then((r) => {

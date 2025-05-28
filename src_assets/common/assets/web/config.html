@@ -437,7 +437,10 @@
 
         return fetch("./api/config", {
           credentials: 'include',
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify(config),
         }).then((r) => {
           if (r.status === 200) {
@@ -460,7 +463,7 @@
               this.saved = this.restarted = false;
             }, 5000);
             fetch("./api/restart", {
-              method: "POST"
+              method: 'POST'
             })
             .then((resp) => {
               if (resp.status !== 200) {

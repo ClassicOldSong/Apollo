@@ -81,7 +81,10 @@
         this.error = null;
         this.loading = true;
         fetch("./api/password", {
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify(this.passwordData),
         }).then((r) => {
           this.loading = false;

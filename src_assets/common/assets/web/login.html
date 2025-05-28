@@ -89,7 +89,10 @@
           localStorage.removeItem('login')
         }
         fetch("./api/login", {
-          method: "POST",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
           body: JSON.stringify(this.passwordData),
         }).then((res) => {
           this.loading = false;
