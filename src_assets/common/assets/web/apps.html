@@ -637,9 +637,13 @@
       launchApp(app) {
         if (confirm(this.$t('apps.launch_warning'))) {
           this.actionDisabled = true;
-          fetch("./api/apps/launch?uuid=" + app.uuid, {
+          fetch("./api/apps/launch", {
             credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            },
             method: 'POST',
+            body: JSON.stringify({ uuid: app.uuid })
           })
           .then(r => r.json())
           .then(r => {
@@ -682,9 +686,13 @@
         );
         if (resp) {
           this.actionDisabled = true;
-          fetch("./api/apps/delete?uuid=" + app.uuid, {
+          fetch("./api/apps/delete", {
             credentials: 'include',
-            method: 'POST'
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            method: 'POST',
+            body: JSON.stringify({ uuid: app.uuid })
           }).then((r) => r.json())
           .then((r) => {
             if (!r.status) {

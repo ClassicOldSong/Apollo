@@ -421,8 +421,13 @@
       requestOTP() {
         if (this.editingHost) return;
 
-        fetch(`./api/otp?passphrase=${this.passphrase}${this.deviceName && `&deviceName=${this.deviceName}` || ''}`, {
-          credentials: 'include'
+        fetch("./api/otp", {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST',
+          body: JSON.stringify({ passphrase: this.passphrase, deviceName: this.deviceName })
         })
         .then(resp => resp.json())
         .then(resp => {

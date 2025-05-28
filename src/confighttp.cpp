@@ -238,6 +238,28 @@ namespace confighttp {
     response->write(code, tree.dump(), headers);
   }
 
+
+  /**
+   * @brief Validate the request content type and send bad request when mismatch.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   * @param contentType The required content type.
+   */
+  bool validateContentType(resp_https_t response, req_https_t request, const std::string_view& contentType) {
+    auto requestContentType = request->header.find("content-type");
+    if (requestContentType == request->header.end()) {
+      bad_request(response, request, "Content type not provided");
+      return false;
+    }
+
+    if (requestContentType->second != contentType) {
+      bad_request(response, request, "Content type mismatch");
+      return false;
+    }
+
+    return true;
+  }
+
   /**
    * @brief Get the index page.
    * @param response The HTTP response object.
@@ -561,7 +583,7 @@ namespace confighttp {
    * @api_examples{/api/apps| POST| {"name":"Hello, World!","uuid": "aaaa-bbbb"}}
    */
   void saveApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -627,7 +649,7 @@ namespace confighttp {
    * @api_examples{/api/apps/reorder| POST| {"order": ["aaaa-bbbb", "cccc-dddd"]}}
    */
   void reorderApps(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -738,22 +760,27 @@ namespace confighttp {
    * @param response The HTTP response object.
    * @param request The HTTP request object.
    *
-   * @api_examples{/api/apps/9999| DELETE| null}
+   * @api_examples{/api/apps/delete | POST| { uuid: 'aaaa-bbbb' }}
    */
   void deleteApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request))
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
+    }
 
     print_req(request);
 
-    auto args = request->parse_query_string();
-    if (args.find("uuid"s) == std::end(args)) {
-      bad_request(response, request, "Missing a required parameter to delete app");
-      return;
-    }
-    auto uuid = nvhttp::get_arg(args, "uuid");
-
     try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      nlohmann::json input_tree = nlohmann::json::parse(ss.str());
+
+      // Check for required uuid field in body
+      if (!input_tree.contains("uuid") || !input_tree["uuid"].is_string()) {
+        bad_request(response, request, "Missing or invalid uuid in request body");
+        return;
+      }
+      auto uuid = input_tree["uuid"].get<std::string>();
+
       // Read the apps file into a nlohmann::json object.
       std::string content = file_handler::read_file(config::stream.file_apps.c_str());
       nlohmann::json fileTree = nlohmann::json::parse(content);
@@ -826,7 +853,7 @@ namespace confighttp {
    * @endcode
    */
   void updateClient(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -866,7 +893,7 @@ namespace confighttp {
    * @api_examples{/api/clients/unpair| POST| {"uuid":"1234"}}
    */
   void unpair(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -965,7 +992,7 @@ namespace confighttp {
    * @api_examples{/api/config| POST| {"key":"value"}}
    */
   void saveConfig(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -1004,7 +1031,7 @@ namespace confighttp {
    * @api_examples{/api/covers/upload| POST| {"key":"igdb_1234","url":"https://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc123.png"}}
    */
   void uploadCover(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -1089,7 +1116,7 @@ namespace confighttp {
    * @api_examples{/api/password| POST| {"currentUsername":"admin","currentPassword":"admin","newUsername":"admin","newPassword":"admin","confirmNewPassword":"admin"}}
    */
   void savePassword(resp_https_t response, req_https_t request) {
-    if (!config::sunshine.username.empty() && !authenticate(response, request))
+    if ((!config::sunshine.username.empty() && !authenticate(response, request)) || !validateContentType(response, request, "application/json"sv))
       return;
     print_req(request);
     std::vector<std::string> errors;
@@ -1146,7 +1173,7 @@ namespace confighttp {
    * @api_examples{/api/otp| GET| null}
    */
   void getOTP(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
@@ -1154,17 +1181,17 @@ namespace confighttp {
 
     nlohmann::json output_tree;
     try {
-      auto args = request->parse_query_string();
-      auto it = args.find("passphrase");
-      if (it == args.end())
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      nlohmann::json input_tree = nlohmann::json::parse(ss.str());
+
+      std::string passphrase = input_tree.value("passphrase", "");
+      if (passphrase.empty())
         throw std::runtime_error("Passphrase not provided!");
-      if (it->second.size() < 4)
+      if (passphrase.size() < 4)
         throw std::runtime_error("Passphrase too short!");
-      std::string passphrase = it->second;
-      std::string deviceName;
-      it = args.find("deviceName");
-      if (it != args.end())
-        deviceName = it->second;
+
+      std::string deviceName = input_tree.value("deviceName", "");
       output_tree["otp"] = nvhttp::request_otp(passphrase, deviceName);
       output_tree["ip"] = platf::get_local_ip_for_gateway();
       output_tree["name"] = config::nvhttp.sunshine_name;
@@ -1193,15 +1220,15 @@ namespace confighttp {
    * @api_examples{/api/pin| POST| {"pin":"1234","name":"My PC"}}
    */
   void savePin(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
     print_req(request);
 
-    std::stringstream ss;
-    ss << request->content.rdbuf();
     try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
       nlohmann::json input_tree = nlohmann::json::parse(ss.str());
       nlohmann::json output_tree;
       std::string pin = input_tree.value("pin", "");
@@ -1288,43 +1315,54 @@ namespace confighttp {
    * @param request The HTTP request object.
    */
   void launchApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
     print_req(request);
 
-    nlohmann::json output_tree;
-    auto args = request->parse_query_string();
-    if (args.find("uuid") == args.end()) {
-      bad_request(response, request, "Missing a required launch parameter");
-      return;
-    }
-    std::string uuid = nvhttp::get_arg(args, "uuid");
-    const auto &apps = proc::proc.get_apps();
-    for (auto &app : apps) {
-      if (app.uuid == uuid) {
-        crypto::named_cert_t named_cert {
-          .name = "",
-          .uuid = http::unique_id,
-          .perm = crypto::PERM::_all,
-        };
-        BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
-        auto launch_session = nvhttp::make_launch_session(true, false, args, &named_cert);
-        auto err = proc::proc.execute(app, launch_session);
-        if (err) {
-          bad_request(response, request, err == 503 ?
-                      "Failed to initialize video capture/encoding. Is a display connected and turned on?" :
-                      "Failed to start the specified application");
-        } else {
-          output_tree["status"] = true;
-          send_response(response, output_tree);
-        }
+    try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      nlohmann::json input_tree = nlohmann::json::parse(ss.str());
+
+      // Check for required uuid field in body
+      if (!input_tree.contains("uuid") || !input_tree["uuid"].is_string()) {
+        bad_request(response, request, "Missing or invalid uuid in request body");
         return;
       }
+      std::string uuid = input_tree["uuid"].get<std::string>();
+
+      nlohmann::json output_tree;
+      const auto &apps = proc::proc.get_apps();
+      for (auto &app : apps) {
+        if (app.uuid == uuid) {
+          crypto::named_cert_t named_cert {
+            .name = "",
+            .uuid = http::unique_id,
+            .perm = crypto::PERM::_all,
+          };
+          BOOST_LOG(info) << "Launching app ["sv << app.name << "] from web UI"sv;
+          auto launch_session = nvhttp::make_launch_session(true, false, request->parse_query_string(), &named_cert);
+          auto err = proc::proc.execute(app, launch_session);
+          if (err) {
+            bad_request(response, request, err == 503 ?
+                        "Failed to initialize video capture/encoding. Is a display connected and turned on?" :
+                        "Failed to start the specified application");
+          } else {
+            output_tree["status"] = true;
+            send_response(response, output_tree);
+          }
+          return;
+        }
+      }
+      BOOST_LOG(error) << "Couldn't find app with uuid ["sv << uuid << ']';
+      bad_request(response, request, "Cannot find requested application");
     }
-    BOOST_LOG(error) << "Couldn't find app with uuid ["sv << uuid << ']';
-    bad_request(response, request, "Cannot find requested application");
+    catch (std::exception &e) {
+      BOOST_LOG(warning) << "LaunchApp: "sv << e.what();
+      bad_request(response, request, e.what());
+    }
   }
 
   /**
@@ -1333,24 +1371,24 @@ namespace confighttp {
    * @param request The HTTP request object.
    */
   void disconnect(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
+    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
     print_req(request);
 
-    std::stringstream ss;
-    ss << request->content.rdbuf();
-    nlohmann::json output_tree;
     try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
+      nlohmann::json output_tree;
       nlohmann::json input_tree = nlohmann::json::parse(ss.str());
       std::string uuid = input_tree.value("uuid", "");
       output_tree["status"] = nvhttp::find_and_stop_session(uuid, true);
+      send_response(response, output_tree);
     } catch (std::exception &e) {
       BOOST_LOG(warning) << "Disconnect: "sv << e.what();
       bad_request(response, request, e.what());
     }
-    send_response(response, output_tree);
   }
 
   /**
@@ -1367,16 +1405,17 @@ namespace confighttp {
    * @endcode
    */
   void login(resp_https_t response, req_https_t request) {
-    if (!checkIPOrigin(response, request)) {
+    if (!checkIPOrigin(response, request) || !validateContentType(response, request, "application/json"sv)) {
       return;
     }
 
     auto fg = util::fail_guard([&]{
       response->write(SimpleWeb::StatusCode::client_error_unauthorized);
     });
-    std::stringstream ss;
-    ss << request->content.rdbuf();
+
     try {
+      std::stringstream ss;
+      ss << request->content.rdbuf();
       nlohmann::json input_tree = nlohmann::json::parse(ss.str());
       std::string username = input_tree.value("username", "");
       std::string password = input_tree.value("password", "");
@@ -1431,7 +1470,7 @@ namespace confighttp {
     server.resource["^/troubleshooting/?$"]["GET"] = getTroubleshootingPage;
     server.resource["^/api/login"]["POST"] = login;
     server.resource["^/api/pin$"]["POST"] = savePin;
-    server.resource["^/api/otp$"]["GET"] = getOTP;
+    server.resource["^/api/otp$"]["POST"] = getOTP;
     server.resource["^/api/apps$"]["GET"] = getApps;
     server.resource["^/api/apps$"]["POST"] = saveApp;
     server.resource["^/api/apps/reorder$"]["POST"] = reorderApps;
