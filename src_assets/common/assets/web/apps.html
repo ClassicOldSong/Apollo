@@ -470,6 +470,9 @@
       <button class="btn btn-primary" @click="newApp" :disabled="actionDisabled">
         <i class="fas fa-plus"></i> {{ $t('apps.add_new') }}
       </button>
+      <button class="btn btn-secondary float-end" @click="alphabetizeApps" :disabled="actionDisabled" v-if="!listReordered">
+        <i class="fas fa-sort-alpha-up"></i> {{ $t('apps.alphabetize') }}
+      </button>
       <button class="btn btn-warning float-end" @click="saveOrder" :disabled="actionDisabled" v-if="listReordered">
         <i class="fas fa-floppy-disk"></i> {{ $t('apps.save_order') }}
       </button>
@@ -585,6 +588,10 @@
 
         this.apps.splice(idx, 0, draggedApp);
 
+        this.listReordered = true;
+      },
+      alphabetizeApps() {
+        this.apps.sort((a, b) => a.name.localeCompare(b.name));
         this.listReordered = true;
       },
       saveOrder() {

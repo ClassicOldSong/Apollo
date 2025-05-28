@@ -36,6 +36,7 @@
     "add_new": "Add New",
     "allow_client_commands": "Allow client prepare commands",
     "allow_client_commands_desc": "Whether to execute client prepare commands when running this app.",
+    "alphabetize": "Alphabetize",
     "app_name": "Application Name",
     "app_name_desc": "Application Name, as shown on Moonlight",
     "applications_desc": "Applications are refreshed when a session is terminated.",

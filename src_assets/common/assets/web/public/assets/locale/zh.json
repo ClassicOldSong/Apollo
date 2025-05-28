@@ -36,6 +36,7 @@
     "add_new": "添加新应用",
     "allow_client_commands": "允许客户端准备命令",
     "allow_client_commands_desc": "在此APP运行时是否允许执行客户端准备命令",
+    "alphabetize": "按字母排序",
     "app_name": "应用名称",
     "app_name_desc": "在 Moonlight 显示的应用名称",
     "applications_desc": "应用列表在会话终止时刷新",
