@@ -274,6 +274,8 @@ namespace nvhttp {
     const std::string& display_mode,
     const cmd_list_t& do_cmds,
     const cmd_list_t& undo_cmds,
-    const crypto::PERM newPerm
+    const crypto::PERM newPerm,
+    const bool enable_legacy_ordering,
+    const bool allow_client_commands
   );
 }  // namespace nvhttp

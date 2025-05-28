@@ -248,6 +248,9 @@ namespace nvhttp {
         named_cert_node["uuid"] = named_cert_p->uuid;
         named_cert_node["display_mode"] = named_cert_p->display_mode;
         named_cert_node["perm"] = static_cast<uint32_t>(named_cert_p->perm);
+        named_cert_node["enable_legacy_ordering"] = named_cert_p->enable_legacy_ordering;
+        named_cert_node["allow_client_commands"] = named_cert_p->allow_client_commands;
+
 
         // Add "do" commands if available.
         if (!named_cert_p->do_cmds.empty()) {
@@ -324,6 +327,8 @@ namespace nvhttp {
             named_cert_p->uuid = uuid_util::uuid_t::generate().string();
             named_cert_p->display_mode = "";
             named_cert_p->perm = PERM::_all;
+            named_cert_p->enable_legacy_ordering = true;
+            named_cert_p->allow_client_commands = true;
             client.named_devices.emplace_back(named_cert_p);
           }
         }
@@ -339,6 +344,8 @@ namespace nvhttp {
         named_cert_p->uuid = el.value("uuid", "");
         named_cert_p->display_mode = el.value("display_mode", "");
         named_cert_p->perm = (PERM)(util::get_non_string_json_value<uint32_t>(el, "perm", (uint32_t)PERM::_all)) & PERM::_all;
+        named_cert_p->enable_legacy_ordering = el.value("enable_legacy_ordering", true);
+        named_cert_p->allow_client_commands = el.value("allow_client_commands", true);
         // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
@@ -1009,6 +1016,8 @@ namespace nvhttp {
       named_cert_node["uuid"] = named_cert->uuid;
       named_cert_node["display_mode"] = named_cert->display_mode;
       named_cert_node["perm"] = static_cast<uint32_t>(named_cert->perm);
+      named_cert_node["enable_legacy_ordering"] = named_cert->enable_legacy_ordering;
+      named_cert_node["allow_client_commands"] = named_cert->allow_client_commands;
 
       // Add "do" commands if available
       if (!named_cert->do_cmds.empty()) {
@@ -1073,8 +1082,9 @@ namespace nvhttp {
 
       auto app_list = proc::proc.get_apps();
 
+      bool enable_legacy_ordering = config::sunshine.legacy_ordering && named_cert_p->enable_legacy_ordering;
       size_t bits;
-      if (config::sunshine.legacy_ordering) {
+      if (enable_legacy_ordering) {
         bits = zwpad::pad_width_for_count(app_list.size());
       }
 
@@ -1095,9 +1105,11 @@ namespace nvhttp {
           }
         }
 
-        auto app_name = app.name;
-        if (config::sunshine.legacy_ordering) {
-          zwpad::pad_for_ordering(app.name, bits, i);
+        std::string app_name;
+        if (enable_legacy_ordering) {
+          app_name = zwpad::pad_for_ordering(app.name, bits, i);
+        } else {
+          app_name = app.name;
         }
 
         pt::ptree app_node;
@@ -1253,7 +1265,7 @@ namespace nvhttp {
 
         BOOST_LOG(debug) << "Resuming app [" << proc::proc.get_last_run_app_name() << "] from launch app path...";
 
-        if (!proc::proc.allow_client_commands) {
+        if (!proc::proc.allow_client_commands || !named_cert_p->allow_client_commands) {
           launch_session->client_do_cmds.clear();
           launch_session->client_undo_cmds.clear();
         }
@@ -1370,7 +1382,7 @@ namespace nvhttp {
     }
     auto launch_session = make_launch_session(host_audio, false, args, named_cert_p);
 
-    if (!proc::proc.allow_client_commands) {
+    if (!proc::proc.allow_client_commands || !named_cert_p->allow_client_commands) {
       launch_session->client_do_cmds.clear();
       launch_session->client_undo_cmds.clear();
     }
@@ -1792,7 +1804,9 @@ namespace nvhttp {
     const std::string& display_mode,
     const cmd_list_t& do_cmds,
     const cmd_list_t& undo_cmds,
-    const crypto::PERM newPerm
+    const crypto::PERM newPerm,
+    const bool enable_legacy_ordering,
+    const bool allow_client_commands
   ) {
     find_and_udpate_session_info(uuid, name, newPerm);
 
@@ -1806,6 +1820,8 @@ namespace nvhttp {
         named_cert_p->perm = newPerm;
         named_cert_p->do_cmds = do_cmds;
         named_cert_p->undo_cmds = undo_cmds;
+        named_cert_p->enable_legacy_ordering = enable_legacy_ordering;
+        named_cert_p->allow_client_commands = allow_client_commands;
         save_state();
         return true;
       }

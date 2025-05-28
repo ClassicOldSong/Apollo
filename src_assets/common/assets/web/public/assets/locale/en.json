@@ -307,7 +307,7 @@
     "lan_encryption_mode_2": "Required for all clients",
     "lan_encryption_mode_desc": "This determines when encryption will be used when streaming over your local network. Encryption can reduce streaming performance, particularly on less powerful hosts and clients.",
     "legacy_ordering": "App ordering for legacy clients",
-    "legacy_ordering_desc": "Enable ordering support workaround for legacy clients. Can cause issues with clients or scripts that can't handle UTF8 correctly.",
+    "legacy_ordering_desc": "Enable ordering support workaround for legacy clients. Can cause issues with clients or scripts that can't handle UTF8 correctly. Artemis clients support this by default.",
     "limit_framerate": "Limit capture framerate",
     "limit_framerate_desc": "Limit the framerate being captured to client requested framerate. May not run at full framerate if vsync is enabled and display refreshrate does not match requested framerate. Could cause lag on some clients if disabled.",
     "locale": "Locale",
@@ -497,6 +497,8 @@
     "launch": "Launch Apps"
   },
   "pin": {
+    "allow_client_commands": "Allow client commands",
+    "allow_client_commands_desc": "Allow client commands to be executed when connecting to this device.",
     "client_do_cmd": "Client connect commands",
     "client_do_cmd_desc": "Commands to be executed when client connects. All of the commands are executed detached.",
     "client_undo_cmd": "Client disconnect commands",
@@ -505,6 +507,8 @@
     "display_mode_override": "Display Mode Override",
     "display_mode_override_desc": "Apollo will ignore client requested display mode and use this value to configure (virtual) displays. Leave blank for auto matching. Format: [Width]x[Height]x[FPS]",
     "display_mode_override_error": "Invalid mode override. Format: [Width]x[Height]x[FPS]",
+    "enable_legacy_ordering": "Enable legacy ordering",
+    "enable_legacy_ordering_desc": "Enable app ordering for legacy clients. Disable if this client can't handle UTF8 correctly. Needs to enable \"App ordering for legacy clients\" in the Advanced settings.",
     "pair_failure": "Pairing Failed: Check if the PIN is typed correctly",
     "pair_success": "Success! Please check Moonlight to continue",
     "pair_success_check_perm": "Pair success! Please grant necessary permissions to the client manually below.",

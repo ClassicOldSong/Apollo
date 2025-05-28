@@ -104,6 +104,8 @@ namespace crypto {
     std::list<command_entry_t> do_cmds;
     std::list<command_entry_t> undo_cmds;
     PERM perm;
+    bool enable_legacy_ordering;
+    bool allow_client_commands;
   };
 
   using p_named_cert_t = std::shared_ptr<named_cert_t>;

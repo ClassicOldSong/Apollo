@@ -867,10 +867,21 @@ namespace confighttp {
       std::string uuid = input_tree.value("uuid", "");
       std::string name = input_tree.value("name", "");
       std::string display_mode = input_tree.value("display_mode", "");
+      bool enable_legacy_ordering = input_tree.value("enable_legacy_ordering", true);
+      bool allow_client_commands = input_tree.value("allow_client_commands", true);
       auto do_cmds = nvhttp::extract_command_entries(input_tree, "do");
       auto undo_cmds = nvhttp::extract_command_entries(input_tree, "undo");
       auto perm = static_cast<crypto::PERM>(input_tree.value("perm", static_cast<uint32_t>(crypto::PERM::_no)) & static_cast<uint32_t>(crypto::PERM::_all));
-      output_tree["status"] = nvhttp::update_device_info(uuid, name, display_mode, do_cmds, undo_cmds, perm);
+      output_tree["status"] = nvhttp::update_device_info(
+        uuid,
+        name,
+        display_mode,
+        do_cmds,
+        undo_cmds,
+        perm,
+        enable_legacy_ordering,
+        allow_client_commands
+      );
       send_response(response, output_tree);
     } catch (std::exception &e) {
       BOOST_LOG(warning) << "Update Client: "sv << e.what();
