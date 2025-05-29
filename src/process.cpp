@@ -304,13 +304,13 @@ namespace proc {
             // Apply display settings
             VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, target_fps);
           }
-          
+
           // Check the ISOLATED DISPLAY configuration setting and rearrange the displays
          if (config::video.isolated_virtual_display_option == true) {
               // Apply the isolated display settings
               VDISPLAY::changeDisplaySettings2(vdisplayName.c_str(), render_width, render_height, target_fps, true);
          }
-  
+
           // Set virtual_display to true when everything went fine
           this->virtual_display = true;
           this->display_name = platf::to_utf8(vdisplayName);
