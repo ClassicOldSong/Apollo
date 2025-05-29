@@ -629,6 +629,9 @@ namespace nvhttp {
         named_cert_p->perm = PERM::_default;
       }
 
+      named_cert_p->enable_legacy_ordering = true;
+      named_cert_p->allow_client_commands = true;
+
       auto it = map_id_sess.find(client.uniqueID);
       map_id_sess.erase(it);
 
