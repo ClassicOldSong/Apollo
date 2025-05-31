@@ -32,6 +32,7 @@ extern "C" {
 #include "video.h"
 
 #ifdef _WIN32
+  #include "platform/windows/virtual_display.h"
 extern "C" {
   #include <libavutil/hwcontext_d3d11va.h>
 }
@@ -48,10 +49,19 @@ namespace video {
   bool allow_encoder_probing() {
     const auto devices {display_device::enumerate_devices()};
 
-    // If there are no devices, then either the API is not working correctly or OS does not support the lib.
-    // Either way we should not block the probing in this case as we can't tell what's wrong.
+    // // If there are no devices, then either the API is not working correctly or OS does not support the lib.
+    // // Either way we should not block the probing in this case as we can't tell what's wrong.
+    // if (devices.empty()) {
+    //   return true;
+    // }
+
     if (devices.empty()) {
-      return true;
+      // We'll create a temporary virtual display for probing anyways.
+      if (proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        return false;
+      } else {
+        return true;
+      }
     }
 
     // Since Windows 11 24H2, it is possible that there will be no active devices present
