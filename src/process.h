@@ -134,7 +134,7 @@ namespace proc {
     std::string get_app_image(int app_id);
     std::string get_last_run_app_name();
     std::string get_running_app_uuid();
-    boost::process::environment get_env();
+    boost::process::v1::environment get_env();
     void terminate(bool immediate = false, bool needs_refresh = true);
 
   private:
@@ -162,7 +162,7 @@ namespace proc {
   };
 
   boost::filesystem::path
-  find_working_directory(const std::string &cmd, boost::process::environment &env);
+  find_working_directory(const std::string &cmd, boost::process::v1::environment &env);
 
   /**
    * @brief Calculate a stable id based on name and image data
