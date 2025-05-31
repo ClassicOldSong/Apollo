@@ -22,7 +22,14 @@
 // lib includes
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/host_name.hpp>
-#include <boost/process/v1.hpp>
+#include <boost/process/v1/group.hpp>
+#include <boost/process/v1/child.hpp>
+#include <boost/process/v1/env.hpp>
+#include <boost/process/v1/environment.hpp>
+#include <boost/process/v1/group.hpp>
+#include <boost/process/v1/handles.hpp>
+#include <boost/process/v1/io.hpp>
+#include <boost/process/v1/start_dir.hpp>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -45,7 +52,7 @@
 
 using namespace std::literals;
 namespace fs = std::filesystem;
-namespace bp = boost::process;
+namespace bp = boost::process::v1;
 
 window_system_e window_system;
 

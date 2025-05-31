@@ -4,6 +4,9 @@
  */
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
+#ifndef BOOST_PROCESS_VERSION
+ #define BOOST_PROCESS_VERSION 1
+#endif
 // standard includes
 #include <filesystem>
 #include <string>

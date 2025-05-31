@@ -14,8 +14,10 @@
 // lib includes
 #include <boost/core/noncopyable.hpp>
 #ifndef _WIN32
-  #include <boost/asio.hpp>
-  #include <boost/process.hpp>
+  #include <boost/asio/ip/address.hpp>
+  #include <boost/process/v1/child.hpp>
+  #include <boost/process/v1/group.hpp>
+  #include <boost/process/v1/environment.hpp>
 #endif
 
 // local includes
