@@ -56,12 +56,13 @@ namespace video {
     // }
 
     if (devices.empty()) {
+      #ifdef _WIN32
       // We'll create a temporary virtual display for probing anyways.
       if (proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         return false;
-      } else {
-        return true;
       }
+      #endif
+        return true;
     }
 
     // Since Windows 11 24H2, it is possible that there will be no active devices present
