@@ -1162,7 +1162,7 @@ namespace nvhttp {
     auto appid = util::from_view(appid_str);
     auto current_appid = proc::proc.running();
     auto current_app_uuid = proc::proc.get_running_app_uuid();
-    bool is_input_only = config::input.enable_input_only_mode && appid == proc::input_only_app_id;
+    bool is_input_only = config::input.enable_input_only_mode && (appid == proc::input_only_app_id || (appuuid_str == REMOTE_INPUT_UUID));
 
     auto named_cert_p = get_verified_cert(request);
     auto perm = PERM::launch;

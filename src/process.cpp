@@ -165,6 +165,7 @@ namespace proc {
   void proc_t::launch_input_only() {
     _app_id = input_only_app_id;
     _app_name = "Remote Input";
+    _app.uuid = REMOTE_INPUT_UUID;
     allow_client_commands = false;
     placebo = true;
 
