@@ -124,30 +124,6 @@ function addRemappingEntry() {
                 </div>
               </div>
 
-              <!-- HDR option -->
-              <div class="mb-3">
-                <label for="dd_hdr_option" class="form-label">
-                  {{ $t('config.dd_hdr_option') }}
-                </label>
-                <select id="dd_hdr_option" class="mb-3 form-select" v-model="config.dd_hdr_option">
-                  <option value="disabled">{{ $t('config.dd_hdr_option_disabled') }}</option>
-                  <option value="auto">{{ $t('config.dd_hdr_option_auto') }}</option>
-                </select>
-                <!-- HDR toggle -->
-                <!-- <label for="dd_wa_hdr_toggle_delay" class="form-label">
-                  {{ $t('config.dd_wa_hdr_toggle_delay') }}
-                </label>
-                <input type="number" class="form-control" id="dd_wa_hdr_toggle_delay" placeholder="0" min="0" max="3000"
-                       v-model="config.dd_wa_hdr_toggle_delay" />
-                <div class="form-text">
-                  {{ $t('config.dd_wa_hdr_toggle_delay_desc_1') }}
-                  <br>
-                  {{ $t('config.dd_wa_hdr_toggle_delay_desc_2') }}
-                  <br>
-                  {{ $t('config.dd_wa_hdr_toggle_delay_desc_3') }}
-                </div> -->
-              </div>
-
               <!-- Config revert delay -->
               <div class="mb-3" v-if="config.dd_configuration_option !== 'disabled'">
                 <label for="dd_config_revert_delay" class="form-label">
@@ -241,6 +217,30 @@ function addRemappingEntry() {
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- HDR option -->
+      <div class="mb-3">
+        <label for="dd_hdr_option" class="form-label">
+          {{ $t('config.dd_hdr_option') }}
+        </label>
+        <select id="dd_hdr_option" class="mb-3 form-select" v-model="config.dd_hdr_option">
+          <option value="disabled">{{ $t('config.dd_hdr_option_disabled') }}</option>
+          <option value="auto">{{ $t('config.dd_hdr_option_auto') }}</option>
+        </select>
+        <!-- HDR toggle -->
+        <!-- <label for="dd_wa_hdr_toggle_delay" class="form-label">
+          {{ $t('config.dd_wa_hdr_toggle_delay') }}
+        </label>
+        <input type="number" class="form-control" id="dd_wa_hdr_toggle_delay" placeholder="0" min="0" max="3000"
+              v-model="config.dd_wa_hdr_toggle_delay" />
+        <div class="form-text">
+          {{ $t('config.dd_wa_hdr_toggle_delay_desc_1') }}
+          <br>
+          {{ $t('config.dd_wa_hdr_toggle_delay_desc_2') }}
+          <br>
+          {{ $t('config.dd_wa_hdr_toggle_delay_desc_3') }}
+        </div> -->
       </div>
     </template>
     <template #linux>
