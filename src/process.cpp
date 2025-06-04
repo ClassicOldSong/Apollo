@@ -593,6 +593,16 @@ namespace proc {
     return 0;
   }
 
+  void proc_t::pause() {
+    if (_app.terminate_on_pause) {
+      terminate();
+    } else {
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+      system_tray::update_tray_pausing(proc::proc.get_last_run_app_name());
+#endif
+    }
+  }
+
   void proc_t::terminate(bool immediate, bool needs_refresh) {
     std::error_code ec;
     placebo = false;
@@ -1219,6 +1229,7 @@ namespace proc {
           ctx.use_app_identity = app_node.value("use-app-identity", false);
           ctx.per_client_app_identity = app_node.value("per-client-app-identity", false);
           ctx.allow_client_commands = app_node.value("allow-client-commands", true);
+          ctx.terminate_on_pause = app_node.value("terminate-on-pause", false);
           ctx.gamepad = app_node.value("gamepad", "");
 
           // Calculate a unique application id.
@@ -1284,6 +1295,7 @@ namespace proc {
       ctx.use_app_identity = false;
       ctx.per_client_app_identity = false;
       ctx.allow_client_commands = false;
+      ctx.terminate_on_pause = false;
 
       ctx.elevated = false;
       ctx.auto_detach = true;
@@ -1317,6 +1329,7 @@ namespace proc {
       ctx.use_app_identity = false;
       ctx.per_client_app_identity = false;
       ctx.allow_client_commands = false;
+      ctx.terminate_on_pause = false;
 
       ctx.elevated = false;
       ctx.auto_detach = true;
@@ -1351,6 +1364,7 @@ namespace proc {
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
+        ctx.terminate_on_pause = false;
 
         ctx.elevated = false;
         ctx.auto_detach = true;
@@ -1386,6 +1400,7 @@ namespace proc {
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
+        ctx.terminate_on_pause = false;
 
         ctx.elevated = false;
         ctx.auto_detach = true;

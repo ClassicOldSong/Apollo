@@ -94,6 +94,7 @@ namespace proc {
     bool use_app_identity;
     bool per_client_app_identity;
     bool allow_client_commands;
+    bool terminate_on_pause;
     int  scale_factor;
     std::chrono::seconds exit_timeout;
   };
@@ -135,6 +136,7 @@ namespace proc {
     std::string get_last_run_app_name();
     std::string get_running_app_uuid();
     boost::process::v1::environment get_env();
+    void pause();
     void terminate(bool immediate = false, bool needs_refresh = true);
 
   private:
