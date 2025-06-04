@@ -594,6 +594,7 @@ namespace config {
     false,  // notify_pre_releases
     false,  // legacy_ordering
     {},  // prep commands
+    {},  // state commands
     {},  // server commands
   };
 
@@ -1211,6 +1212,7 @@ namespace config {
 
     string_f(vars, "external_ip", nvhttp.external_ip);
     list_prep_cmd_f(vars, "global_prep_cmd", config::sunshine.prep_cmds);
+    list_prep_cmd_f(vars, "global_state_cmd", config::sunshine.state_cmds);
     list_server_cmd_f(vars, "server_cmd", config::sunshine.server_cmds);
 
     string_f(vars, "audio_sink", audio.sink);

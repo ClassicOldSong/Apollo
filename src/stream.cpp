@@ -2120,6 +2120,7 @@ namespace stream {
       // If this is the first session, invoke the platform callbacks
       if (++running_sessions == 1) {
         platf::streaming_will_start();
+        proc::proc.resume();
       }
 
       if (!session.do_cmds.empty()) {

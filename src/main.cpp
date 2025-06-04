@@ -268,6 +268,9 @@ int main(int argc, char *argv[]) {
       logging::log_flush();
       lifetime::debug_trap();
     };
+
+    proc::proc.terminate();
+
     force_shutdown = task_pool.pushDelayed(task, 10s).task_id;
 
     shutdown_event->raise(true);

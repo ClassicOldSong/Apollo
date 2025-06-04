@@ -38,6 +38,7 @@
         v-if="currentTab === 'general'"
         :config="config"
         :global-prep-cmd="global_prep_cmd"
+        :global-state-cmd="global_state_cmd"
         :server-cmd="server_cmd"
         :platform="platform">
       </general>
@@ -137,6 +138,7 @@
         currentTab: "general",
         vdisplayStatus: "1",
         global_prep_cmd: [],
+        global_state_cmd: [],
         server_cmd: [],
         tabs: [ // TODO: Move the options to each Component instead, encapsulate.
           {
@@ -147,6 +149,7 @@
               "sunshine_name": "",
               "min_log_level": 2,
               "global_prep_cmd": [],
+              "global_state_cmd": [],
               "server_cmd": [],
               "notify_pre_releases": "disabled",
               "hide_tray_controls": "disabled",
@@ -358,7 +361,7 @@
           // TODO: let each tab's Component handle it's own data instead of doing it here
 
           // Parse the special options before population if available
-          const specialOptions = ["dd_mode_remapping", "global_prep_cmd", "server_cmd"]
+          const specialOptions = ["dd_mode_remapping", "global_prep_cmd", "global_state_cmd", "server_cmd"]
           for (const optionKey of specialOptions) {
             if (typeof this.config[optionKey] === "string") {
               this.config[optionKey] = JSON.parse(this.config[optionKey]);
@@ -369,6 +372,7 @@
 
           this.config.dd_mode_remapping ??= {mixed: [], resolution_only: [], refresh_rate_only: []};
           this.config.global_prep_cmd ??= [];
+          this.config.global_state_cmd ??= [];
           this.config.server_cmd ??= [];
 
           // Populate default values from tabs options
@@ -386,12 +390,17 @@
               i.elevated = !!i.elevated
               return i
             });
+            this.global_state_cmd = this.config.global_state_cmd.map((i) => {
+              i.elevated = !!i.elevated
+              return i
+            });
             this.server_cmd = this.config.server_cmd.map((i) => {
               i.elevated = !!i.elevated
               return i
             });
           } else {
             this.global_prep_cmd = this.config.global_prep_cmd;
+            this.global_state_cmd = this.config.global_state_cmd;
             this.server_cmd = this.config.server_cmd;
           }
 
@@ -409,9 +418,10 @@
           fallbackDisplayModeCache = this.config.fallback_mode;
         }
         let config = JSON.parse(JSON.stringify(this.config));
-        config.global_prep_cmd = this.global_prep_cmd.filter(cmd => cmd.do || cmd.undo);
+        config.global_prep_cmd = this.global_prep_cmd.filter(cmd => (cmd.do && cmd.do.trim()) || (cmd.undo && cmd.undo.trim()));
+        config.global_state_cmd = this.global_state_cmd.filter(cmd => (cmd.do && cmd.do.trim()) || (cmd.undo && cmd.undo.trim()));
         config.dd_mode_remapping = config.dd_mode_remapping;
-        config.server_cmd = this.server_cmd.filter(cmd => cmd.name && cmd.cmd);
+        config.server_cmd = this.server_cmd.filter(cmd => (cmd.name && cmd.cmd && cmd.name.trim() && cmd.cmd.trim()));
         return config;
       },
       save() {

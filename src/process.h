@@ -62,6 +62,7 @@ namespace proc {
    */
   struct ctx_t {
     std::vector<cmd_t> prep_cmds;
+    std::vector<cmd_t> state_cmds;
 
     /**
      * Some applications, such as Steam, either exit quickly, or keep running indefinitely.
@@ -136,6 +137,7 @@ namespace proc {
     std::string get_last_run_app_name();
     std::string get_running_app_uuid();
     boost::process::v1::environment get_env();
+    void resume();
     void pause();
     void terminate(bool immediate = false, bool needs_refresh = true);
 
@@ -164,7 +166,7 @@ namespace proc {
   };
 
   boost::filesystem::path
-  find_working_directory(const std::string &cmd, boost::process::v1::environment &env);
+  find_working_directory(const std::string &cmd, const boost::process::v1::environment &env);
 
   /**
    * @brief Calculate a stable id based on name and image data

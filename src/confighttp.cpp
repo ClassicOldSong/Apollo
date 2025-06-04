@@ -1285,6 +1285,8 @@ namespace confighttp {
 
     print_req(request);
 
+    proc::proc.terminate();
+
     // We may not return from this call
     platf::restart();
   }
@@ -1304,6 +1306,9 @@ namespace confighttp {
     print_req(request);
 
     BOOST_LOG(warning) << "Requested quit from config page!"sv;
+
+    proc::proc.terminate();
+
 #ifdef _WIN32
     if (GetConsoleWindow() == NULL) {
       lifetime::exit_sunshine(ERROR_SHUTDOWN_IN_PROGRESS, true);

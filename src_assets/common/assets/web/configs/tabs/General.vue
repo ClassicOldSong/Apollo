@@ -6,12 +6,19 @@ const props = defineProps({
   platform: String,
   config: Object,
   globalPrepCmd: Array,
+  globalStateCmd: Array,
   serverCmd: Array
 })
 
 const config = ref(props.config)
 const globalPrepCmd = ref(props.globalPrepCmd)
+const globalStateCmd = ref(props.globalStateCmd)
 const serverCmd = ref(props.serverCmd)
+
+const cmds = ref({
+  prep: globalPrepCmd,
+  state: globalStateCmd
+})
 
 const prepCmdTemplate = {
   do: "",
@@ -32,7 +39,7 @@ function addCmd(cmdArr, template, idx) {
   if (idx < 0) {
     cmdArr.push(_tpl);
   } else {
-    cmdArr.splice(idx + 1, 0, _tpl);
+    cmdArr.splice(idx, 0, _tpl);
   }
 }
 
@@ -99,11 +106,11 @@ onMounted(() => {
       <div class="form-text">{{ $t('config.log_level_desc') }}</div>
     </div>
 
-    <!-- Global Prep Commands -->
-    <div id="global_prep_cmd" class="mb-3 d-flex flex-column">
-      <label class="form-label">{{ $t('config.global_prep_cmd') }}</label>
-      <div class="form-text">{{ $t('config.global_prep_cmd_desc') }}</div>
-      <table class="table" v-if="globalPrepCmd.length > 0">
+    <!-- Global Prep/State Commands -->
+    <div v-for="type in ['prep', 'state']" :id="`global_${type}_cmd`" class="mb-3 d-flex flex-column">
+      <label class="form-label">{{ $t(`config.global_${type}_cmd`) }}</label>
+      <div class="form-text pre-wrap">{{ $t(`config.global_${type}_cmd_desc`) }}</div>
+      <table class="table" v-if="cmds[type].length > 0">
         <thead>
         <tr>
           <th scope="col"><i class="fas fa-play"></i> {{ $t('_common.do_cmd') }}</th>
@@ -115,7 +122,7 @@ onMounted(() => {
         </tr>
         </thead>
         <tbody>
-        <tr v-for="(c, i) in globalPrepCmd">
+        <tr v-for="(c, i) in cmds[type]">
           <td>
             <input type="text" class="form-control monospace" v-model="c.do" />
           </td>
@@ -123,25 +130,25 @@ onMounted(() => {
             <input type="text" class="form-control monospace" v-model="c.undo" />
           </td>
           <td v-if="platform === 'windows'" class="align-middle">
-            <Checkbox :id="'prep-cmd-admin-' + i"
+            <Checkbox :id="type + '-cmd-admin-' + i"
                       label="_common.elevated"
                       desc=""
                       default="false"
                       v-model="c.elevated"
             ></Checkbox>
           </td>
-          <td>
-            <button class="btn btn-danger me-2" @click="removeCmd(globalPrepCmd, i)">
+          <td class="text-end">
+            <button class="btn btn-danger me-2" @click="removeCmd(cmds[type], i)">
               <i class="fas fa-trash"></i>
             </button>
-            <button class="btn btn-success" @click="addCmd(globalPrepCmd, prepCmdTemplate, i)">
+            <button class="btn btn-success" @click="addCmd(cmds[type], prepCmdTemplate, i)">
               <i class="fas fa-plus"></i>
             </button>
           </td>
         </tr>
         </tbody>
       </table>
-      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(globalPrepCmd, prepCmdTemplate, -1)">
+      <button class="ms-0 mt-2 btn btn-success" style="margin: 0 auto" @click="addCmd(cmds[type], prepCmdTemplate, -1)">
         &plus; {{ $t('config.add') }}
       </button>
     </div>
@@ -178,7 +185,7 @@ onMounted(() => {
               <label :for="'server-cmd-admin-' + i" class="form-check-label">{{ $t('_common.elevated') }}</label>
             </div>
           </td>
-          <td>
+          <td class="text-end">
             <button class="btn btn-danger me-2" @click="removeCmd(serverCmd, i)">
               <i class="fas fa-trash"></i>
             </button>

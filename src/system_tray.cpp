@@ -79,11 +79,14 @@ namespace system_tray {
   void tray_restart_cb(struct tray_menu *item) {
     BOOST_LOG(info) << "Restarting from system tray"sv;
 
+    proc::proc.terminate();
     platf::restart();
   }
 
   void tray_quit_cb(struct tray_menu *item) {
     BOOST_LOG(info) << "Quitting from system tray"sv;
+
+    proc::proc.terminate();
 
   #ifdef _WIN32
     // If we're running in a service, return a special status to
