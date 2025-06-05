@@ -114,6 +114,15 @@
                       default="true"
             ></Checkbox>
 
+            <!-- Always Use Virtual Display -->
+            <Checkbox class="mb-3"
+                      id="always_use_virtual_display"
+                      label="pin.always_use_virtual_display"
+                      desc="pin.always_use_virtual_display_desc"
+                      v-model="client.editAlwaysUseVirtualDisplay"
+                      default="false"
+                      v-if="platform === 'windows'"
+            ></Checkbox>
             <!-- Display Mode Override -->
             <div class="mb-3 mt-2">
               <label for="display_mode_override" class="form-label">{{ $t('pin.display_mode_override') }}</label>
@@ -522,6 +531,7 @@
         client.editName = client.name;
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
+        client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
@@ -537,6 +547,7 @@
         client.editDisplayMode = client.display_mode;
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
+        client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
       },
       saveClient(client) {
         client.editing = false;
@@ -547,6 +558,7 @@
           display_mode: client.editDisplayMode.trim(),
           allow_client_commands: client.editAllowClientCommands,
           enable_legacy_ordering: client.editEnableLegacyOrdering,
+          always_use_virtual_display: client.editAlwaysUseVirtualDisplay,
           perm: client.editPerm & permissionMapping._all,
           do: client.edit_do.reduce((filtered, {cmd: _cmd, elevated}) => {
             const cmd = _cmd.trim()
@@ -576,6 +588,14 @@
           },
           method: 'POST',
           body: JSON.stringify(editedClient)
+        })
+        .then(resp => resp.json())
+        .then(resp => {
+          if (resp.status) {
+            this.refreshClients();
+          } else {
+            throw new Error(resp.message);
+          }
         })
         .catch(err => {
           alert(this.i18n.t('pin.save_client_error') + err);
@@ -678,6 +698,7 @@
                 do: _do,
                 undo,
                 allow_client_commands,
+                always_use_virtual_display,
                 enable_legacy_ordering
               }) => {
                 const permInt = parseInt(perm, 10);
@@ -691,7 +712,8 @@
                   do: _do,
                   undo,
                   allow_client_commands,
-                  enable_legacy_ordering
+                  enable_legacy_ordering,
+                  always_use_virtual_display
                 }
               })
               currentEditingClient = null;

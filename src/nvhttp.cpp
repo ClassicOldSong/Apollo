@@ -250,7 +250,7 @@ namespace nvhttp {
         named_cert_node["perm"] = static_cast<uint32_t>(named_cert_p->perm);
         named_cert_node["enable_legacy_ordering"] = named_cert_p->enable_legacy_ordering;
         named_cert_node["allow_client_commands"] = named_cert_p->allow_client_commands;
-
+        named_cert_node["always_use_virtual_display"] = named_cert_p->always_use_virtual_display;
 
         // Add "do" commands if available.
         if (!named_cert_p->do_cmds.empty()) {
@@ -329,6 +329,7 @@ namespace nvhttp {
             named_cert_p->perm = PERM::_all;
             named_cert_p->enable_legacy_ordering = true;
             named_cert_p->allow_client_commands = true;
+            named_cert_p->always_use_virtual_display = false;
             client.named_devices.emplace_back(named_cert_p);
           }
         }
@@ -346,6 +347,7 @@ namespace nvhttp {
         named_cert_p->perm = (PERM)(util::get_non_string_json_value<uint32_t>(el, "perm", (uint32_t)PERM::_all)) & PERM::_all;
         named_cert_p->enable_legacy_ordering = el.value("enable_legacy_ordering", true);
         named_cert_p->allow_client_commands = el.value("allow_client_commands", true);
+        named_cert_p->always_use_virtual_display = el.value("always_use_virtual_display", false);
         // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
@@ -456,7 +458,7 @@ namespace nvhttp {
     launch_session->surround_params = (get_arg(args, "surroundParams", ""));
     launch_session->gcmap = util::from_view(get_arg(args, "gcmap", "0"));
     launch_session->enable_hdr = util::from_view(get_arg(args, "hdrMode", "0"));
-    launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0"));
+    launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0")) || named_cert_p->always_use_virtual_display;
     launch_session->scale_factor = util::from_view(get_arg(args, "scaleFactor", "100"));
 
     launch_session->client_do_cmds = named_cert_p->do_cmds;
@@ -631,6 +633,7 @@ namespace nvhttp {
 
       named_cert_p->enable_legacy_ordering = true;
       named_cert_p->allow_client_commands = true;
+      named_cert_p->always_use_virtual_display = false;
 
       auto it = map_id_sess.find(client.uniqueID);
       map_id_sess.erase(it);
@@ -1021,6 +1024,7 @@ namespace nvhttp {
       named_cert_node["perm"] = static_cast<uint32_t>(named_cert->perm);
       named_cert_node["enable_legacy_ordering"] = named_cert->enable_legacy_ordering;
       named_cert_node["allow_client_commands"] = named_cert->allow_client_commands;
+      named_cert_node["always_use_virtual_display"] = named_cert->always_use_virtual_display;
 
       // Add "do" commands if available
       if (!named_cert->do_cmds.empty()) {
@@ -1809,7 +1813,8 @@ namespace nvhttp {
     const cmd_list_t& undo_cmds,
     const crypto::PERM newPerm,
     const bool enable_legacy_ordering,
-    const bool allow_client_commands
+    const bool allow_client_commands,
+    const bool always_use_virtual_display
   ) {
     find_and_udpate_session_info(uuid, name, newPerm);
 
@@ -1825,6 +1830,7 @@ namespace nvhttp {
         named_cert_p->undo_cmds = undo_cmds;
         named_cert_p->enable_legacy_ordering = enable_legacy_ordering;
         named_cert_p->allow_client_commands = allow_client_commands;
+        named_cert_p->always_use_virtual_display = always_use_virtual_display;
         save_state();
         return true;
       }
