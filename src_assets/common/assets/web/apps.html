@@ -85,12 +85,27 @@
 <body id="app" v-cloak>
   <Navbar></Navbar>
   <div class="container">
-    <div class="my-4">
+    <div class="my-4" v-if="!showEditForm">
         <h1>{{ $t('apps.applications_title') }}</h1>
         <div>{{ $t('apps.applications_desc') }}</div>
         <div>{{ $t('apps.applications_reorder_desc') }}</div>
+        <div class="pre-wrap">{{ $t('apps.applications_tips') }}</div>
     </div>
-    <div class="card p-4">
+    <div class="my-4" v-else>
+        <h1>{{ editForm.name || "&lt; NO NAME &gt;"}}</h1>
+        <div>
+          <button @click="showEditForm = false" class="btn btn-secondary me-2 mt-2">
+            <i class="fas fa-xmark"></i> {{ $t('_common.cancel') }}
+          </button>
+          <button class="btn btn-primary me-2 mt-2" :disabled="actionDisabled || !editForm.name.trim()" @click="save">
+            <i class="fas fa-floppy-disk"></i> {{ $t('_common.save') }}
+          </button>
+          <button class="btn btn-success mt-2" @click="exportLauncherFile(editForm)" :disabled="!editForm.uuid">
+            <i class="fas fa-arrow-up-from-bracket"></i> {{ $t('apps.export_launcher_file') }}
+          </button>
+        </div>
+    </div>
+    <div class="card p-4" v-if="!showEditForm">
       <table class="table">
         <thead>
           <tr>
@@ -111,7 +126,7 @@
             @dragend="onDragEnd()"
             @drop="onDrop($event, app, i)"
           >
-            <td>{{app.name || ' '}}</td>
+            <td @dblclick="exportLauncherFile(app)">{{app.name || ' '}}</td>
             <td v-if="app.uuid" class="text-end">
               <button class="btn btn-primary me-1" :disabled="actionDisabled" @click="editApp(app)">
                 <i class="fas fa-edit"></i>
@@ -122,16 +137,27 @@
               <button class="btn btn-warning" :disabled="actionDisabled" @click="closeApp()" v-if="currentApp === app.uuid">
                 <i class="fas fa-stop"></i>
               </button>
-              <button class="btn btn-success" :disabled="actionDisabled" @click="launchApp(app)" v-else>
+              <a class="btn btn-success" :disabled="actionDisabled" @click.prevent="launchApp(event, app)" :href="'art://launch?host_uuid=' + hostUUID + '&host_name=' + hostName + '&app_uuid=' + app.uuid + '&app_name=' + app.name" v-else>
                 <i class="fas fa-play"></i>
-              </button>
+              </a>
             </td>
             <td v-else></td>
           </tr>
         </tbody>
       </table>
+      <div class="mt-2">
+        <button class="btn btn-primary" @click="newApp" :disabled="actionDisabled">
+          <i class="fas fa-plus"></i> {{ $t('apps.add_new') }}
+        </button>
+        <button class="btn btn-secondary float-end" @click="alphabetizeApps" :disabled="actionDisabled" v-if="!listReordered">
+          <i class="fas fa-sort-alpha-up"></i> {{ $t('apps.alphabetize') }}
+        </button>
+        <button class="btn btn-warning float-end" @click="saveOrder" :disabled="actionDisabled" v-if="listReordered">
+          <i class="fas fa-floppy-disk"></i> {{ $t('apps.save_order') }}
+        </button>
+      </div>
     </div>
-    <div class="edit-form card mt-2" v-if="showEditForm">
+    <div class="edit-form card mt-2" v-else>
       <div class="p-4">
         <!-- Application Name -->
         <div class="mb-3">
@@ -484,23 +510,14 @@
 
         <!-- Save buttons -->
         <div class="d-flex">
-          <button @click="showEditForm = false" class="btn btn-secondary m-2">
-            {{ $t('_common.cancel') }}
+          <button @click="showEditForm = false" class="btn btn-secondary me-2">
+            <i class="fas fa-xmark"></i> {{ $t('_common.cancel') }}
           </button>
-          <button class="btn btn-primary m-2" :disabled="actionDisabled || !editForm.name.trim()" @click="save">{{ $t('_common.save') }}</button>
+          <button class="btn btn-primary" :disabled="actionDisabled || !editForm.name.trim()" @click="save">
+            <i class="fas fa-floppy-disk"></i> {{ $t('_common.save') }}
+          </button>
         </div>
       </div>
-    </div>
-    <div class="mt-2" v-else>
-      <button class="btn btn-primary" @click="newApp" :disabled="actionDisabled">
-        <i class="fas fa-plus"></i> {{ $t('apps.add_new') }}
-      </button>
-      <button class="btn btn-secondary float-end" @click="alphabetizeApps" :disabled="actionDisabled" v-if="!listReordered">
-        <i class="fas fa-sort-alpha-up"></i> {{ $t('apps.alphabetize') }}
-      </button>
-      <button class="btn btn-warning float-end" @click="saveOrder" :disabled="actionDisabled" v-if="listReordered">
-        <i class="fas fa-floppy-disk"></i> {{ $t('apps.save_order') }}
-      </button>
     </div>
   </div>
 </body>
@@ -681,12 +698,12 @@
         this.editForm = Object.assign({}, newApp);
         this.showEditForm = true;
       },
-      launchApp(app) {
+      launchApp(event, app) {
         const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) >= 0
 
         if (!isLocalHost && confirm(this.$t('apps.launch_local_client'))) {
           const link = document.createElement('a');
-          link.href = `art://launch?host_uuid=${this.hostUUID}&host_name=${this.hostName}&app_uuid=${app.uuid}&app_name=${app.name}`;
+          link.href = event.target.href;
           link.click();
           return;
         }
@@ -735,6 +752,21 @@
       editApp(app) {
         this.editForm = Object.assign({}, newApp, JSON.parse(JSON.stringify(app)));
         this.showEditForm = true;
+      },
+      exportLauncherFile(app) {
+        const link = document.createElement('a');
+        const fileContent = `# Artemis app entry
+# Exported by Apollo
+# https://github.com/ClassicOldSong/Apollo
+
+[host_uuid] ${this.hostUUID}
+[host_name] ${this.hostName}
+[app_uuid] ${app.uuid}
+[app_name] ${app.name}
+`;
+        link.href = `data:text/plain;charset=utf-8,${encodeURIComponent(fileContent)}`;
+        link.download = `${app.name}.art`;
+        link.click();
       },
       showDeleteForm(app) {
         const resp = confirm(
