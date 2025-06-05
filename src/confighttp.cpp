@@ -541,6 +541,8 @@ namespace confighttp {
       nlohmann::json file_tree = nlohmann::json::parse(content);
 
       file_tree["current_app"] = proc::proc.get_running_app_uuid();
+      file_tree["host_uuid"] = http::unique_id;
+      file_tree["host_name"] = config::nvhttp.sunshine_name;
 
       send_response(response, file_tree);
     } catch (std::exception &e) {

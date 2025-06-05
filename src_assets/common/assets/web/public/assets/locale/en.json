@@ -96,6 +96,7 @@
     "image": "Image",
     "image_desc": "Application icon/picture/image path that will be sent to client. Image must be a PNG file. If not set, Apollo will send default box image.",
     "launch": "Launch",
+    "launch_local_client": "Do you want to launch the app from local client on this device?",
     "launch_warning": "Are you sure you want to launch this app? This will terminate the currently running app.",
     "launch_failed": "App launch failed: ",
     "loading": "Loading...",

@@ -471,7 +471,7 @@
           this.otpStatus = 'success'
           this.otpMessage = this.i18n.t('pin.otp_success')
 
-          const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) < 0
+          const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) >= 0
 
           if (hostManuallySet) {
             Object.assign(this, hostInfoCache);
@@ -479,7 +479,7 @@
             this.hostAddr = resp.ip
             this.hostPort = parseInt(location.port, 10) - 1
 
-            if (isLocalHost) {
+            if (!isLocalHost) {
               this.hostAddr = location.hostname
             }
 
@@ -498,7 +498,7 @@
               resetOTPTimeout = null
             }, 3 * 60 * 1000)
 
-            if (isLocalHost) {
+            if (!isLocalHost) {
               setTimeout(() => {
                 if (window.confirm(this.i18n.t('pin.otp_pair_now'))) {
                   window.open(this.deepLink);

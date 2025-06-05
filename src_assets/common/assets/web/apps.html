@@ -68,6 +68,10 @@
           vertical-align: top;
         }
 
+        .actions-col {
+          min-width: 150px;
+        }
+
         .pre-wrap {
           white-space: pre-wrap;
         }
@@ -91,7 +95,7 @@
         <thead>
           <tr>
             <th scope="col">{{ $t('apps.name') }}</th>
-            <th scope="col" class="text-end">{{ $t('apps.actions') }}</th>
+            <th scope="col" class="text-end actions-col">{{ $t('apps.actions') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -109,10 +113,10 @@
           >
             <td>{{app.name || ' '}}</td>
             <td v-if="app.uuid" class="text-end">
-              <button class="btn btn-primary me-2" :disabled="actionDisabled" @click="editApp(app)">
+              <button class="btn btn-primary me-1" :disabled="actionDisabled" @click="editApp(app)">
                 <i class="fas fa-edit"></i>
               </button>
-              <button class="btn btn-danger me-2" :disabled="actionDisabled" @click="showDeleteForm(app)">
+              <button class="btn btn-danger me-1" :disabled="actionDisabled" @click="showDeleteForm(app)">
                 <i class="fas fa-trash"></i>
               </button>
               <button class="btn btn-warning" :disabled="actionDisabled" @click="closeApp()" v-if="currentApp === app.uuid">
@@ -548,6 +552,8 @@
         platform: "",
         currentApp: "",
         draggingApp: -1,
+        hostName: "",
+        hostUUID: "",
         listReordered: false
       };
     },
@@ -666,6 +672,8 @@
         .then(r => {
           this.apps = r.apps.filter(i => i.uuid).map(i => ({...i, launching: false, dragover: false}));
           this.currentApp = r.current_app;
+          this.hostName = r.host_name;
+          this.hostUUID = r.host_uuid;
           this.listReordered = false;
         });
       },
@@ -674,6 +682,15 @@
         this.showEditForm = true;
       },
       launchApp(app) {
+        const isLocalHost = ['localhost', '127.0.0.1', '[::1]'].indexOf(location.hostname) >= 0
+
+        if (!isLocalHost && confirm(this.$t('apps.launch_local_client'))) {
+          const link = document.createElement('a');
+          link.href = `art://launch?host_uuid=${this.hostUUID}&host_name=${this.hostName}&app_uuid=${app.uuid}&app_name=${app.name}`;
+          link.click();
+          return;
+        }
+
         if (confirm(this.$t('apps.launch_warning'))) {
           this.actionDisabled = true;
           fetch("./api/apps/launch", {
