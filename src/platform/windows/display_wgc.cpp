@@ -139,7 +139,7 @@ namespace platf::dxgi {
     }
     try {
       if (winrt::ApiInformation::IsPropertyPresent(L"Windows.Graphics.Capture.GraphicsCaptureSession", L"MinUpdateInterval")) {
-        capture_session.MinUpdateInterval(winrt::TimeSpan{ 10000 });
+        capture_session.MinUpdateInterval(winrt::TimeSpan{ 10000000 / (config.framerate * 2) });
       }
       else {
         BOOST_LOG(warning) << "Can't set MinUpdateInterval";
