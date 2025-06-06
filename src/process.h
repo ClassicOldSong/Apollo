@@ -107,15 +107,14 @@ namespace proc {
     std::string display_name;
     std::string initial_display;
     std::string mode_changed_display;
-    bool initial_hdr;
-    bool virtual_display;
-    bool allow_client_commands;
+    bool initial_hdr = false;
+    bool virtual_display = false;
+    bool allow_client_commands = false;
 
     proc_t(
       boost::process::v1::environment &&env,
       std::vector<ctx_t> &&apps
     ):
-        _app_id(0),
         _env(std::move(env)),
         _apps(std::move(apps)) {
     }
@@ -142,7 +141,7 @@ namespace proc {
     void terminate(bool immediate = false, bool needs_refresh = true);
 
   private:
-    int _app_id;
+    int _app_id = 0;
     std::string _app_name;
 
     boost::process::v1::environment _env;
