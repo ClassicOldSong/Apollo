@@ -166,6 +166,7 @@ namespace proc {
     _app_id = input_only_app_id;
     _app_name = "Remote Input";
     _app.uuid = REMOTE_INPUT_UUID;
+    _app.terminate_on_pause = true;
     allow_client_commands = false;
     placebo = true;
 
@@ -1490,7 +1491,7 @@ namespace proc {
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
-        ctx.terminate_on_pause = false;
+        ctx.terminate_on_pause = true; // There's no need to keep an active input only session ongoing
 
         ctx.elevated = false;
         ctx.auto_detach = true;
