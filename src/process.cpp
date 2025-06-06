@@ -523,9 +523,9 @@ namespace proc {
       if (config::video.dd.hdr_option == config::video_t::dd_t::hdr_option_e::automatic) {
         mode_changed_display = currentDisplay;
 
-        if (!VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), false)) {
-          return;
-        }
+        // Try turn off HDR whatever
+        // As we always have to apply the workaround by turining off HDR first
+        VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), false);
 
         if (enable_hdr) {
           if (VDISPLAY::setDisplayHDRByName(currentDisplayW.c_str(), true)) {
