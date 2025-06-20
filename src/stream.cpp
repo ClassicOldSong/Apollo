@@ -423,6 +423,7 @@ namespace stream {
     safe::signal_t controlEnd;
 
     std::atomic<session::state_e> state;
+    int iAltControllerNameIndex;
   };
 
   /**
@@ -997,8 +998,7 @@ namespace stream {
       if (tagged_cipher_length >= 16 + iv.size()) {
         std::copy(payload.end() - 16, payload.end(), std::begin(iv));
       }
-
-      input::passthrough(session->input, std::move(plaintext), session->permission);
+      input::passthrough(session->input, std::move(plaintext), session->permission, session->iAltControllerNameIndex );
     });
 
     server->map(packetTypes[IDX_EXEC_SERVER_CMD], [server](session_t *session, const std::string_view &payload) {
@@ -1112,7 +1112,7 @@ namespace stream {
       // IDX_INPUT_DATA callback will attempt to decrypt unencrypted data, therefore we need pass it directly
       if (type == packetTypes[IDX_INPUT_DATA]) {
         plaintext.erase(std::begin(plaintext), std::begin(plaintext) + 4);
-        input::passthrough(session->input, std::move(plaintext), session->permission);
+        input::passthrough(session->input, std::move(plaintext), session->permission, session->iAltControllerNameIndex );
       } else {
         server->call(type, session, next_payload, true);
       }
@@ -2145,14 +2145,53 @@ namespace stream {
       return 0;
     }
 
+
+  struct alt_controller_info
+  {
+    std::string sDeviceName;
+    int iIndex;
+  };
+
+  int findDeviceNameInAltGamePadNumbering( std::string sToFind )
+  {
+    size_t Index;
+    size_t Max;
+
+    Max = config::alt_gamepad_numbering.sDeviceNames.size();
+
+    for( Index = 0; Index < Max; Index += 1 ) {
+      if( sToFind == config::alt_gamepad_numbering.sDeviceNames[Index] ) {
+        return Index;
+      }
+    }
+    return -1;
+  }
+
     std::shared_ptr<session_t> alloc(config_t &config, rtsp_stream::launch_session_t &launch_session) {
       auto session = std::make_shared<session_t>();
+      int iTempAltGamepad = 0;
 
       auto mail = std::make_shared<safe::mail_raw_t>();
 
       session->shutdown_event = mail->event<bool>(mail::shutdown);
       session->launch_session_id = launch_session.id;
       session->device_name = launch_session.device_name;
+      if( config::input.enable_alt_controller_numbering_mode == true ) {
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+        iTempAltGamepad = findDeviceNameInAltGamePadNumbering( session->device_name );
+
+        // If not found, set the index to the next element after a pushback
+        if( iTempAltGamepad == -1 ) {
+          iTempAltGamepad = config::alt_gamepad_numbering.sDeviceNames.size();
+          config::alt_gamepad_numbering.sDeviceNames.push_back( session->device_name );
+        }
+
+        // Set the index to the appropriate element
+        session->iAltControllerNameIndex = iTempAltGamepad;
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+      } else {
+      }
+
       session->device_uuid = launch_session.unique_id;
       session->permission = launch_session.perm;
 
