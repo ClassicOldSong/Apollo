@@ -88,6 +88,8 @@ namespace platf {
 
     gamepad_feedback_msg_t last_rumble;
     gamepad_feedback_msg_t last_rgb_led;
+    int alt_numbering_feedback_queue_index;
+
   };
 
   constexpr float EARTH_G = 9.80665f;
@@ -211,6 +213,9 @@ namespace platf {
 
       gamepads.resize(MAX_GAMEPADS);
 
+
+      placeholder_gamepads.resize(MAX_GAMEPADS);
+
       return 0;
     }
 
@@ -225,7 +230,9 @@ namespace platf {
       auto &gamepad = gamepads[id.globalIndex];
       assert(!gamepad.gp);
 
+      VIGEM_API VIGEM_ERROR status;
       gamepad.client_relative_index = id.clientRelativeIndex;
+	  gamepad.alt_numbering_feedback_queue_index = id.holderRelativeIndex;
       gamepad.last_report_ts = std::chrono::steady_clock::now();
 
       // Establish a connect to the ViGEm driver if we don't have one yet
@@ -241,48 +248,52 @@ namespace platf {
         }
       }
 
-      if (gp_type == Xbox360Wired) {
-        gamepad.gp.reset(vigem_target_x360_alloc());
-        XUSB_REPORT_INIT(&gamepad.report.x360);
-      } else {
-        gamepad.gp.reset(vigem_target_ds4_alloc());
+      if( (config::input.enable_alt_controller_numbering_mode == true) && (config::alt_gamepad_numbering.bFirstTimeControllerAllocation == false ) && (id.holderRelativeIndex != -1) ) {
+        vigem_target_x360_unregister_notification(gamepad.gp.get());
+        } else {
+        if (gp_type == Xbox360Wired) {
+          gamepad.gp.reset(vigem_target_x360_alloc());
+          XUSB_REPORT_INIT(&gamepad.report.x360);
+        } else {
+          gamepad.gp.reset(vigem_target_ds4_alloc());
 
-        // There is no equivalent DS4_REPORT_EX_INIT()
-        gamepad.report.ds4 = ds4_report_init_ex;
+          // There is no equivalent DS4_REPORT_EX_INIT()
+          gamepad.report.ds4 = ds4_report_init_ex;
 
-        // Set initial accelerometer and gyro state
-        ds4_update_motion(gamepad, LI_MOTION_TYPE_ACCEL, 0.0f, EARTH_G, 0.0f);
-        ds4_update_motion(gamepad, LI_MOTION_TYPE_GYRO, 0.0f, 0.0f, 0.0f);
+          // Set initial accelerometer and gyro state
+          ds4_update_motion(gamepad, LI_MOTION_TYPE_ACCEL, 0.0f, EARTH_G, 0.0f);
+          ds4_update_motion(gamepad, LI_MOTION_TYPE_GYRO, 0.0f, 0.0f, 0.0f);
 
-        // Request motion events from the client at 100 Hz
-        feedback_queue->raise(gamepad_feedback_msg_t::make_motion_event_state(gamepad.client_relative_index, LI_MOTION_TYPE_ACCEL, 100));
-        feedback_queue->raise(gamepad_feedback_msg_t::make_motion_event_state(gamepad.client_relative_index, LI_MOTION_TYPE_GYRO, 100));
+          // Request motion events from the client at 100 Hz
+          feedback_queue->raise(gamepad_feedback_msg_t::make_motion_event_state(gamepad.client_relative_index, LI_MOTION_TYPE_ACCEL, 100));
+          feedback_queue->raise(gamepad_feedback_msg_t::make_motion_event_state(gamepad.client_relative_index, LI_MOTION_TYPE_GYRO, 100));
 
-        // We support pointer index 0 and 1
-        gamepad.available_pointers = 0x3;
-      }
+          // We support pointer index 0 and 1
+          gamepad.available_pointers = 0x3;
+        }
 
-      auto status = vigem_target_add(client.get(), gamepad.gp.get());
-      if (!VIGEM_SUCCESS(status)) {
-        BOOST_LOG(error) << "Couldn't add Gamepad to ViGEm connection ["sv << util::hex(status).to_string_view() << ']';
+        status = vigem_target_add(client.get(), gamepad.gp.get());
+        if (!VIGEM_SUCCESS(status)) {
+          BOOST_LOG(error) << "Couldn't add Gamepad to ViGEm connection ["sv << util::hex(status).to_string_view() << ']';
 
-        return -1;
+          return -1;
+        }
       }
 
       gamepad.feedback_queue = std::move(feedback_queue);
 
-      if (gp_type == Xbox360Wired) {
-        status = vigem_target_x360_register_notification(client.get(), gamepad.gp.get(), x360_notify, this);
-      } else {
-        status = vigem_target_ds4_register_notification(client.get(), gamepad.gp.get(), ds4_notify, this);
-      }
-
-      if (!VIGEM_SUCCESS(status)) {
-        BOOST_LOG(warning) << "Couldn't register notifications for rumble support ["sv << util::hex(status).to_string_view() << ']';
-      }
-
-      return 0;
+    if (gp_type == Xbox360Wired) {
+      status = vigem_target_x360_register_notification(client.get(), gamepad.gp.get(), x360_notify, this);
+    } else {
+      status = vigem_target_ds4_register_notification(client.get(), gamepad.gp.get(), ds4_notify, this);
     }
+
+    if (!VIGEM_SUCCESS(status)) {
+        BOOST_LOG(warning) << "Couldn't register notifications for rumble support ["sv << util::hex(status).to_string_view() << ']';
+    }
+
+    return 0;
+  }
 
     /**
      * @brief Detaches the specified gamepad
@@ -397,6 +408,7 @@ namespace platf {
     }
 
     std::vector<gamepad_context_t> gamepads;
+    std::vector<gamepad_context_t> placeholder_gamepads;
 
     client_t client;
   };
@@ -1229,6 +1241,26 @@ namespace platf {
     }
 
     raw->vigem->free_target(nr);
+  }
+
+  void detach_feedback_queue_from_gamepad(input_t &input, int nr) {
+    auto raw = (input_raw_t *) input.get();
+
+    if (!raw->vigem) {
+      return;
+    }
+
+      auto &gamepad = raw->vigem->gamepads[nr];
+
+      if (gamepad.repeat_task) {
+        task_pool.cancel(gamepad.repeat_task);
+        gamepad.repeat_task = 0;
+      }
+
+      if (gamepad.gp && vigem_target_is_attached(gamepad.gp.get())) {
+        vigem_target_x360_unregister_notification(gamepad.gp.get());
+      }
+    return;
   }
 
   /**

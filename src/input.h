@@ -12,6 +12,10 @@
 #include "thread_safe.h"
 #include "crypto.h"
 
+namespace config {
+  extern std::vector<platf::feedback_queue_t> placeholder_feedback_queues;
+}
+
 namespace input {
   struct input_t;
 

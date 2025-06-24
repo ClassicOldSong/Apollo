@@ -301,6 +301,9 @@ namespace platf {
     // client. It must be used when communicating back to the client via
     // the input feedback queue.
     std::uint8_t clientRelativeIndex;
+    
+    // This is the holder relative index that should be used to detect when the holder is being used (Just checking the config::enabled flag is not good enough)
+    std::uint8_t holderRelativeIndex = -1;
   };
 
   struct gamepad_arrival_t {
@@ -820,6 +823,7 @@ namespace platf {
    */
   int alloc_gamepad(input_t &input, const gamepad_id_t &id, const gamepad_arrival_t &metadata, feedback_queue_t feedback_queue);
   void free_gamepad(input_t &input, int nr);
+  void detach_feedback_queue_from_gamepad(input_t &input, int nr);
 
   /**
    * @brief Get the supported platform capabilities to advertise to the client.

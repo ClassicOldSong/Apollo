@@ -297,6 +297,7 @@ namespace config {
     std::vector< std::string > sDeviceNames;
     volatile bool bFirstTimeControllerAllocation { true };
     volatile bool bFirstTimeParsing { true };
+    volatile bool bFirstTimeFeedbackQueues { true };
   }; 
 
   extern alt_gamepad_numbering_t alt_gamepad_numbering;

@@ -440,7 +440,8 @@ namespace config {
     {}, // alt_gamepad_numbering_mutex
     {}, // sDeviceNames
     true, // bFirstTimeControllerAllocation
-    true, // bFirstTimeParsing 
+    true, // bFirstTimeParsing
+    true, // bFirstTimeFeedbackQueues
   };
 
   video_t video {
@@ -1532,4 +1533,10 @@ namespace config {
 
     return 0;
   }
+
+  // Alternate Controller placeholder for feedback queues
+  // Use alt_gamepad_numbering_mutex to access this element
+  // This will not work in the config.h file where the other alternate controller placeholder variables are because platf::feedback_queue_t is not defined and adding the "platform/common.h" in the config.h context will cause many files which include config.h to fail.
+  std::vector<platf::feedback_queue_t> placeholder_feedback_queues { platf::MAX_GAMEPADS };
+
 }  // namespace config

@@ -84,6 +84,10 @@ using asio::ip::udp;
 
 using namespace std::literals;
 
+namespace config {
+  extern std::vector<platf::feedback_queue_t> placeholder_feedback_queues;
+}
+
 namespace stream {
 
   enum class socket_e : int {
@@ -2188,6 +2192,17 @@ namespace stream {
 
         // Set the index to the appropriate element
         session->iAltControllerNameIndex = iTempAltGamepad;
+
+        // Initialize all of the feedback queues properly
+        if( config::alt_gamepad_numbering.bFirstTimeFeedbackQueues == true ) {
+          int x;
+          platf::feedback_queue_t a;
+          for(x = 0; x < 16; x++) {
+            a = mail->queue<platf::gamepad_feedback_msg_t>(mail::gamepad_feedback);
+            config::placeholder_feedback_queues[x] = a;
+          }
+          config::alt_gamepad_numbering.bFirstTimeFeedbackQueues = false;
+        }
         config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
       } else {
       }
