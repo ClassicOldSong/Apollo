@@ -327,6 +327,11 @@ namespace platf {
      * @param smallMotor The small motor.
      */
     void rumble(target_t::pointer target, std::uint8_t largeMotor, std::uint8_t smallMotor) {
+      // config::input.enable_block_rumble_messages_to_controllers - Default is false so ignore rumble messages when true
+      if( config::input.enable_block_rumble_messages_to_controllers == true ) {
+        // Do nothing; just return
+        return;
+      }
       for (int x = 0; x < gamepads.size(); ++x) {
         auto &gamepad = gamepads[x];
 

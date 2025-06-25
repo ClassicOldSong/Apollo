@@ -3,6 +3,7 @@
  * @brief Definitions for UPnP port mapping.
  */
 // lib includes
+#include <cstddef>   // Needed to compile size_t in Windows
 #include <miniupnpc/miniupnpc.h>
 #include <miniupnpc/upnpcommands.h>
 

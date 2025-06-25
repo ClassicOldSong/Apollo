@@ -255,6 +255,8 @@
     "enable_discovery_desc": "When disabled, you'll need to manually enter host IP on the client to pair.",
     "enable_input_only_mode": "Enable Input Only Mode",
     "enable_input_only_mode_desc": "Add an Input Only app entry. When enabled, the app list will only show the current running app and the Input Only entry when streaming. The Input Only entry will not receive any image or audio. Useful for operating the desktop on TV or connecting peripherals which the TV doesn't support with a phone.",
+    "enable_block_rumble_messages_to_controllers": "Block Rumble Messages to Controllers",
+    "enable_block_rumble_messages_to_controllers_desc": "Block Rumble Messages to Controllers",
     "enable_pairing": "Enable Pairing",
     "enable_pairing_desc": "Enable pairing for the Moonlight client. This allows the client to authenticate with the host and establish a secure connection.",
     "encoder": "Force a Specific Encoder",
