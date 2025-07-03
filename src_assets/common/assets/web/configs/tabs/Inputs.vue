@@ -178,14 +178,14 @@ const config = ref(props.config)
               default="false"
     ></Checkbox>
 
-    <!-- Enable Block Rumble Messages to Controllers -->
+    <!-- Enable Rumble Messages to Controllers -->
     <hr>
     <Checkbox v-if="platform === 'windows'"
               class="mb-3"
-              id="enable_block_rumble_messages_to_controllers"
+              id="enable_rumble_messages_to_controllers"
               locale-prefix="config"
-              v-model="config.enable_block_rumble_messages_to_controllers"
-              default="false"
+              v-model="config.enable_rumble_messages_to_controllers"
+              default="true"
     ></Checkbox>
 
   </div>
