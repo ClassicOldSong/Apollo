@@ -6,6 +6,7 @@
 #include "src/utility.h"
 #include "utils.h"
 
+// platform includes
 #include <audioclient.h>
 #include <codecvt>
 #include <iostream>
@@ -14,7 +15,6 @@
 #include <roapi.h>
 #include <synchapi.h>
 
-#include <io.h>
 
 DEFINE_PROPERTYKEY(PKEY_Device_DeviceDesc, 0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 2);  // DEVPROP_TYPE_STRING
 DEFINE_PROPERTYKEY(PKEY_Device_FriendlyName, 0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0, 14);  // DEVPROP_TYPE_STRING

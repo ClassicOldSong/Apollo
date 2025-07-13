@@ -509,7 +509,6 @@ namespace config {
       {}  // wa
     },  // display_device
 
-    1,  // min_fps_factor
     0,  // max_bitrate
 
     "1920x1080x60",  // fallback_mode
@@ -1195,7 +1194,6 @@ namespace config {
       video.dd.wa.hdr_toggle_delay = std::chrono::milliseconds {value};
     }
 
-    int_between_f(vars, "min_fps_factor", video.min_fps_factor, {1, 3});
     int_f(vars, "max_bitrate", video.max_bitrate);
     string_f(vars, "fallback_mode", video.fallback_mode);
     bool_f(vars, "isolated_virtual_display_option", video.isolated_virtual_display_option);
@@ -1304,6 +1302,7 @@ namespace config {
 
     string_restricted_f(vars, "locale", config::sunshine.locale, {
                                                                    "bg"sv,  // Bulgarian
+                                                                   "cs"sv,  // Czech
                                                                    "de"sv,  // German
                                                                    "en"sv,  // English
                                                                    "en_GB"sv,  // English (UK)
@@ -1321,6 +1320,7 @@ namespace config {
                                                                    "tr"sv,  // Turkish
                                                                    "uk"sv,  // Ukrainian
                                                                    "zh"sv,  // Chinese
+                                                                   "zh_TW"sv,  // Chinese (Traditional)
                                                                  });
 
     std::string log_level_string;

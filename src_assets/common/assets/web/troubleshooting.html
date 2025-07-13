@@ -182,7 +182,9 @@
       },
       methods: {
         refreshLogs() {
-          fetch("./api/logs", { credentials: 'include' })
+          fetch("./api/logs", {
+            credentials: 'include'
+          })
             .then(response => {
               // Retrieve the Content-Type header
               const contentType = response.headers.get("Content-Type") || "";
@@ -205,7 +207,10 @@
           this.closeAppPressed = true;
           fetch("./api/apps/close", {
             credentials: 'include',
-            method: 'POST'
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           })
             .then((r) => r.json())
             .then((r) => {
@@ -227,6 +232,9 @@
           fetch("./api/restart", {
             credentials: 'include',
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           })
           .then((resp) => {
             if (resp.status !== 200) {
@@ -251,6 +259,9 @@
             fetch("./api/quit", {
               credentials: 'include',
               method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
             })
             .then(() => {
               this.serverQuitting = false;
@@ -267,7 +278,10 @@
           this.ddResetPressed = true;
           fetch("/api/reset-display-device-persistence", {
             credentials: 'include',
-            method: 'POST'
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            }
           })
             .then((r) => r.json())
             .then((r) => {

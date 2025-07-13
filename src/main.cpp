@@ -103,6 +103,10 @@ int main(int argc, char *argv[]) {
   task_pool_util::TaskPool::task_id_t force_shutdown = nullptr;
 
 #ifdef _WIN32
+  // Avoid searching the PATH in case a user has configured their system insecurely
+  // by placing a user-writable directory in the system-wide PATH variable.
+  SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+
   setlocale(LC_ALL, "C");
 #endif
 
@@ -129,7 +133,7 @@ int main(int argc, char *argv[]) {
   // logging can begin at this point
   // if anything is logged prior to this point, it will appear in stdout, but not in the log viewer in the UI
   // the version should be printed to the log before anything else
-  BOOST_LOG(info) << PROJECT_NAME << " version: " << PROJECT_VER;
+  BOOST_LOG(info) << PROJECT_NAME << " version: " << PROJECT_VERSION << " commit: " << PROJECT_VERSION_COMMIT;
 
   // Log publisher metadata
   log_publisher_data();
@@ -389,6 +393,7 @@ int main(int argc, char *argv[]) {
 
   std::thread httpThread {nvhttp::start};
   std::thread configThread {confighttp::start};
+  std::thread rtspThread {rtsp_stream::start};
 
 #ifdef _WIN32
   // If we're using the default port and GameStream is enabled, warn the user
@@ -398,10 +403,12 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-  rtsp_stream::rtpThread();
+  // Wait for shutdown
+  shutdown_event->view();
 
   httpThread.join();
   configThread.join();
+  rtspThread.join();
 
   task_pool.stop();
   task_pool.join();

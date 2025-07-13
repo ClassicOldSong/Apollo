@@ -6,7 +6,7 @@ class @PROJECT_NAME@ < Formula
   homepage "@PROJECT_HOMEPAGE_URL@"
   url "@GITHUB_CLONE_URL@",
     tag: "@GITHUB_TAG@"
-  version "@FORMULA_VERSION@"
+  version "@BUILD_VERSION@"
   license all_of: ["GPL-3.0-only"]
   head "@GITHUB_CLONE_URL@", branch: "@GITHUB_DEFAULT_BRANCH@"
 
@@ -319,31 +319,31 @@ index 5b3638d..aca9481 100644
     run [opt_bin/"sunshine", "~/.config/sunshine/sunshine.conf"]
   end
 
-  def caveats
-    caveats_message = <<~EOS
-      Thanks for installing @PROJECT_NAME@!
-
-      To get started, review the documentation at:
-        https://docs.lizardbyte.dev/projects/sunshine
-    EOS
-
+  def post_install
     if OS.linux?
-      caveats_message += <<~EOS
+      opoo <<~EOS
         ATTENTION: To complete installation, you must run the following command:
         `sudo #{bin}/postinst`
       EOS
     end
 
     if OS.mac?
-      caveats_message += <<~EOS
+      opoo <<~EOS
         Sunshine can only access microphones on macOS due to system limitations.
         To stream system audio use "Soundflower" or "BlackHole".
 
         Gamepads are not currently supported on macOS.
       EOS
     end
+  end
 
-    caveats_message
+  def caveats
+    <<~EOS
+      Thanks for installing @PROJECT_NAME@!
+
+      To get started, review the documentation at:
+        https://docs.lizardbyte.dev/projects/sunshine
+    EOS
   end
 
   test do

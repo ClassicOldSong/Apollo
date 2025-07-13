@@ -51,7 +51,6 @@
   #include "process.h"
   #include "network.h"
   #include "src/entry_handler.h"
-  #include "version.h"
 
 using namespace std::literals;
 
