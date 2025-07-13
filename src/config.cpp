@@ -571,7 +571,7 @@ namespace config {
     true,  // high resolution scrolling
     true,  // native pen/touch support
     false, // enable input only mode
-    true, // enable_rumble_messages_to_controllers
+    true, // forward_rumble
   };
 
   sunshine_t sunshine {
@@ -1287,7 +1287,7 @@ namespace config {
     bool_f(vars, "envvar_compatibility_mode", sunshine.envvar_compatibility_mode);
     bool_f(vars, "notify_pre_releases", sunshine.notify_pre_releases);
     bool_f(vars, "legacy_ordering", sunshine.legacy_ordering);
-    bool_f(vars, "enable_rumble_messages_to_controllers", input.enable_rumble_messages_to_controllers);
+    bool_f(vars, "forward_rumble", input.forward_rumble);
 
     int port = sunshine.port;
     int_between_f(vars, "port"s, port, {1024 + nvhttp::PORT_HTTPS, 65535 - rtsp_stream::RTSP_SETUP_PORT});

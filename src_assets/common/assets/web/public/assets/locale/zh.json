@@ -269,6 +269,8 @@
     "file_apps_desc": "Apollo 保存应用程序配置的文件。",
     "file_state": "实时状态文件",
     "file_state_desc": "Apollo 保存当前状态的文件",
+    "forward_rumble": "转发手柄震动",
+    "forward_rumble_desc": "向客户端转发手柄震动信息",
     "gamepad": "模拟游戏手柄类型",
     "gamepad_auto": "自动选择选项",
     "gamepad_desc": "选择要在主机上模拟的游戏手柄类型",

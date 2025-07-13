@@ -182,9 +182,9 @@ const config = ref(props.config)
     <hr>
     <Checkbox v-if="platform === 'windows'"
               class="mb-3"
-              id="enable_rumble_messages_to_controllers"
+              id="forward_rumble"
               locale-prefix="config"
-              v-model="config.enable_rumble_messages_to_controllers"
+              v-model="config.forward_rumble"
               default="true"
     ></Checkbox>
 

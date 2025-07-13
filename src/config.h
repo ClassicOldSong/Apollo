@@ -211,7 +211,7 @@ namespace config {
     bool native_pen_touch;
 
     bool enable_input_only_mode;
-    bool enable_rumble_messages_to_controllers;
+    bool forward_rumble;
   };
 
   namespace flag {

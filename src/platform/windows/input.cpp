@@ -327,8 +327,8 @@ namespace platf {
      * @param smallMotor The small motor.
      */
     void rumble(target_t::pointer target, std::uint8_t largeMotor, std::uint8_t smallMotor) {
-      // config::input.enable_rumble_messages_to_controllers - Default is true so ignore rumble messages when false
-      if( config::input.enable_rumble_messages_to_controllers == false ) {
+      // config::input.forward_rumble - Default is true so ignore rumble messages when false
+      if( config::input.forward_rumble == false ) {
         // Do nothing; just return
         return;
       }
