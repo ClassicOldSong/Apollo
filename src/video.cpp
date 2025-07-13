@@ -1925,7 +1925,6 @@ namespace video {
     // set minimum frame time based on client-requested target framerate
     auto minimum_frame_time = std::chrono::milliseconds(1000 / config.framerate);
     auto frame_threshold = std::chrono::microseconds(1000ms * 1000 / config.encodingFramerate);
-    BOOST_LOG(debug) << "Minimum frame time set to "sv << minimum_frame_time.count() << "ms, based on min fps factor of "sv << config::video.min_fps_factor << "."sv;
     BOOST_LOG(info) << "Frame threshold: "sv << frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);

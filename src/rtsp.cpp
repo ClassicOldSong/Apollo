@@ -600,6 +600,8 @@ namespace rtsp_stream {
       acceptor.close();
       io_context.stop();
       clear();
+    }
+
     std::shared_ptr<stream::session_t>
     find_session(const std::string_view& uuid) {
       auto lg = _session_slots.lock();

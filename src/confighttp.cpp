@@ -624,7 +624,7 @@ namespace confighttp {
    * @api_examples{/api/apps| POST| {"name":"Hello, World!","uuid": "aaaa-bbbb"}}
    */
   void saveApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -670,10 +670,7 @@ namespace confighttp {
    * @api_examples{/api/apps/close| POST| null}
    */
   void closeApp(resp_https_t response, req_https_t request) {
-    if (!check_content_type(response, request, "application/json")) {
-      return;
-    }
-    if (!authenticate(response, request)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -693,7 +690,7 @@ namespace confighttp {
    * @api_examples{/api/apps/reorder| POST| {"order": ["aaaa-bbbb", "cccc-dddd"]}}
    */
   void reorderApps(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -807,7 +804,7 @@ namespace confighttp {
    * @api_examples{/api/apps/delete | POST| { uuid: 'aaaa-bbbb' }}
    */
   void deleteApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -897,7 +894,7 @@ namespace confighttp {
    * @endcode
    */
   void updateClient(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -950,7 +947,7 @@ namespace confighttp {
    * @api_examples{/api/clients/unpair| POST| {"uuid":"1234"}}
    */
   void unpair(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -978,7 +975,7 @@ namespace confighttp {
    * @api_examples{/api/clients/unpair-all| POST| null}
    */
   void unpairAll(resp_https_t response, req_https_t request) {
-    if (!validateContentType(response, request, "application/json"sv) || !authenticate(response, request)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1049,7 +1046,7 @@ namespace confighttp {
    * @api_examples{/api/config| POST| {"key":"value"}}
    */
   void saveConfig(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1088,7 +1085,7 @@ namespace confighttp {
    * @api_examples{/api/covers/upload| POST| {"key":"igdb_1234","url":"https://images.igdb.com/igdb/image/upload/t_cover_big_2x/abc123.png"}}
    */
   void uploadCover(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1175,7 +1172,7 @@ namespace confighttp {
    * @api_examples{/api/password| POST| {"currentUsername":"admin","currentPassword":"admin","newUsername":"admin","newPassword":"admin","confirmNewPassword":"admin"}}
    */
   void savePassword(resp_https_t response, req_https_t request) {
-    if ((!config::sunshine.username.empty() && !authenticate(response, request)) || !validateContentType(response, request, "application/json"sv))
+    if ((!config::sunshine.username.empty() && !authenticate(response, request)) || !validateContentType(response, request, "application/json"))
       return;
     print_req(request);
     std::vector<std::string> errors;
@@ -1232,7 +1229,7 @@ namespace confighttp {
    * @api_examples{/api/otp| GET| null}
    */
   void getOTP(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1279,7 +1276,7 @@ namespace confighttp {
    * @api_examples{/api/pin| POST| {"pin":"1234","name":"My PC"}}
    */
   void savePin(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1308,7 +1305,7 @@ namespace confighttp {
    * @api_examples{/api/reset-display-device-persistence| POST| null}
    */
   void resetDisplayDevicePersistence(resp_https_t response, req_https_t request) {
-    if (!validateContentType(response, request, "application/json"sv) || !authenticate(response, request)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1327,7 +1324,7 @@ namespace confighttp {
    * @api_examples{/api/restart| POST| null}
    */
   void restart(resp_https_t response, req_https_t request) {
-    if (!validateContentType(response, request, "application/json"sv) || !authenticate(response, request)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1379,7 +1376,7 @@ namespace confighttp {
    * @param request The HTTP request object.
    */
   void launchApp(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1435,7 +1432,7 @@ namespace confighttp {
    * @param request The HTTP request object.
    */
   void disconnect(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!validateContentType(response, request, "application/json") || !authenticate(response, request)) {
       return;
     }
 
@@ -1469,7 +1466,7 @@ namespace confighttp {
    * @endcode
    */
   void login(resp_https_t response, req_https_t request) {
-    if (!checkIPOrigin(response, request) || !validateContentType(response, request, "application/json"sv)) {
+    if (!checkIPOrigin(response, request) || !validateContentType(response, request, "application/json")) {
       return;
     }
 

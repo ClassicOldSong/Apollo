@@ -21,7 +21,6 @@
 #include "system_tray.h"
 #include "upnp.h"
 #include "uuid.h"
-#include "version.h"
 #include "video.h"
 
 #ifdef _WIN32
