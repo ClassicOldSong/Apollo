@@ -177,6 +177,17 @@ const config = ref(props.config)
               v-model="config.enable_input_only_mode"
               default="false"
     ></Checkbox>
+
+    <!-- Enable Rumble Messages to Controllers -->
+    <hr>
+    <Checkbox v-if="platform === 'windows'"
+              class="mb-3"
+              id="enable_rumble_messages_to_controllers"
+              locale-prefix="config"
+              v-model="config.enable_rumble_messages_to_controllers"
+              default="true"
+    ></Checkbox>
+
   </div>
 </template>
 
