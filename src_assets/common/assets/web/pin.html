@@ -655,7 +655,10 @@
         this.unpairAllPressed = true;
         fetch("./api/clients/unpair-all", {
           credentials: 'include',
-          method: 'POST'
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
         })
           .then((r) => r.json())
           .then((r) => {

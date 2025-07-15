@@ -475,7 +475,10 @@
               this.saved = this.restarted = false;
             }, 5000);
             fetch("./api/restart", {
-              method: 'POST'
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
             })
             .then((resp) => {
               if (resp.status !== 200) {

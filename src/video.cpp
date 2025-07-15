@@ -1924,8 +1924,10 @@ namespace video {
 
     // set minimum frame time based on client-requested target framerate
     auto minimum_frame_time = std::chrono::milliseconds(1000 / config.framerate);
-    auto frame_threshold = std::chrono::microseconds(1000ms * 1000 / config.encodingFramerate);
-    BOOST_LOG(info) << "Frame threshold: "sv << frame_threshold;
+    auto capture_frame_threshold = std::chrono::microseconds(1000 * 1000 / config.framerate);
+    auto encode_frame_threshold = std::chrono::microseconds(1000 * 1000 / config.encodingFramerate);
+    BOOST_LOG(info) << "Capture Frame threshold: "sv << capture_frame_threshold;
+    BOOST_LOG(info) << "Encoding Frame threshold: "sv << encode_frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);
     auto packets = mail::man->queue<packet_t>(mail::video_packets);
@@ -1999,7 +2001,7 @@ namespace video {
         if (auto img = images->pop(minimum_frame_time)) {
           frame_timestamp = img->frame_timestamp;
           // If new frame comes in way too fast, just drop
-          if (*frame_timestamp < next_frame_start) {
+          if (*frame_timestamp < (next_frame_start - capture_frame_threshold / 2)) {
             continue;
           }
           if (session->convert(*img)) {
@@ -2013,11 +2015,13 @@ namespace video {
         if (frame_timestamp) {
           auto frame_diff = *frame_timestamp - next_frame_start;
 
-          if (frame_diff > frame_threshold / 2) {
-            next_frame_start = *frame_timestamp + frame_threshold / 2;
+          next_frame_start = *frame_timestamp + encode_frame_threshold;
+
+          if (frame_diff > encode_frame_threshold / 2) {
+            next_frame_start = *frame_timestamp + encode_frame_threshold;
           } else {
             frame_timestamp = next_frame_start;
-            next_frame_start += frame_threshold;
+            next_frame_start += encode_frame_threshold;
           }
         }
       }

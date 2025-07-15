@@ -735,6 +735,9 @@
           this.actionDisabled = true;
           fetch("./api/apps/close", {
             credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json'
+            },
             method: 'POST',
           })
           .then((r) => r.json())
