@@ -440,6 +440,7 @@ namespace config {
     false, // headless_mode
     true, // limit_framerate
     false, // double_refreshrate
+
     28,  // qp
 
     0,  // hevc_mode
