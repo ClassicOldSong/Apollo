@@ -297,6 +297,8 @@
     "hide_tray_controls_desc": "不在托盘图标菜单内显示 \"Force Close\", \"Restart\" 和 \"Quit\"。",
     "high_resolution_scrolling": "高分辨率鼠标滚动支持",
     "high_resolution_scrolling_desc": "启用后，Apollo 将透传来自 Moonlight 客户端的高分辨率滚动事件。对于那些使用高分辨率滚动事件时滚动速度过快的旧版应用程序来说，禁用此功能非常有用。",
+    "ignore_encoder_probe_failure": "忽略编码器探测失败",
+    "ignore_encoder_probe_failure_desc": "即使探测编码器失败也允许继续推流。如果无可用编码器，这可能导致推流失败。",
     "install_steam_audio_drivers": "安装 Steam 音频驱动程序",
     "install_steam_audio_drivers_desc": "如果安装了 Steam，则会自动安装 Steam Streaming Speakers 驱动程序，以支持 5.1/7.1 环绕声和主机音频静音。",
     "isolated_virtual_display_option": "将虚拟显示器移动到显示布局的右下角",

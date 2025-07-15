@@ -302,6 +302,8 @@
     "hide_tray_controls_desc": "Do not show \"Force Stop\", \"Restart\" and \"Quit\" in tray menu.",
     "high_resolution_scrolling": "High Resolution Scrolling Support",
     "high_resolution_scrolling_desc": "When enabled, Apollo will pass through high resolution scroll events from Moonlight clients. This can be useful to disable for older applications that scroll too fast with high resolution scroll events.",
+    "ignore_encoder_probe_failure": "Ignore Encoder Probe Failure",
+    "ignore_encoder_probe_failure_desc": "Allow streaming to continue even if probing for encoders fails. This may result in streaming failure if no encoder is available.",
     "install_steam_audio_drivers": "Install Steam Audio Drivers",
     "install_steam_audio_drivers_desc": "If Steam is installed, this will automatically install the Steam Streaming Speakers driver to support 5.1/7.1 surround sound and muting host audio.",
     "isolated_virtual_display_option": "Move the Virtual Display to the bottom right-most corner of the display layout",
