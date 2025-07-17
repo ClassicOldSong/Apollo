@@ -35,7 +35,190 @@ extern "C" {
 
 using namespace std::literals;
 
+#define ALT_GAMEPAD_USER_PREFIX "DeviceName"
+#define ALT_GAMEPAD_ORDER_PREFIX "Order"
+#define ALT_GAME_PAD_CONNECTOR "="
+#define ALT_GAMEPAD_ENCAPSULATE "\""
+#define ALT_GAMEPAD_BEGIN_CHARACTER " "
+#define ALT_GAMEPAD_EMPTY ""
+
+#define ALT_GAMEPAD_ALL_NON_LISTED "NOMATCH"
+
+//#define ALT_GAMEPAD_ANY_WITHIN 999
+//#define ALT_GAMEPAD_ANY_WITHOUT 1000
+#define	ALT_CONTROLLER_NO_PLACEHOLDER 1000
+#define	ALT_CONTROLLER_ANY_PLACEHOLDER 999
+#define ALT_CONTROLLER_ASSIGN_FAILED 1001
+
+#define ALT_GAMEPAD_MAX_STRING_NUMBER 99
+
+// For the alternative controller numbering
+namespace config {
+  extern std::vector<platf::feedback_queue_t> placeholder_feedback_queues;
+}
+
+struct sDeviceNameOrder
+{
+  std::string sDeviceName;
+  std::string sOrder;
+  std::vector < int > vOrder;
+};
+
+std::vector<struct sDeviceNameOrder> VectorAlternateGamepadParameter;
+
+int parseGamepadOrderStr(std::string sLine, int iMin, int iMax) {
+  std::string sSearch1;
+  std::string sSearch2;
+  std::string sSearch3;
+  std::string sSearch4;
+  std::string sDeviceName;
+  std::string sOrder;
+
+  std::string sOrderAll;
+  std::string sOrderWorking;
+  std::string sOrderCurrent;
+
+  std::string sLineToSearch;
+  std::string sCurrentNumber;
+
+  struct sDeviceNameOrder vCurrent;
+
+  size_t iPosition1, iPosition2, iPosition3, iPosition4, iPosition5;
+
+  int iCurrentNumber = 0;
+  int iCurrentNumberError = 0;
+
+  sLineToSearch = ALT_GAMEPAD_EMPTY;
+  sLineToSearch += ALT_GAMEPAD_BEGIN_CHARACTER;
+  sLineToSearch += sLine;
+
+  for (int iLoop = 1; iLoop < ALT_GAMEPAD_MAX_STRING_NUMBER; iLoop++) {
+    sOrder.clear();
+    sDeviceName.clear();
+
+    // Build the string to look for
+    // Find the DeviceName
+    sSearch1 = ALT_GAMEPAD_EMPTY;
+    sSearch1 += ALT_GAMEPAD_BEGIN_CHARACTER;
+    sSearch1 += ALT_GAMEPAD_USER_PREFIX;
+    sSearch1 += std::to_string(iLoop);
+    sSearch1 += ALT_GAME_PAD_CONNECTOR;
+    sSearch1 += ALT_GAMEPAD_ENCAPSULATE;
+
+    sSearch2 = ALT_GAMEPAD_EMPTY;
+    sSearch2 += ALT_GAMEPAD_BEGIN_CHARACTER;
+    sSearch2 += ALT_GAMEPAD_ORDER_PREFIX;
+    sSearch2 += std::to_string(iLoop);
+    sSearch2 += ALT_GAME_PAD_CONNECTOR;
+    sSearch2 += ALT_GAMEPAD_ENCAPSULATE;
+
+    iPosition1 = sLineToSearch.find(sSearch1);
+    if (iPosition1 != std::string::npos ) {
+      sSearch3 = ALT_GAMEPAD_ENCAPSULATE;
+
+      // Find the End of the Quotation Marks
+      iPosition2 = sLineToSearch.find(sSearch3, iPosition1 + sSearch1.length());
+      if (iPosition2 != std::string::npos) {
+        sDeviceName = sLineToSearch.substr(iPosition1 + sSearch1.length(), iPosition2 - (iPosition1 + sSearch1.length()) );
+
+        // Find the Order String
+        iPosition3 = sLineToSearch.find(sSearch2);
+        if (iPosition3 != std::string::npos) {
+          // Find the End of the Quotation Marks
+          iPosition4 = sLineToSearch.find(sSearch3, iPosition3 + sSearch2.length());
+
+          if (iPosition4 != std::string::npos) {
+            sOrder = sLineToSearch.substr(iPosition3 + sSearch2.length(), iPosition4 - (iPosition3 + sSearch2.length()) );
+
+            // Parse the Order String
+            sOrderWorking = sOrder;
+
+            while (sOrderWorking.length() > 0) {
+              // Remove beginning spaces
+              iPosition5 = sOrderWorking.find(ALT_GAMEPAD_BEGIN_CHARACTER);
+              if (iPosition5 == 0) {
+                sOrderWorking.erase(iPosition5, 1);
+                continue;
+              } else {
+                if (iPosition5 != std::string::npos) {
+                  sOrderCurrent = sOrderWorking.substr(0, iPosition5);
+                  sOrderWorking.erase(0, iPosition5 + 1);
+                } else {
+                  sOrderCurrent = sOrderWorking;
+                  sOrderWorking = ALT_GAMEPAD_EMPTY;
+                }
+
+                iCurrentNumberError = 0;
+                try {
+                  iCurrentNumber = stoi(sOrderCurrent);
+                }
+                catch (...) {
+                  iCurrentNumberError = 1;
+                }
+                if(iCurrentNumberError == 0) {
+                  if(iCurrentNumber == ALT_CONTROLLER_ANY_PLACEHOLDER ||
+                     iCurrentNumber == ALT_CONTROLLER_NO_PLACEHOLDER ||
+                    (iCurrentNumber >= iMin && iCurrentNumber <= iMax)) {
+                    vCurrent.vOrder.push_back(iCurrentNumber);
+                  }
+                }
+              }
+            }
+            if (vCurrent.vOrder.size() > 0) {
+              // Put the variables into the vector list
+              vCurrent.sDeviceName = sDeviceName;
+              vCurrent.sOrder = sOrder;
+              VectorAlternateGamepadParameter.push_back(vCurrent);
+
+              // Prepare for next loop - Clear Variables
+              vCurrent.sDeviceName = ALT_GAMEPAD_EMPTY;
+              vCurrent.sOrder = ALT_GAMEPAD_EMPTY;
+              vCurrent.vOrder.clear();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (VectorAlternateGamepadParameter.size() > 0 ) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
+int matchAlternativeGamepadNumberingString(std::string sDeviceName, struct sDeviceNameOrder &sReturn ) {
+  bool bFound = false;
+
+  struct sDeviceNameOrder sCurrent;
+  std::vector< struct sDeviceNameOrder >::iterator i;
+  i = VectorAlternateGamepadParameter.begin();
+
+  while (bFound == false && i != VectorAlternateGamepadParameter.end() ) {
+    sCurrent = *i;
+    if (sCurrent.sDeviceName == sDeviceName) {
+      bFound = true;
+    }
+    i = i + 1;
+  }
+
+  if (bFound == true) {
+    sReturn = sCurrent;
+    return 0;
+  } else {
+      // If there are no matches, try to the ALT_GAMEPAD_ALL_NON_LISTED name and use that to find the next match
+      if( sDeviceName == ALT_GAMEPAD_ALL_NON_LISTED ) {
+        return -1;
+      } else {
+        return matchAlternativeGamepadNumberingString( ALT_GAMEPAD_ALL_NON_LISTED, sReturn );
+      }
+  }
+}
+
 namespace input {
+  // Alternate Controller Numbering Mode
+  int altgamepaddnumberingDeleteGamepadInStructure( int alt_controller_placeholder_index, int alt_controller_placeholder, int alt_controller_real_index, int id_OS );
 
   constexpr auto MAX_GAMEPADS = std::min((std::size_t) platf::MAX_GAMEPADS, sizeof(std::int16_t) * 8);
 #define DISABLE_LEFT_BUTTON_DELAY ((thread_pool_util::ThreadPool::task_id_t) 0x01)
@@ -66,6 +249,19 @@ namespace input {
       }
     }
 
+    return -1;
+  }
+
+// Request a specific ID instead of the next in line
+  template<std::size_t N>
+  int alloc_id_request(std::bitset<N> &gamepad_mask, int iIdRequest) {
+    if( iIdRequest < gamepad_mask.size()) {
+      if (!gamepad_mask[iIdRequest]) {
+
+        gamepad_mask[iIdRequest] = true;
+        return iIdRequest;
+      }
+    }
     return -1;
   }
 
@@ -115,26 +311,54 @@ namespace input {
   static platf::input_t platf_input;
   static std::bitset<platf::MAX_GAMEPADS> gamepadMask {};
 
+// This is for the alternate gamepad numbering
+  void free_gamepad_but_not_id(platf::input_t &platf_input, int id, int internal) {
+    platf::gamepad_update(platf_input, id, platf::gamepad_state_t {});
+
+    // This will be reused, so do not eliminate it from the vigem
+    // platf::free_gamepad(platf_input, id);
+    // Instead just detection the feedback_queue to prevent the rumble messages
+    platf::detach_feedback_queue_from_gamepad( platf_input, id);
+
+    // This does not free the id since it will be reused.
+    //free_id(gamepadMask, id);
+  }
   void free_gamepad(platf::input_t &platf_input, int id) {
     platf::gamepad_update(platf_input, id, platf::gamepad_state_t {});
     platf::free_gamepad(platf_input, id);
 
     free_id(gamepadMask, id);
   }
+  // Alternate Gamepad Number Mode
+  struct gamepad_t;
+  static std::vector<gamepad_t> placeholder_gamepads; // Holds the placeholder for the gamepads
+
 
   struct gamepad_t {
     gamepad_t():
-        gamepad_state {},
-        back_timeout_id {},
-        id {-1},
-        back_button_state {button_state_e::NONE} {
+      gamepad_state {},
+      back_timeout_id {},
+      id {-1},
+      // Alternate Gamepad Numbering Mode
+      alt_controller_placeholder { 0 }, // For the alternative controller numbering; 0 if real (not alternate gamepad numbering), 1 if a placeholder, 2 if being used by session and is a placeholder, 3 if being used by session and is a placeholder and to be deleted, 4 if using alt gamepad numbering but there is no room for it
+      alt_controller_placeholder_index { -1 },// Placeholder index into the placeholder_gamepads vector
+      alt_controller_real_index { -1 }, // Real Index assigned at the session level
+      alt_controller_real_devicename { -1}, // Real Device Name (string) index at the external vector made for the alternate gamepad numbering
+      back_button_state {button_state_e::NONE} {
     }
 
     ~gamepad_t() {
       if (id >= 0) {
-        task_pool.push([id = this->id]() {
+        // Alternate Gamepad Numbering Mode
+        if ((config::input.enable_alt_controller_numbering_mode == true ) && (this->alt_controller_placeholder == 2 || this->alt_controller_placeholder == 3)) {
+          task_pool.push([id = this->id, alt_controller_placeholder_index = this->alt_controller_placeholder_index, alt_controller_placeholder = this->alt_controller_placeholder, alt_controller_real_index = this->alt_controller_real_index]() {
+            altgamepaddnumberingDeleteGamepadInStructure(alt_controller_placeholder_index, alt_controller_placeholder, alt_controller_real_index, id);
+          });
+        } else {
+          task_pool.push([id = this->id]() {
           free_gamepad(platf_input, id);
-        });
+          });
+        }
       }
     }
 
@@ -143,6 +367,12 @@ namespace input {
     thread_pool_util::ThreadPool::task_id_t back_timeout_id;
 
     int id;
+
+    // Alternate gamepad numbering
+    int alt_controller_placeholder; // For the alternative controller numbering; 0 if real (not alternate gamepad numbering), 1 if a placeholder, 2 if being used by session and is a placeholder, 3 if being used by session and is a placeholder and to be deleted, 4 if using alt gamepad numbering but there is no room for it
+    int alt_controller_placeholder_index; // Placeholder index
+    int alt_controller_real_index; // Real Index assigned in session
+    int alt_controller_real_devicename; // Real Device Name index
 
     // When emulating the HOME button, we may need to artificially release the back button.
     // Afterwards, the gamepad state on sunshine won't match the state on Moonlight.
@@ -164,15 +394,17 @@ namespace input {
       safe::mail_raw_t::event_t<input::touch_port_t> touch_port_event,
       platf::feedback_queue_t feedback_queue
     ):
-        shortcutFlags {},
-        gamepads(MAX_GAMEPADS),
-        client_context {platf::allocate_client_input_context(platf_input)},
-        touch_port_event {std::move(touch_port_event)},
-        feedback_queue {std::move(feedback_queue)},
-        mouse_left_button_timeout {},
-        touch_port {{0, 0, 0, 0}, 0, 0, 1.0f},
-        accumulated_vscroll_delta {},
-        accumulated_hscroll_delta {} {
+      shortcutFlags {},
+      gamepads(MAX_GAMEPADS),
+      client_context {platf::allocate_client_input_context(platf_input)},
+      touch_port_event {std::move(touch_port_event)},
+      feedback_queue {std::move(feedback_queue)},
+      mouse_left_button_timeout {},
+      touch_port {{0, 0, 0, 0}, 0, 0, 1.0f},
+      accumulated_vscroll_delta {},
+      accumulated_hscroll_delta {}
+    {
+      // empty body
     }
 
     // Keep track of alt+ctrl+shift key combo
@@ -193,6 +425,8 @@ namespace input {
 
     int32_t accumulated_vscroll_delta;
     int32_t accumulated_hscroll_delta;
+    // Alternate Controller Numbering
+    int iAltControllerNameIndex;
   };
 
   /**
@@ -797,6 +1031,59 @@ namespace input {
     }
   }
 
+	// Alternate gamepad numbering
+  int find_empty_placeholder_gamepad( void ) {
+    int count;
+    count = 0;
+    for( auto& gamepad : placeholder_gamepads ) {
+      if( gamepad.id == -1) {
+        return count;
+      }
+      count += 1;
+    }
+    return -1;
+  }
+
+  int find_id_OS_placeholder_gamepad( int id_OS ) {
+    int count;
+    count = 0;
+    for( auto& gamepad : placeholder_gamepads ) {
+      if( gamepad.id == id_OS ) {
+        return count;
+      }
+      count += 1;
+    }
+    return -1;
+  }
+
+  int find_empty_gamepad( std::vector<gamepad_t> &gamepads ) {
+    int count;
+    int maxindex = -1;
+    count = 0;
+
+    for( auto& gamepad : gamepads ) {
+      if( gamepad.id == -1) {
+        maxindex = count;
+      }
+      count += 1;
+    }
+    return maxindex;
+  }
+
+  int find_id_OS_gamepad( std::vector<gamepad_t> gamepads, int id_OS ) {
+    int count;
+    int maxindex = -1;
+    count = 0;
+    for( auto& gamepad : gamepads ) {
+      if( gamepad.id == id_OS ) {
+        maxindex = count;
+      }
+      count += 1;
+    }
+    return maxindex;
+  }
+
+
   /**
    * @brief Called to pass a horizontal scroll message the platform backend.
    * @param input The input context pointer.
@@ -818,6 +1105,214 @@ namespace input {
         input->accumulated_hscroll_delta -= full_ticks * WHEEL_DELTA;
       }
     }
+  }
+
+  int altgamepaddnumberingDeleteGamepadInStructure( int alt_controller_placeholder_index, int alt_controller_placeholder, int alt_controller_real_index, int id_OS ) {
+    if( (alt_controller_placeholder == 2 || alt_controller_placeholder == 3) ) {
+      if( config::input.enable_alt_controller_numbering_mode == true ) {
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+        // See if the controller is a member of the placeholder vector
+        if( alt_controller_placeholder_index >= 0 ) {
+          // Set the controller back into the placeholder array as useable
+          (placeholder_gamepads[ alt_controller_placeholder_index]).alt_controller_placeholder = 1;
+
+          // Reset the real indexes
+          (placeholder_gamepads[ alt_controller_placeholder_index]).alt_controller_real_index = -1;
+          (placeholder_gamepads[ alt_controller_real_index]).alt_controller_real_devicename = -1;
+        }
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+
+      }
+      task_pool.push([id_OS = id_OS]() {
+        free_gamepad_but_not_id(platf_input, id_OS,0);
+      });
+    }
+
+  return 0;
+  }
+
+  int altOrderingDeleteGamepad( std::shared_ptr<input_t> &input, int controllerNumber) {
+    auto &gamepad = input->gamepads[controllerNumber];
+
+    if( gamepad.alt_controller_placeholder == 2 || gamepad.alt_controller_placeholder == 3) {
+      if( config::input.enable_alt_controller_numbering_mode == true ) {
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+        // See if the controller is a member of the placeholder vector
+        if( gamepad.alt_controller_placeholder_index >= 0 ) {
+          // Set the controller back into the placeholder array as useable
+          (placeholder_gamepads[ gamepad.alt_controller_placeholder_index]).alt_controller_placeholder = 1;
+
+          // Reset the real indexes
+          (placeholder_gamepads[ gamepad.alt_controller_placeholder_index]).alt_controller_real_index = -1;
+          (placeholder_gamepads[ gamepad.alt_controller_real_index]).alt_controller_real_devicename = -1;
+        }
+        free_gamepad_but_not_id(platf_input, gamepad.id, 0);
+
+        input->gamepads[controllerNumber].id = -1;
+        input->gamepads[controllerNumber].alt_controller_placeholder = 0;
+
+        gamepad_t gamepadempty;
+        input->gamepads[controllerNumber] = gamepadempty;
+        // Index within the client of the gamepads array
+        input->gamepads[controllerNumber].alt_controller_real_index = -1;
+        // Set the index that represents the string for the gamepad
+        input->gamepads[controllerNumber].alt_controller_real_devicename = -1;
+        input->gamepads[controllerNumber].alt_controller_placeholder_index = -1;
+        input->gamepads[controllerNumber].id = -1;
+        input->gamepads[controllerNumber].alt_controller_placeholder = 0;
+        config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+      }
+    }
+    return 0;
+  }
+
+  int altOrderingAssignGamepad(std::shared_ptr<input_t> &input, int controllerNumber, platf::gamepad_arrival_t &arrival) {
+    bool bDoLegacyAdd = false;
+    bool bCompletedAdd = false;
+
+    int allocatedIndex = 0;
+
+    if (config::input.enable_alt_controller_numbering_mode == true) {
+      struct sDeviceNameOrder ListNumbers;
+      std::string sLocalDeviceName;
+      int iIndex;
+      int iIndex2;
+
+      config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+      if (input->iAltControllerNameIndex != -1) {
+        // Search the vector to see if the string is already there
+        if (
+          config::alt_gamepad_numbering.sDeviceNames.size() > input->iAltControllerNameIndex
+          && input->iAltControllerNameIndex >= 0
+        ) {
+          // Get the string
+          sLocalDeviceName = config::alt_gamepad_numbering.sDeviceNames[input->iAltControllerNameIndex];
+
+          // Get the number list based on the name
+          if (matchAlternativeGamepadNumberingString(sLocalDeviceName, ListNumbers) == 0) {
+            // Go through all of the numbers and see if there is a controller that matches that number
+            for (iIndex2 = 0; iIndex2 < ListNumbers.vOrder.size() && bCompletedAdd == false; iIndex2 += 1) {
+              for (iIndex = 0; iIndex < placeholder_gamepads.size() && bCompletedAdd == false ; iIndex += 1) {
+                // See if the gamepad number as a place holder matches the number from the string configuration
+                // The -1 is there because the strings start at 1 whereas the index starts at 0
+                // 999 means that any available one is fine
+                if ((placeholder_gamepads[iIndex].alt_controller_placeholder_index == ((ListNumbers.vOrder[iIndex2]) -1)) ||
+								((ListNumbers.vOrder[iIndex2]) == ALT_CONTROLLER_ANY_PLACEHOLDER)) {
+                  // See if the gamepad is available
+
+                  if (placeholder_gamepads[iIndex].alt_controller_placeholder == 1) {
+                    // Found the controller to match up
+
+                    // Copy from the placeholder to the real controller needed
+                    input->gamepads[controllerNumber] = placeholder_gamepads[iIndex];
+
+                    // Remove the placeholder values as that one cannot be used.
+                    placeholder_gamepads[iIndex].alt_controller_placeholder = 3;
+
+                    // Set the state to controller that it is a placeholder one that is being used so special actions need to be done for deletion
+                    input->gamepads[controllerNumber].alt_controller_placeholder = 2;
+
+                    // Index within the client of the gamepads array
+                    input->gamepads[controllerNumber].alt_controller_real_index = controllerNumber;
+
+                    // Set the index that represents the string for the gamepad
+                    input->gamepads[controllerNumber].alt_controller_real_devicename = input->iAltControllerNameIndex;
+                    // Connect up the feedback_queue only
+                    allocatedIndex = platf::alloc_gamepad(platf_input, {placeholder_gamepads[ iIndex].id, (uint8_t)controllerNumber, (uint8_t)iIndex}, arrival, input->feedback_queue);
+                    bCompletedAdd = true;
+                  }
+                }
+                if ((ListNumbers.vOrder[iIndex2] == ALT_CONTROLLER_NO_PLACEHOLDER)) {
+                  if (bCompletedAdd == false) {
+                    // Do legacy actions since one can just add another one
+                    bDoLegacyAdd = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+    }
+
+    if (bCompletedAdd == false) {
+      if (bDoLegacyAdd == true) {
+        return ALT_CONTROLLER_NO_PLACEHOLDER;
+      } else {
+        input->gamepads[controllerNumber].alt_controller_placeholder = 4;
+        return ALT_CONTROLLER_ASSIGN_FAILED;
+      }
+    }
+
+    return allocatedIndex;
+  }
+
+  int altOrderingInitialPlaceholderAllocation(std::shared_ptr<input_t> &input, platf::gamepad_arrival_t &arrival, int iControllerNumber) {
+
+    if (config::input.enable_alt_controller_numbering_mode == true) {
+      int iNumberOfPlaceholders = config::input.alt_controller_count;
+      int iIndexPlaceholder;
+      int iCount;
+      int iStartCount = 2;
+      auto iOld_OS = alloc_id_request(gamepadMask, -1);
+      int iPlaceHolderIndex = 15;
+      int allocatedIndex = 0;
+      int iPlaceholdersAllocated = 0;
+
+      config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+      if (config::alt_gamepad_numbering.bFirstTimeControllerAllocation == true ) {
+        placeholder_gamepads.resize(MAX_GAMEPADS);
+
+        if (config::input.alt_controller_order_string.empty()) {
+          parseGamepadOrderStr("DeviceName1=\"NOMATCH\" Order1=\"999\"", 1, config::input.alt_controller_count);
+        } else {
+          parseGamepadOrderStr(config::input.alt_controller_order_string, 1, config::input.alt_controller_count );
+        }
+
+        iIndexPlaceholder = 16;
+        int iLoopCount = 0;
+
+        iCount = iStartCount;
+
+        while (iPlaceholdersAllocated < iNumberOfPlaceholders) {
+          iIndexPlaceholder -= 1;
+          iIndexPlaceholder = find_empty_gamepad( input->gamepads );
+
+          if (iIndexPlaceholder != -1) {
+            iOld_OS = alloc_id_request(gamepadMask, iCount);
+            iPlaceHolderIndex = iControllerNumber;
+            input->gamepads[iPlaceHolderIndex].alt_controller_placeholder = 1;
+            if (iOld_OS != -1) {
+
+              // Make all of the controllers in the same element in the gamepad array, and then move them to the holder array
+              input->gamepads[iPlaceHolderIndex].id = iOld_OS;
+              input->gamepads[iPlaceHolderIndex].alt_controller_placeholder = 1;
+              input->gamepads[iPlaceHolderIndex].alt_controller_placeholder_index = iLoopCount;
+              input->gamepads[iPlaceHolderIndex].alt_controller_real_index = -1;
+              input->gamepads[iPlaceHolderIndex].alt_controller_real_devicename = -1;
+
+              allocatedIndex = platf::alloc_gamepad(platf_input, { iOld_OS, (uint8_t)(((uint8_t)MAX_GAMEPADS)-(1)-((uint8_t)iLoopCount)), ((uint8_t)iLoopCount)}, arrival, config::placeholder_feedback_queues[iOld_OS] );
+
+              if (allocatedIndex) {
+                free_id(gamepadMask, iOld_OS);
+                return -1;
+              }
+              placeholder_gamepads[ iLoopCount] = input->gamepads[iPlaceHolderIndex];
+              iPlaceholdersAllocated += 1;
+            }
+            iLoopCount += 1;
+          }
+          iCount +=1 ;
+          if (iCount >= gamepadMask.size()) {
+            break;
+          }
+        }
+        config::alt_gamepad_numbering.bFirstTimeControllerAllocation = false;
+      }
+      config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+    }
+    return 0;
   }
 
   void passthrough(PNV_UNICODE_PACKET packet) {
@@ -844,9 +1339,17 @@ namespace input {
       return;
     }
 
-    if (input->gamepads[packet->controllerNumber].id >= 0) {
-      BOOST_LOG(warning) << "ControllerNumber already allocated ["sv << packet->controllerNumber << ']';
+    // If controller has already been refused allocation because there is no more preallocated ones, then just return and drop messages
+    if( config::input.enable_alt_controller_numbering_mode == true && input->gamepads[packet->controllerNumber].alt_controller_placeholder == 4 ) {
       return;
+    }
+
+    if( config::input.enable_alt_controller_numbering_mode == false )
+    {
+      if (input->gamepads[packet->controllerNumber].id >= 0) {
+        BOOST_LOG(warning) << "ControllerNumber already allocated ["sv << packet->controllerNumber << ']';
+        return;
+      }
     }
 
     platf::gamepad_arrival_t arrival {
@@ -855,18 +1358,34 @@ namespace input {
       util::endian::little(packet->supportedButtonFlags),
     };
 
-    auto id = alloc_id(gamepadMask);
-    if (id < 0) {
-      return;
+
+    int allocatedIndex = 0;
+
+    // This is where the work is done for the alt controller number
+    if( (config::input.enable_alt_controller_numbering_mode == true) && (config::alt_gamepad_numbering.bFirstTimeControllerAllocation == true) && (input->gamepads[packet->controllerNumber].alt_controller_placeholder != 4) ) {
+      // Preallocate if not done yet
+      altOrderingInitialPlaceholderAllocation(input, arrival, packet->controllerNumber );
     }
+    if( config::input.enable_alt_controller_numbering_mode == true && input->gamepads[packet->controllerNumber].alt_controller_placeholder != 4) {
+      // Assign gamepad to the session
+      allocatedIndex = altOrderingAssignGamepad( input, packet->controllerNumber, arrival );
+    }
+
+    if( config::input.enable_alt_controller_numbering_mode == false || allocatedIndex == ALT_CONTROLLER_NO_PLACEHOLDER ) {
+      auto id = alloc_id(gamepadMask);
+      if (id < 0) {
+        return;
+      }
 
     // Allocate a new gamepad
-    if (platf::alloc_gamepad(platf_input, {id, packet->controllerNumber}, arrival, input->feedback_queue)) {
-      free_id(gamepadMask, id);
-      return;
-    }
+      if (platf::alloc_gamepad(platf_input, {id, packet->controllerNumber, (uint8_t)-1}, arrival, input->feedback_queue)) {
+        free_id(gamepadMask, id);
+        return;
+      }
 
-    input->gamepads[packet->controllerNumber].id = id;
+      input->gamepads[packet->controllerNumber].id = id;
+      input->gamepads[packet->controllerNumber].alt_controller_placeholder = 0;
+    }
   }
 
   /**
@@ -1089,26 +1608,58 @@ namespace input {
       return;
     }
 
+    // Return Immediately if the controller cannot fit into the alternate gamepad numbering and has been marked as such
+    if( config::input.enable_alt_controller_numbering_mode == true && input->gamepads[packet->controllerNumber].alt_controller_placeholder == 4 ) {
+      return;
+    }
+
     auto &gamepad = input->gamepads[packet->controllerNumber];
+    int allocatedIndex = 0;
 
     // If this is an event for a new gamepad, create the gamepad now. Ideally, the client would
     // send a controller arrival instead of this but it's still supported for legacy clients.
     if ((packet->activeGamepadMask & (1 << packet->controllerNumber)) && gamepad.id < 0) {
-      auto id = alloc_id(gamepadMask);
-      if (id < 0) {
-        return;
+      if (
+        config::input.enable_alt_controller_numbering_mode
+        && config::alt_gamepad_numbering.bFirstTimeControllerAllocation
+        && input->gamepads[packet->controllerNumber].alt_controller_placeholder != 4
+      ) {
+        platf::gamepad_arrival_t arrival{};
+        altOrderingInitialPlaceholderAllocation(input, arrival, packet->controllerNumber);
+      }
+      if (
+        config::input.enable_alt_controller_numbering_mode
+        && input->gamepads[packet->controllerNumber].alt_controller_placeholder != 4
+      ) {
+        platf::gamepad_arrival_t arrival{};
+        allocatedIndex = altOrderingAssignGamepad( input, packet->controllerNumber, arrival );
       }
 
-      if (platf::alloc_gamepad(platf_input, {id, (uint8_t) packet->controllerNumber}, {}, input->feedback_queue)) {
-        free_id(gamepadMask, id);
-        return;
+      if (!config::input.enable_alt_controller_numbering_mode || allocatedIndex == ALT_CONTROLLER_NO_PLACEHOLDER) {
+        auto id = alloc_id(gamepadMask);
+        if (id < 0) {
+          return;
       }
+        if (platf::alloc_gamepad(platf_input, {id, (uint8_t) packet->controllerNumber, (uint8_t)-1}, {}, input->feedback_queue)) {
+          free_id(gamepadMask, id);
+          return;
+        }
 
-      gamepad.id = id;
+        gamepad.id = id;
+        gamepad.alt_controller_placeholder = 0;
+      }
     } else if (!(packet->activeGamepadMask & (1 << packet->controllerNumber)) && gamepad.id >= 0) {
       // If this is the final event for a gamepad being removed, free the gamepad and return.
-      free_gamepad(platf_input, gamepad.id);
-      gamepad.id = -1;
+
+      if (
+        config::input.enable_alt_controller_numbering_mode
+        && (gamepad.alt_controller_placeholder == 2 || gamepad.alt_controller_placeholder == 3)
+      ) {
+        altOrderingDeleteGamepad(input, packet->controllerNumber);
+      } else {
+        free_gamepad(platf_input, gamepad.id);
+        gamepad.id = -1;
+      }
       return;
     }
 
@@ -1576,8 +2127,8 @@ namespace input {
    * @param input The input context pointer.
    * @param input_data The input message.
    */
-  void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data, const crypto::PERM& permission) {
-    // No input permissions at all
+  void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data, const crypto::PERM& permission, int iAltControllerNameIndex ) {
+    input->iAltControllerNameIndex = iAltControllerNameIndex;
     if (!(permission & crypto::PERM::_all_inputs)) {
       return;
     }
