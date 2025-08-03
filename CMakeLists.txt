@@ -10,7 +10,7 @@ project(Apollo VERSION 0.0.0
 
 set(PROJECT_LICENSE "GPL-3.0-only")
 
-set(PROJECT_FQDN "com.SudoMaker.dev.Apollo")
+set(PROJECT_FQDN "dev.lizardbyte.app.Sunshine")
 
 set(PROJECT_BRIEF_DESCRIPTION "GameStream host for Artemis")  # must be <= 35 characters
 
