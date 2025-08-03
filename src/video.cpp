@@ -1922,12 +1922,14 @@ namespace video {
       }
     });
 
-    // set minimum frame time based on client-requested target framerate// set max frame time based on client-requested target framerate.
-    double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target : config.encodingFramerate;
+    // set max frame time based on client-requested target framerate.
+    double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target * 1000 : config.encodingFramerate;
     auto max_frametime = std::chrono::nanoseconds(1000ms) * 1000 / minimum_fps_target;
+    // auto max_frametime = std::chrono::nanoseconds(1000ms) * 1000 / config.encodingFramerate;
     auto encode_frame_threshold = std::chrono::nanoseconds(1000ms) * 1000 / config.encodingFramerate;
     auto frame_variation_threshold = encode_frame_threshold / 4;
-    BOOST_LOG(info) << "Minimum FPS target set to ~"sv << (minimum_fps_target / 2) << "fps ("sv << max_frametime.count() * 2 << "ns)"sv;
+    auto min_frame_diff = encode_frame_threshold - frame_variation_threshold;
+    BOOST_LOG(info) << "Minimum FPS target set to ~"sv << (minimum_fps_target / 2000) << "fps ("sv << max_frametime * 2 << ")"sv;
     BOOST_LOG(info) << "Encoding Frame threshold: "sv << encode_frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);
@@ -1964,7 +1966,7 @@ namespace video {
       }
     }
 
-    std::chrono::steady_clock::time_point next_frame_start;
+    std::chrono::steady_clock::time_point encode_frame_timestamp;
 
     while (true) {
       // Break out of the encoding loop if any of the following are true:
@@ -2001,16 +2003,25 @@ namespace video {
       if (!requested_idr_frame || images->peek()) {
         if (auto img = images->pop(max_frametime)) {
           frame_timestamp = img->frame_timestamp;
+          auto time_diff = *frame_timestamp - encode_frame_timestamp;
+
           // If new frame comes in way too fast, just drop
-          if (*frame_timestamp < (next_frame_start - frame_variation_threshold)) {
+          if (time_diff < -frame_variation_threshold) {
             continue;
           }
+
           if (session->convert(*img)) {
             BOOST_LOG(error) << "Could not convert image"sv;
             break;
           }
 
-          next_frame_start = *frame_timestamp + encode_frame_threshold;
+          if (time_diff < frame_variation_threshold) {
+            *frame_timestamp = encode_frame_timestamp;
+          } else {
+            encode_frame_timestamp = *frame_timestamp;
+          }
+
+          encode_frame_timestamp += encode_frame_threshold;
         } else if (!images->running()) {
           break;
         }
