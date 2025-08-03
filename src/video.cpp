@@ -1922,10 +1922,12 @@ namespace video {
       }
     });
 
-    // set minimum frame time based on client-requested target framerate
-    auto minimum_frame_time = std::chrono::nanoseconds(1000ms) * 1000 / config.encodingFramerate;
+    // set minimum frame time based on client-requested target framerate// set max frame time based on client-requested target framerate.
+    double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target : config.encodingFramerate;
+    auto max_frametime = std::chrono::nanoseconds(1000ms) * 1000 / minimum_fps_target;
     auto encode_frame_threshold = std::chrono::nanoseconds(1000ms) * 1000 / config.encodingFramerate;
     auto frame_variation_threshold = encode_frame_threshold / 4;
+    BOOST_LOG(info) << "Minimum FPS target set to ~"sv << (minimum_fps_target / 2) << "fps ("sv << max_frametime.count() * 2 << "ns)"sv;
     BOOST_LOG(info) << "Encoding Frame threshold: "sv << encode_frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);
@@ -1997,7 +1999,7 @@ namespace video {
 
       // Encode at a minimum FPS to avoid image quality issues with static content
       if (!requested_idr_frame || images->peek()) {
-        if (auto img = images->pop(minimum_frame_time)) {
+        if (auto img = images->pop(max_frametime)) {
           frame_timestamp = img->frame_timestamp;
           // If new frame comes in way too fast, just drop
           if (*frame_timestamp < (next_frame_start - frame_variation_threshold)) {
