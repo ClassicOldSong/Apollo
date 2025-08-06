@@ -234,7 +234,7 @@
     "hevc_mode_1": "Apollo no anunciará soporte para HEVC",
     "hevc_mode_2": "Apollo anunciará soporte para el perfil principal de HEVC",
     "hevc_mode_3": "Apollo anunciará soporte para perfiles HEVC Main y Main10 (HDR)",
-    "hevc_mode_desc": "Permite al cliente solicitar videos HEVC Main o HEVC Main10. HEVC es más intensivo en CPU para codificar, por lo que habilitar esto puede reducir el rendimiento al usar la codificación de software.",,
+    "hevc_mode_desc": "Permite al cliente solicitar videos HEVC Main o HEVC Main10. HEVC es más intensivo en CPU para codificar, por lo que habilitar esto puede reducir el rendimiento al usar la codificación de software.",
     "hide_tray_controls": "Oculta los controles en la bandeja del sistema",
     "hide_tray_controls_desc": "No mostrará \"Forzar parada\", \"Reiniciar\" y \"Salir\" en la bandeja del sistema.",
     "high_resolution_scrolling": "Soporte de desplazamiento de alta resolución",
