@@ -581,7 +581,6 @@ namespace config {
     false, // enable input only mode
     true, // forward_rumble
     false, // alt_controller enable
-    "", // alt_controller_order_string
     4, // alt_controller_count
   };
 
@@ -1292,7 +1291,6 @@ namespace config {
     bool_f(vars, "native_pen_touch", input.native_pen_touch);
     bool_f(vars, "enable_input_only_mode", input.enable_input_only_mode);
     bool_f(vars, "enable_alt_controller_numbering_mode", input.enable_alt_controller_numbering_mode);
-    string_f(vars, "alt_controller_order_string", input.alt_controller_order_string);
     int_between_f(vars, "alt_controller_count", input.alt_controller_count, {1, 16});  // CORRESPONDS TO MAX_GAMEPADS = 16 in common.h on /src/platform/common.h
 
     bool_f(vars, "hide_tray_controls", sunshine.hide_tray_controls);
@@ -1540,5 +1538,5 @@ namespace config {
   // Use alt_gamepad_numbering_mutex to access this element
   // This will not work in the config.h file where the other alternate controller placeholder variables are because platf::feedback_queue_t is not defined and adding the "platform/common.h" in the config.h context will cause many files which include config.h to fail.
   std::vector<platf::feedback_queue_t> placeholder_feedback_queues { platf::MAX_GAMEPADS };
-
+  std::vector< struct config::sDeviceNameOrder > VectorAlternateGamepadParameters;
 }  // namespace config

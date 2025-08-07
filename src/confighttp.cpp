@@ -908,11 +908,14 @@ namespace confighttp {
       std::string uuid = input_tree.value("uuid", "");
       std::string name = input_tree.value("name", "");
       std::string display_mode = input_tree.value("display_mode", "");
+      std::string controller_list2 = input_tree.value("controller_list2","");
       bool enable_legacy_ordering = input_tree.value("enable_legacy_ordering", true);
       bool allow_client_commands = input_tree.value("allow_client_commands", true);
       bool always_use_virtual_display = input_tree.value("always_use_virtual_display", false);
       auto do_cmds = nvhttp::extract_command_entries(input_tree, "do");
       auto undo_cmds = nvhttp::extract_command_entries(input_tree, "undo");
+      int alt_controller_count_temp = config::input.alt_controller_count;
+      bool alt_controller_enable_temp = config::input.enable_alt_controller_numbering_mode;
       auto perm = static_cast<crypto::PERM>(input_tree.value("perm", static_cast<uint32_t>(crypto::PERM::_no)) & static_cast<uint32_t>(crypto::PERM::_all));
       output_tree["status"] = nvhttp::update_device_info(
         uuid,
@@ -923,7 +926,10 @@ namespace confighttp {
         perm,
         enable_legacy_ordering,
         allow_client_commands,
-        always_use_virtual_display
+        always_use_virtual_display,
+        controller_list2,
+        alt_controller_count_temp,
+        alt_controller_enable_temp
       );
       send_response(response, output_tree);
     } catch (std::exception &e) {

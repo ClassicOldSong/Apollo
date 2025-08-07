@@ -64,6 +64,8 @@ namespace nvhttp {
   static std::string otp_device_name;
   static std::chrono::time_point<std::chrono::steady_clock> otp_creation_time;
 
+  bool update_global_controller_info( void );
+  
   class SunshineHTTPSServer: public SimpleWeb::ServerBase<SunshineHTTPS> {
   public:
     SunshineHTTPSServer(const std::string &certification_file, const std::string &private_key_file):
@@ -251,6 +253,9 @@ namespace nvhttp {
         named_cert_node["enable_legacy_ordering"] = named_cert_p->enable_legacy_ordering;
         named_cert_node["allow_client_commands"] = named_cert_p->allow_client_commands;
         named_cert_node["always_use_virtual_display"] = named_cert_p->always_use_virtual_display;
+        named_cert_node["controller_list2"] = named_cert_p->controller_list2;
+        named_cert_node["alt_controller_count_temp"] = config::input.alt_controller_count;
+        named_cert_node["alt_controller_enable_temp"] = config::input.enable_alt_controller_numbering_mode;
 
         // Add "do" commands if available.
         if (!named_cert_p->do_cmds.empty()) {
@@ -274,6 +279,7 @@ namespace nvhttp {
       }
     }
 
+	update_global_controller_info();
     root["root"]["named_devices"] = named_cert_nodes;
 
     try {
@@ -330,6 +336,10 @@ namespace nvhttp {
             named_cert_p->enable_legacy_ordering = true;
             named_cert_p->allow_client_commands = true;
             named_cert_p->always_use_virtual_display = false;
+            named_cert_p->controller_list2 = "";
+            named_cert_p->alt_controller_count_temp = config::input.alt_controller_count;
+            named_cert_p->alt_controller_enable_temp = config::input.enable_alt_controller_numbering_mode;
+
             client.named_devices.emplace_back(named_cert_p);
           }
         }
@@ -351,6 +361,10 @@ namespace nvhttp {
         // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
+        // Load Controller List
+        named_cert_p->controller_list2 = el.value("controller_list2", "");
+        named_cert_p->alt_controller_count_temp = config::input.alt_controller_count;
+        named_cert_p->alt_controller_enable_temp = config::input.enable_alt_controller_numbering_mode;		
         client.named_devices.emplace_back(named_cert_p);
       }
     }
@@ -360,6 +374,7 @@ namespace nvhttp {
     for (auto &named_cert : client.named_devices) {
       cert_chain.add(named_cert);
     }
+    update_global_controller_info();
 
     client_root = client;
   }
@@ -1025,7 +1040,9 @@ namespace nvhttp {
       named_cert_node["enable_legacy_ordering"] = named_cert->enable_legacy_ordering;
       named_cert_node["allow_client_commands"] = named_cert->allow_client_commands;
       named_cert_node["always_use_virtual_display"] = named_cert->always_use_virtual_display;
-
+      named_cert_node["controller_list2"] = named_cert->controller_list2;
+      named_cert_node["alt_controller_count_temp"] = config::input.alt_controller_count;
+      named_cert_node["alt_controller_enable_temp"] = config::input.enable_alt_controller_numbering_mode;
       // Add "do" commands if available
       if (!named_cert->do_cmds.empty()) {
         nlohmann::json do_cmds_node = nlohmann::json::array();
@@ -1657,6 +1674,8 @@ namespace nvhttp {
       bool verified = false;
       p_named_cert_t named_cert_p;
 
+      update_global_controller_info();
+
       auto fg = util::fail_guard([&]() {
         char subject_name[256];
 
@@ -1805,6 +1824,8 @@ namespace nvhttp {
     return false;
   }
 
+  bool update_global_controller_info( void );
+
   bool update_device_info(
     const std::string& uuid,
     const std::string& name,
@@ -1814,9 +1835,13 @@ namespace nvhttp {
     const crypto::PERM newPerm,
     const bool enable_legacy_ordering,
     const bool allow_client_commands,
-    const bool always_use_virtual_display
+    const bool always_use_virtual_display,
+    const std::string& controller_list2,
+    const int alt_controller_count_temp,
+    const bool alt_controller_enable_temp
   ) {
     find_and_udpate_session_info(uuid, name, newPerm);
+    update_global_controller_info();
 
     client_t &client = client_root;
     auto it = client.named_devices.begin();
@@ -1831,6 +1856,9 @@ namespace nvhttp {
         named_cert_p->enable_legacy_ordering = enable_legacy_ordering;
         named_cert_p->allow_client_commands = allow_client_commands;
         named_cert_p->always_use_virtual_display = always_use_virtual_display;
+        named_cert_p->controller_list2 = controller_list2;
+        named_cert_p->alt_controller_count_temp = config::input.alt_controller_count;
+        named_cert_p->alt_controller_enable_temp = config::input.enable_alt_controller_numbering_mode;
         save_state();
         return true;
       }
@@ -1867,4 +1895,51 @@ namespace nvhttp {
 
     return removed;
   }
+// Use this one for getting the controller_list2
+  bool update_global_controller_info( void ) {
+    bool updated = true;
+    client_t &client = client_root;
+    std::string_view uuid;
+    std::string controller_list2;
+
+    struct config::sDeviceNameOrder sCurrent;
+    std::vector< struct config::sDeviceNameOrder >VectorAlternateGamepadParameterTemp;		
+
+    std::vector<int> Numbers;
+
+   get_all_clients();
+
+    config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.lock();
+    // Get the uuid and the the controller_list2
+    for (auto it = client.named_devices.begin(); it != client.named_devices.end(); it++) {
+      controller_list2 = ((*it)->controller_list2);
+      uuid = ((*it)->uuid);
+      try {
+        nlohmann::json J = nlohmann::json::parse(controller_list2);
+        Numbers = J.get<std::vector<int>>();
+      }
+      catch (std::exception& e) {
+      }
+      if( Numbers.size() == 0 ) {
+        Numbers.push_back(999);
+      }
+
+      sCurrent.sDeviceName = (*it)->name;
+      sCurrent.sOrder = (*it)->controller_list2;
+      sCurrent.vOrder = Numbers;
+      sCurrent.sUuid = (*it)->uuid;
+
+      for( int i= 0; i < sCurrent.vOrder.size(); i = i + 1 ) {
+      }
+
+      VectorAlternateGamepadParameterTemp.push_back( sCurrent );
+
+      if( (*it)->controller_list2 == " " ) {
+      }
+    }
+    config::VectorAlternateGamepadParameters = VectorAlternateGamepadParameterTemp;
+    config::alt_gamepad_numbering.alt_gamepad_numbering_mutex.unlock();
+    return updated;
+  }
+
 }  // namespace nvhttp

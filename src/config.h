@@ -215,7 +215,6 @@ namespace config {
     bool forward_rumble;
     // Alternate Controller Numbering Mode
     bool enable_alt_controller_numbering_mode;
-    std::string alt_controller_order_string;
     int alt_controller_count;
   };
 
@@ -292,14 +291,23 @@ namespace config {
   };
   
   // Alternate Controller Numbering Mode
+  
+  struct sDeviceNameOrder {
+    std::string sDeviceName;
+    std::string sOrder;
+    std::vector < int > vOrder;
+    std::string sUuid;
+  };
+  
   struct alt_gamepad_numbering_t {
-    std::mutex alt_gamepad_numbering_mutex;
+    std::recursive_mutex alt_gamepad_numbering_mutex;
     std::vector< std::string > sDeviceNames;
     volatile bool bFirstTimeControllerAllocation { true };
     volatile bool bFirstTimeParsing { true };
     volatile bool bFirstTimeFeedbackQueues { true };
   }; 
 
+  extern std::vector< struct config::sDeviceNameOrder > VectorAlternateGamepadParameters;
   extern alt_gamepad_numbering_t alt_gamepad_numbering;
   extern video_t video;
   extern audio_t audio;

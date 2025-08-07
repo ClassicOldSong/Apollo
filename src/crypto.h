@@ -107,6 +107,9 @@ namespace crypto {
     bool enable_legacy_ordering;
     bool allow_client_commands;
     bool always_use_virtual_display;
+    std::string controller_list2;
+    std::string alt_controller_count_temp;
+    std::string alt_controller_enable_temp;
   };
 
   using p_named_cert_t = std::shared_ptr<named_cert_t>;

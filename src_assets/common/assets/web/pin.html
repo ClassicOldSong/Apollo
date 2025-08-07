@@ -186,6 +186,45 @@
                 &plus; {{ $t('config.add') }}
               </button>
             </div>
+            <!-- Only enable these settings if the alternate controller numbering is enabled --->
+            <template v-if="client.editAltControllerEnableTemp === true" >
+              <!-- Controller list 2 - This holds the numerical values for the controllers and is used by the back end-->
+              <div class="mb-3 mt-2">
+                <label for="controller_list2_label" class="form-label invisible">Controller List 2</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="controller_list2_label"
+                  v-model="client.editControllerList2"
+                  placeholder="[]"
+                  :readonly=true
+                  :hidden=true
+                />
+              </div>
+
+              <!-- Controller list 3 - This holds the text and numerical values for the controllers and is used by the front end -->
+              <div class="mb-3 mt-2">
+                <label for="controller_list3_label" class="form-label">{{ $t('pin.alt_controller_order_list') }}</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="controller_list3_label"
+                  v-model="client.editControllerList3"
+                  placeholder="[]"
+                  :readonly=true
+                />
+              </div>			
+              <div class="form-text pre-wrap">
+			    <p v-html="$t('pin.alt_controller_order_list_desc')"></p>
+              </div>
+			  <div class="align-items-top d-flex flex-row justify-content-center">
+                <button v-for="n in client.editAltControllerCountTemp" v-on:click="buttonControllerListAction( client, n )" :disabled="(checkControllerList(client, controller_list, n, controllerstring, controller_firsttime))"> {{ n }} </button>
+                <button v-on:click="buttonControllerListAction( client, 999 )"  :disabled="controller_list.includes(999) || controller_list.includes(1000) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_any_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, 1000 )" :disabled="controller_list.includes(1000) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_new_non_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, 998 )"  :disabled="controller_list.includes(999) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_stop_looking_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, 0 )">{{ $t('pin.alt_controller_order_list_clear_button') }}</button>
+              </div>			  
+            </template>			
           </div>
           <div v-else class="list-group-item d-flex align-items-center">
             <div class="p-2 flex-grow-1 d-flex align-items-center">
@@ -370,7 +409,12 @@
       clients: [],
       showApplyMessage: false,
       unpairAllPressed: false,
-      unpairAllStatus: null
+      unpairAllStatus: null,
+      controllerstring: '',
+      controller_list: [],
+      controller_list2: [],
+      controller_number: 4,
+      controller_firsttime: true
     }
   }
 
@@ -522,6 +566,61 @@
       removeCmd(arr, idx) {
         arr.splice(idx, 1);
       },
+      languageTranslationControllerList( list ) {
+      const newlist = [];
+      for( const element of list ) {
+        if( element === 999 ) {
+          newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
+        } else if( element === 1000 ) {
+            newlist.push(this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button'));
+          } else if (element === 998 ) {
+            newlist.push(this.i18n.t('pin.alt_controller_order_list_stop_looking_button'));
+          } else {
+            newlist.push(element);
+          }
+        }
+        return newlist;
+      },
+	  buttonControllerListAction( client, n ) {
+        if( n === 0 ) {
+          this.controller_list.splice(0);
+        } else {
+          this.controller_list.push( n );
+        }
+        this.controllerstring=JSON.stringify(this.controller_list);
+        client.editControllerList2=this.controllerstring;
+        client.editControllerList3=JSON.stringify(this.languageTranslationControllerList( this.controller_list ));
+        return;
+      },
+      checkControllerList( client, controller_list, n, controllerstring, controller_firsttime ) {
+         if( controller_firsttime === true ) {
+           try {
+             this.controller_list = JSON.parse(client.editControllerList2);
+           } catch( e ) {
+             this.controller_list = [];
+           }
+           this.controllerstring = client.editControllerList2;
+           this.controller_firsttime = false;
+         }
+         if( controller_list.includes( n ) || controller_list.includes( 999 ) || controller_list.includes( 1000 ) || controller_list.includes( 998 ) ) {
+           return true;
+         } else {
+           return false;
+         }
+      },
+      updatecontrollerstring( )
+      {
+        return client.editControllerList2;
+      },
+      emptyListOrList( list ) {
+        try {
+          JSON.parse(list);
+        }
+        catch (e) {
+          return '[]';
+        }
+        return list;
+      },
       editClient(client) {
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
@@ -535,8 +634,14 @@
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
+        client.editControllerList2 = client.controller_list2;
+        client.editControllerList3 = JSON.stringify( this.languageTranslationControllerList( JSON.parse( this.emptyListOrList( client.controller_list2 ) ) ) );
+        client.editAltControllerCountTemp = client.alt_controller_count_temp;
+        client.editAltControllerEnableTemp = client.alt_controller_enable_temp;
         currentEditingClient = client;
-
+        this.controller_firsttime = true;
+        this.controllerstring = "";
+        this.controller_list = JSON.parse( '[]' );
         console.log(client.do, client.undo)
       },
       cancelEdit(client) {
@@ -548,6 +653,10 @@
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
         client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
+        client.editControllerList2 = client.controller_list2;
+        client.editControllerList3 = JSON.stringify( this.languageTranslationControllerList( JSON.parse( this.emptyListOrList( client.controller_list2 ) ) ) );
+        client.editAltControllerCountTemp = client.alt_controller_count_temp;
+        client.editAltControllerEnableTemp = client.alt_controller_enable_temp;
       },
       saveClient(client) {
         client.editing = false;
@@ -579,7 +688,10 @@
               })
             }
             return filtered
-          }, [])
+          }, []),
+          controller_list2: client.editControllerList2,
+          alt_controller_count_temp: client.editAltControllerCountTemp,
+          alt_controller_enable_temp: client.editAltControllerEnableTemp
         }
         fetch("./api/clients/update", {
           credentials: 'include',
@@ -699,7 +811,10 @@
                 undo,
                 allow_client_commands,
                 always_use_virtual_display,
-                enable_legacy_ordering
+                enable_legacy_ordering,
+                controller_list2,
+                alt_controller_count_temp,
+                alt_controller_enable_temp
               }) => {
                 const permInt = parseInt(perm, 10);
                 return {
@@ -713,7 +828,10 @@
                   undo,
                   allow_client_commands,
                   enable_legacy_ordering,
-                  always_use_virtual_display
+                  always_use_virtual_display,
+                  controller_list2,
+                  alt_controller_count_temp,
+                  alt_controller_enable_temp
                 }
               })
               currentEditingClient = null;

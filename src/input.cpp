@@ -44,10 +44,9 @@ using namespace std::literals;
 
 #define ALT_GAMEPAD_ALL_NON_LISTED "NOMATCH"
 
-//#define ALT_GAMEPAD_ANY_WITHIN 999
-//#define ALT_GAMEPAD_ANY_WITHOUT 1000
 #define	ALT_CONTROLLER_NO_PLACEHOLDER 1000
 #define	ALT_CONTROLLER_ANY_PLACEHOLDER 999
+#define ALT_CONTROLLER_STOP_LOOKING 998
 #define ALT_CONTROLLER_ASSIGN_FAILED 1001
 
 #define ALT_GAMEPAD_MAX_STRING_NUMBER 99
@@ -55,147 +54,19 @@ using namespace std::literals;
 // For the alternative controller numbering
 namespace config {
   extern std::vector<platf::feedback_queue_t> placeholder_feedback_queues;
+  extern std::vector< struct config::sDeviceNameOrder > VectorAlternateGamepadParameters;
 }
 
-struct sDeviceNameOrder
-{
-  std::string sDeviceName;
-  std::string sOrder;
-  std::vector < int > vOrder;
-};
 
-std::vector<struct sDeviceNameOrder> VectorAlternateGamepadParameter;
-
-int parseGamepadOrderStr(std::string sLine, int iMin, int iMax) {
-  std::string sSearch1;
-  std::string sSearch2;
-  std::string sSearch3;
-  std::string sSearch4;
-  std::string sDeviceName;
-  std::string sOrder;
-
-  std::string sOrderAll;
-  std::string sOrderWorking;
-  std::string sOrderCurrent;
-
-  std::string sLineToSearch;
-  std::string sCurrentNumber;
-
-  struct sDeviceNameOrder vCurrent;
-
-  size_t iPosition1, iPosition2, iPosition3, iPosition4, iPosition5;
-
-  int iCurrentNumber = 0;
-  int iCurrentNumberError = 0;
-
-  sLineToSearch = ALT_GAMEPAD_EMPTY;
-  sLineToSearch += ALT_GAMEPAD_BEGIN_CHARACTER;
-  sLineToSearch += sLine;
-
-  for (int iLoop = 1; iLoop < ALT_GAMEPAD_MAX_STRING_NUMBER; iLoop++) {
-    sOrder.clear();
-    sDeviceName.clear();
-
-    // Build the string to look for
-    // Find the DeviceName
-    sSearch1 = ALT_GAMEPAD_EMPTY;
-    sSearch1 += ALT_GAMEPAD_BEGIN_CHARACTER;
-    sSearch1 += ALT_GAMEPAD_USER_PREFIX;
-    sSearch1 += std::to_string(iLoop);
-    sSearch1 += ALT_GAME_PAD_CONNECTOR;
-    sSearch1 += ALT_GAMEPAD_ENCAPSULATE;
-
-    sSearch2 = ALT_GAMEPAD_EMPTY;
-    sSearch2 += ALT_GAMEPAD_BEGIN_CHARACTER;
-    sSearch2 += ALT_GAMEPAD_ORDER_PREFIX;
-    sSearch2 += std::to_string(iLoop);
-    sSearch2 += ALT_GAME_PAD_CONNECTOR;
-    sSearch2 += ALT_GAMEPAD_ENCAPSULATE;
-
-    iPosition1 = sLineToSearch.find(sSearch1);
-    if (iPosition1 != std::string::npos ) {
-      sSearch3 = ALT_GAMEPAD_ENCAPSULATE;
-
-      // Find the End of the Quotation Marks
-      iPosition2 = sLineToSearch.find(sSearch3, iPosition1 + sSearch1.length());
-      if (iPosition2 != std::string::npos) {
-        sDeviceName = sLineToSearch.substr(iPosition1 + sSearch1.length(), iPosition2 - (iPosition1 + sSearch1.length()) );
-
-        // Find the Order String
-        iPosition3 = sLineToSearch.find(sSearch2);
-        if (iPosition3 != std::string::npos) {
-          // Find the End of the Quotation Marks
-          iPosition4 = sLineToSearch.find(sSearch3, iPosition3 + sSearch2.length());
-
-          if (iPosition4 != std::string::npos) {
-            sOrder = sLineToSearch.substr(iPosition3 + sSearch2.length(), iPosition4 - (iPosition3 + sSearch2.length()) );
-
-            // Parse the Order String
-            sOrderWorking = sOrder;
-
-            while (sOrderWorking.length() > 0) {
-              // Remove beginning spaces
-              iPosition5 = sOrderWorking.find(ALT_GAMEPAD_BEGIN_CHARACTER);
-              if (iPosition5 == 0) {
-                sOrderWorking.erase(iPosition5, 1);
-                continue;
-              } else {
-                if (iPosition5 != std::string::npos) {
-                  sOrderCurrent = sOrderWorking.substr(0, iPosition5);
-                  sOrderWorking.erase(0, iPosition5 + 1);
-                } else {
-                  sOrderCurrent = sOrderWorking;
-                  sOrderWorking = ALT_GAMEPAD_EMPTY;
-                }
-
-                iCurrentNumberError = 0;
-                try {
-                  iCurrentNumber = stoi(sOrderCurrent);
-                }
-                catch (...) {
-                  iCurrentNumberError = 1;
-                }
-                if(iCurrentNumberError == 0) {
-                  if(iCurrentNumber == ALT_CONTROLLER_ANY_PLACEHOLDER ||
-                     iCurrentNumber == ALT_CONTROLLER_NO_PLACEHOLDER ||
-                    (iCurrentNumber >= iMin && iCurrentNumber <= iMax)) {
-                    vCurrent.vOrder.push_back(iCurrentNumber);
-                  }
-                }
-              }
-            }
-            if (vCurrent.vOrder.size() > 0) {
-              // Put the variables into the vector list
-              vCurrent.sDeviceName = sDeviceName;
-              vCurrent.sOrder = sOrder;
-              VectorAlternateGamepadParameter.push_back(vCurrent);
-
-              // Prepare for next loop - Clear Variables
-              vCurrent.sDeviceName = ALT_GAMEPAD_EMPTY;
-              vCurrent.sOrder = ALT_GAMEPAD_EMPTY;
-              vCurrent.vOrder.clear();
-            }
-          }
-        }
-      }
-    }
-  }
-
-  if (VectorAlternateGamepadParameter.size() > 0 ) {
-    return 0;
-  } else {
-    return 1;
-  }
-}
-
-int matchAlternativeGamepadNumberingString(std::string sDeviceName, struct sDeviceNameOrder &sReturn ) {
+// MATCH and extract
+int matchAlternativeGamepadNumberingString(std::string sDeviceName, struct config::sDeviceNameOrder &sReturn ) {
   bool bFound = false;
 
-  struct sDeviceNameOrder sCurrent;
-  std::vector< struct sDeviceNameOrder >::iterator i;
-  i = VectorAlternateGamepadParameter.begin();
+  struct config::sDeviceNameOrder sCurrent;
+  std::vector< struct config::sDeviceNameOrder >::iterator i;
+  i = config::VectorAlternateGamepadParameters.begin();
 
-  while (bFound == false && i != VectorAlternateGamepadParameter.end() ) {
+  while (bFound == false && i != config::VectorAlternateGamepadParameters.end() ) {
     sCurrent = *i;
     if (sCurrent.sDeviceName == sDeviceName) {
       bFound = true;
@@ -204,7 +75,10 @@ int matchAlternativeGamepadNumberingString(std::string sDeviceName, struct sDevi
   }
 
   if (bFound == true) {
-    sReturn = sCurrent;
+	for( int i=0; i < sCurrent.vOrder.size(); i++) {
+      // Empty code to inspect numbers
+    }
+    sReturn = sCurrent;		
     return 0;
   } else {
       // If there are no matches, try to the ALT_GAMEPAD_ALL_NON_LISTED name and use that to find the next match
@@ -1173,7 +1047,7 @@ namespace input {
     int allocatedIndex = 0;
 
     if (config::input.enable_alt_controller_numbering_mode == true) {
-      struct sDeviceNameOrder ListNumbers;
+      struct config::sDeviceNameOrder ListNumbers;
       std::string sLocalDeviceName;
       int iIndex;
       int iIndex2;
@@ -1192,6 +1066,10 @@ namespace input {
           if (matchAlternativeGamepadNumberingString(sLocalDeviceName, ListNumbers) == 0) {
             // Go through all of the numbers and see if there is a controller that matches that number
             for (iIndex2 = 0; iIndex2 < ListNumbers.vOrder.size() && bCompletedAdd == false; iIndex2 += 1) {
+              // Stop looking directive
+              if( ListNumbers.vOrder[ iIndex2 ] == ALT_CONTROLLER_STOP_LOOKING ) {
+                break;
+              }
               for (iIndex = 0; iIndex < placeholder_gamepads.size() && bCompletedAdd == false ; iIndex += 1) {
                 // See if the gamepad number as a place holder matches the number from the string configuration
                 // The -1 is there because the strings start at 1 whereas the index starts at 0
@@ -1264,11 +1142,6 @@ namespace input {
       if (config::alt_gamepad_numbering.bFirstTimeControllerAllocation == true ) {
         placeholder_gamepads.resize(MAX_GAMEPADS);
 
-        if (config::input.alt_controller_order_string.empty()) {
-          parseGamepadOrderStr("DeviceName1=\"NOMATCH\" Order1=\"999\"", 1, config::input.alt_controller_count);
-        } else {
-          parseGamepadOrderStr(config::input.alt_controller_order_string, 1, config::input.alt_controller_count );
-        }
 
         iIndexPlaceholder = 16;
         int iLoopCount = 0;

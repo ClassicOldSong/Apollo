@@ -199,13 +199,6 @@ const config = ref(props.config)
 
     <template v-if="config.enable_alt_controller_numbering_mode === 'enabled'">
       <template v-if="platform === 'windows'">
-        <!-- Alt_Controller_order_string -->
-        <div class="mb-3">
-          <label for="alt_controller_order_string" class="form-label">{{ $t('config.alt_controller_order_string') }}</label>
-          <input type="text" class="form-control" id="alt_controller_order_string" placeholder=""
-                 v-model="config.alt_controller_order_string" />
-          <div class="form-text pre-wrap">{{ $t('config.alt_controller_order_string_desc') }}<br></div>
-        </div>
 
         <!-- alt_controller_count-->
         <div class="mb-3">
