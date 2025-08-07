@@ -187,29 +187,15 @@
               </button>
             </div>
             <!-- Only enable these settings if the alternate controller numbering is enabled --->
-            <template v-if="client.editAltControllerEnableTemp === true" >
-              <!-- Controller list 2 - This holds the numerical values for the controllers and is used by the back end-->
+            <template v-if="enableAltControllerNumberingMode === true" >
+              <!-- : This holds the text and numerical values for the controllers and is used by the front end -->
               <div class="mb-3 mt-2">
-                <label for="controller_list2_label" class="form-label invisible">Controller List 2</label>
+                <label for="controllerListTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_order_list') }}</label>
                 <input
                   type="text"
                   class="form-control"
-                  id="controller_list2_label"
-                  v-model="client.editControllerList2"
-                  placeholder="[]"
-                  :readonly=true
-                  :hidden=true
-                />
-              </div>
-
-              <!-- Controller list 3 - This holds the text and numerical values for the controllers and is used by the front end -->
-              <div class="mb-3 mt-2">
-                <label for="controller_list3_label" class="form-label">{{ $t('pin.alt_controller_order_list') }}</label>
-                <input
-                  type="text"
-                  class="form-control"
-                  id="controller_list3_label"
-                  v-model="client.editControllerList3"
+                  id="controllerListTextForUsersLabel"
+                  v-model="controllerListTextForUsers"
                   placeholder="[]"
                   :readonly=true
                 />
@@ -218,10 +204,10 @@
 			    <p v-html="$t('pin.alt_controller_order_list_desc')"></p>
               </div>
 			  <div class="align-items-top d-flex flex-row justify-content-center">
-                <button v-for="n in client.editAltControllerCountTemp" v-on:click="buttonControllerListAction( client, n )" :disabled="(checkControllerList(client, controller_list, n, controllerstring, controller_firsttime))"> {{ n }} </button>
-                <button v-on:click="buttonControllerListAction( client, 999 )"  :disabled="controller_list.includes(999) || controller_list.includes(1000) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_any_preallocated_button') }}</button>
-                <button v-on:click="buttonControllerListAction( client, 1000 )" :disabled="controller_list.includes(1000) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_new_non_preallocated_button') }}</button>
-                <button v-on:click="buttonControllerListAction( client, 998 )"  :disabled="controller_list.includes(999) || controller_list.includes(998)">{{ $t('pin.alt_controller_order_list_stop_looking_button') }}</button>
+                <button v-for="n in altControllerCount" v-on:click="buttonControllerListAction( client, n )" :disabled="(checkControllerList(client, controllerListNumbersForInternal, n, controllerFirstTime))"> {{ n }} </button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_any_placeholder )"  :disabled="controllerListNumbersForInternal.includes(alt_controller_any_placeholder) || controllerListNumbersForInternal.includes(alt_controller_no_placeholder) || controllerListNumbersForInternal.includes(alt_controller_stop_looking)">{{ $t('pin.alt_controller_order_list_any_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_no_placeholder )" :disabled="controllerListNumbersForInternal.includes(alt_controller_no_placeholder) || controllerListNumbersForInternal.includes(alt_controller_stop_looking)">{{ $t('pin.alt_controller_order_list_new_non_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_stop_looking )"  :disabled="controllerListNumbersForInternal.includes(alt_controller_any_placeholder) || controllerListNumbersForInternal.includes(alt_controller_stop_looking)">{{ $t('pin.alt_controller_order_list_stop_looking_button') }}</button>
                 <button v-on:click="buttonControllerListAction( client, 0 )">{{ $t('pin.alt_controller_order_list_clear_button') }}</button>
               </div>			  
             </template>			
@@ -343,6 +329,13 @@
     _all: 0x071F1F00
   };
 
+  const altControllerMapping = {
+    alt_controller_any_placeholder: 999,
+	alt_controller_stop_looking: 998,
+	alt_controller_assign_failed: 1001,
+	alt_controller_no_placeholder: 1000
+  };
+  
   const permissionGroups = [
     { name: 'Action', permissions: [
       {
@@ -410,11 +403,15 @@
       showApplyMessage: false,
       unpairAllPressed: false,
       unpairAllStatus: null,
-      controllerstring: '',
-      controller_list: [],
-      controller_list2: [],
-      controller_number: 4,
-      controller_firsttime: true
+      altControllerCount: 4,
+      enableAltControllerNumberingMode: false,
+      controllerListNumbersForInternal: [],
+      controllerListTextForUsers: '',
+      controllerFirstTime: true,  
+      alt_controller_any_placeholder: altControllerMapping.alt_controller_any_placeholder,
+      alt_controller_stop_looking: altControllerMapping.alt_controller_stop_looking,
+      alt_controller_assign_failed: altControllerMapping.alt_controller_assign_failed,
+      alt_controller_no_placeholder: altControllerMapping.alt_controller_no_placeholder
     }
   }
 
@@ -440,6 +437,7 @@
     },
     created() {
       this.refreshClients();
+	  this.refreshAltControllerLimits();
     },
     methods: {
       switchTab(currentTab) {
@@ -569,11 +567,11 @@
       languageTranslationControllerList( list ) {
       const newlist = [];
       for( const element of list ) {
-        if( element === 999 ) {
+        if( element === altControllerMapping.alt_controller_any_placeholder ) {
           newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
-        } else if( element === 1000 ) {
+        } else if( element === altControllerMapping.alt_controller_no_placeholder ) {
             newlist.push(this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button'));
-          } else if (element === 998 ) {
+          } else if (element === altControllerMapping.alt_controller_stop_looking ) {
             newlist.push(this.i18n.t('pin.alt_controller_order_list_stop_looking_button'));
           } else {
             newlist.push(element);
@@ -581,36 +579,30 @@
         }
         return newlist;
       },
-	  buttonControllerListAction( client, n ) {
+      buttonControllerListAction( client, n ) {
         if( n === 0 ) {
-          this.controller_list.splice(0);
+          this.controllerListNumbersForInternal.splice(0);
         } else {
-          this.controller_list.push( n );
+          this.controllerListNumbersForInternal.push( n );
         }
-        this.controllerstring=JSON.stringify(this.controller_list);
-        client.editControllerList2=this.controllerstring;
-        client.editControllerList3=JSON.stringify(this.languageTranslationControllerList( this.controller_list ));
+        client.editControllerListNumbers=JSON.stringify(this.controllerListNumbersForInternal);
+        this.controllerListTextForUsers=JSON.stringify(this.languageTranslationControllerList( this.controllerListNumbersForInternal ));
         return;
       },
-      checkControllerList( client, controller_list, n, controllerstring, controller_firsttime ) {
-         if( controller_firsttime === true ) {
+      checkControllerList( client, controllerListNumbersForInternal, n, controllerFirstTime) {
+         if( controllerFirstTime === true ) {
            try {
-             this.controller_list = JSON.parse(client.editControllerList2);
+             this.controllerListNumbersForInternal = JSON.parse(client.editControllerListNumbers);
            } catch( e ) {
-             this.controller_list = [];
+             this.controllerListNumbersForInternal = [];
            }
-           this.controllerstring = client.editControllerList2;
-           this.controller_firsttime = false;
+           this.controllerFirstTime = false;
          }
-         if( controller_list.includes( n ) || controller_list.includes( 999 ) || controller_list.includes( 1000 ) || controller_list.includes( 998 ) ) {
+         if( controllerListNumbersForInternal.includes( n ) || controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_any_placeholder ) || controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_no_placeholder ) || controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_stop_looking ) ) {
            return true;
          } else {
            return false;
-         }
-      },
-      updatecontrollerstring( )
-      {
-        return client.editControllerList2;
+         }	 
       },
       emptyListOrList( list ) {
         try {
@@ -634,14 +626,13 @@
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
-        client.editControllerList2 = client.controller_list2;
-        client.editControllerList3 = JSON.stringify( this.languageTranslationControllerList( JSON.parse( this.emptyListOrList( client.controller_list2 ) ) ) );
-        client.editAltControllerCountTemp = client.alt_controller_count_temp;
-        client.editAltControllerEnableTemp = client.alt_controller_enable_temp;
         currentEditingClient = client;
-        this.controller_firsttime = true;
-        this.controllerstring = "";
-        this.controller_list = JSON.parse( '[]' );
+
+        client.editControllerListNumbers = client.controller_list_numbers;
+        this.controllerFirstTime = true;
+        this.controllerListTextForUsers = JSON.stringify( this.languageTranslationControllerList( JSON.parse( this.emptyListOrList( client.controller_list_numbers ) ) ) );
+        this.controllerListNumbersForInternal = this.emptyListOrList( client.controller_list_numbers );
+
         console.log(client.do, client.undo)
       },
       cancelEdit(client) {
@@ -653,10 +644,7 @@
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
         client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
-        client.editControllerList2 = client.controller_list2;
-        client.editControllerList3 = JSON.stringify( this.languageTranslationControllerList( JSON.parse( this.emptyListOrList( client.controller_list2 ) ) ) );
-        client.editAltControllerCountTemp = client.alt_controller_count_temp;
-        client.editAltControllerEnableTemp = client.alt_controller_enable_temp;
+        client.editControllerListNumbers = client.controller_list_numbers;
       },
       saveClient(client) {
         client.editing = false;
@@ -689,9 +677,7 @@
             }
             return filtered
           }, []),
-          controller_list2: client.editControllerList2,
-          alt_controller_count_temp: client.editAltControllerCountTemp,
-          alt_controller_enable_temp: client.editAltControllerEnableTemp
+          controller_list_numbers: client.editControllerListNumbers,
         }
         fetch("./api/clients/update", {
           credentials: 'include',
@@ -792,6 +778,23 @@
           this.refreshClients();
         });
       },
+      refreshAltControllerLimits( ) {
+        fetch("./api/altcontroller", { credentials: 'include' })
+          .then((response) => response.json())
+          .then((response) => {
+            if (response.status) {
+              this.altControllerCount = response.alt_controller_count
+              this.enableAltControllerNumberingMode = response.enable_alt_controller_numbering_mode
+            } else {
+              this.altControllerCount = 4
+              this.enableAltControllerNumberingMode = false
+            }
+          })
+          .catch(e => {
+            console.error(e)
+            location.reload();
+          });
+      },	  
       refreshClients() {
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
@@ -812,9 +815,7 @@
                 allow_client_commands,
                 always_use_virtual_display,
                 enable_legacy_ordering,
-                controller_list2,
-                alt_controller_count_temp,
-                alt_controller_enable_temp
+                controller_list_numbers
               }) => {
                 const permInt = parseInt(perm, 10);
                 return {
@@ -829,9 +830,7 @@
                   allow_client_commands,
                   enable_legacy_ordering,
                   always_use_virtual_display,
-                  controller_list2,
-                  alt_controller_count_temp,
-                  alt_controller_enable_temp
+                  controller_list_numbers
                 }
               })
               currentEditingClient = null;

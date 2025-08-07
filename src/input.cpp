@@ -35,21 +35,12 @@ extern "C" {
 
 using namespace std::literals;
 
-#define ALT_GAMEPAD_USER_PREFIX "DeviceName"
-#define ALT_GAMEPAD_ORDER_PREFIX "Order"
-#define ALT_GAME_PAD_CONNECTOR "="
-#define ALT_GAMEPAD_ENCAPSULATE "\""
-#define ALT_GAMEPAD_BEGIN_CHARACTER " "
-#define ALT_GAMEPAD_EMPTY ""
-
-#define ALT_GAMEPAD_ALL_NON_LISTED "NOMATCH"
 
 #define	ALT_CONTROLLER_NO_PLACEHOLDER 1000
 #define	ALT_CONTROLLER_ANY_PLACEHOLDER 999
 #define ALT_CONTROLLER_STOP_LOOKING 998
 #define ALT_CONTROLLER_ASSIGN_FAILED 1001
 
-#define ALT_GAMEPAD_MAX_STRING_NUMBER 99
 
 // For the alternative controller numbering
 namespace config {
@@ -80,14 +71,8 @@ int matchAlternativeGamepadNumberingString(std::string sDeviceName, struct confi
     }
     sReturn = sCurrent;		
     return 0;
-  } else {
-      // If there are no matches, try to the ALT_GAMEPAD_ALL_NON_LISTED name and use that to find the next match
-      if( sDeviceName == ALT_GAMEPAD_ALL_NON_LISTED ) {
-        return -1;
-      } else {
-        return matchAlternativeGamepadNumberingString( ALT_GAMEPAD_ALL_NON_LISTED, sReturn );
-      }
   }
+  return 1;
 }
 
 namespace input {

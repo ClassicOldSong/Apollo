@@ -281,8 +281,6 @@ namespace nvhttp {
     const bool enable_legacy_ordering,
     const bool allow_client_commands,
     const bool always_use_virtual_display,
-    const std::string& controller_list2,
-    const int alt_controller_count_temp,
-    const bool alt_controller_enable_temp
+	const std::string& controller_list_numbers
   );
 }  // namespace nvhttp
