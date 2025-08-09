@@ -195,7 +195,7 @@
                   type="text"
                   class="form-control"
                   id="controllerListTextForUsersLabel"
-                  v-model="controllerListTextForUsers"
+                  v-model="client.editControllerListNumbers"
                   placeholder="[]"
                   :readonly=true
                   :disabled=" checkControllerDisable( client, 0 )"
@@ -406,15 +406,10 @@
       showApplyMessage: false,
       unpairAllPressed: false,
       unpairAllStatus: null,
-      // Set default values for the number of controllers and whether the mode is enable which will be overridden when those values are loaded in
+      // Will be read in from the refreshClients() 
       altControllerCount: 4,
+      // Will be read in from the refreshClients() 
       enableAltControllerNumberingMode: false,
-      // A list of the numbers representing the controllers. This is the main list used when a button is pressed to add/clear values.
-      controllerListNumbersForInternal: [],
-      // A string that is displayed via the html page which contains the controller numbers and the special numbers displayed as text. This is for the GUI use only. This uses the controllerListNumberForInternal to get the correct values.
-      controllerListTextForUsers: '',
-      // A trigger to check if the devicename has changed meaning that the controller lists need to be updated
-      controllerLastName: '',
       // Constants for the special numbers of the controllers for conditions
       alt_controller_any_placeholder: altControllerMapping.alt_controller_any_placeholder,
       alt_controller_stop_looking: altControllerMapping.alt_controller_stop_looking,
@@ -572,18 +567,35 @@
       removeCmd(arr, idx) {
         arr.splice(idx, 1);
       },
-      languageTranslationControllerList( list ) {
+      languageTranslationControllerList( list, mode ) {
         const newlist = [];
         // Go through all of the elements in the list and replace the special numbers with text
         for( const element of list ) {
-          if( element === altControllerMapping.alt_controller_any_placeholder ) {
-            newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
-          } else if( element === altControllerMapping.alt_controller_no_placeholder ) {
-            newlist.push(this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button'));
-          } else if (element === altControllerMapping.alt_controller_stop_looking ) {
-            newlist.push(this.i18n.t('pin.alt_controller_order_list_stop_looking_button'));
-          } else {
-            newlist.push(element);
+          // Go from numbers to string elements - Typically after reading from the state file or after adding a new number
+          if( mode === 1 )
+          {
+            if( element === altControllerMapping.alt_controller_any_placeholder ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
+            } else if( element === altControllerMapping.alt_controller_no_placeholder ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button'));
+            } else if (element === altControllerMapping.alt_controller_stop_looking ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_stop_looking_button'));
+            } else {
+              newlist.push(element);
+            }
+          }
+          if( mode === 2 )
+          {
+            // Go from string elements to numbers - Typically when saving to the state file
+            if( element === this.i18n.t('pin.alt_controller_order_list_any_preallocated_button') ) {
+              newlist.push( altControllerMapping.alt_controller_any_placeholder );
+            } else if( element === this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button') ) {
+              newlist.push(altControllerMapping.alt_controller_no_placeholder );
+            } else if (element === this.i18n.t('pin.alt_controller_order_list_stop_looking_button') ) {
+              newlist.push(altControllerMapping.alt_controller_stop_looking);
+            } else {
+              newlist.push(element);
+            }         
           }
         }
       return newlist;
@@ -591,71 +603,72 @@
       buttonControllerListAction( client, n ) {
         if( n === 0 ) {
           // Clear the internal number list
-          this.controllerListNumbersForInternal.splice(0);
+          client.editControllerListNumbers.splice(0);
         } else {
           // Just add the passed number to the list
-          this.controllerListNumbersForInternal.push( n );
+          client.editControllerListNumbers.push( n );
         }
-        // Update the string that will be saved to the state file using the internal control list
-        client.editControllerListNumbers=JSON.stringify(this.controllerListNumbersForInternal);
-        // Update the string that the user sees being sure to pass it through the translation function to convert the special numbers to strings
-        this.controllerListTextForUsers=JSON.stringify(this.languageTranslationControllerList( this.controllerListNumbersForInternal ));
+        // Replace the number element with the string element for ease of use by the user
+        client.editControllerListNumbers = this.languageTranslationControllerList( client.editControllerListNumbers, 1 ); 
         return;
       },
       checkControllerDisable( client, n ) {
-        // The number passed is what would be added to the controller list
-        // Make sure the Internal and User Text is updated when an edit is started
-        if( this.controllerLastName !== client.name ) {
-          try {
-            this.controllerListNumbersForInternal = JSON.parse(client.editControllerListNumbers);
-          } catch( e ) {
-          this.controllerListNumbersForInternal = [];
-          }
-          // Update the Text for Users
-          this.controllerListTextForUsers = JSON.stringify( this.languageTranslationControllerList( this.controllerListNumbersForInternal ) );
-          // Reset the trigger for the controllerlist updates
-          this.controllerLastName = client.name;
-        }
+        let returnCode = false;
+        // Create list to do the number comparison against
+        const compareList = this.languageTranslationControllerList( client.editControllerListNumbers, 2 );
+        
         if( n === altControllerMapping.alt_controller_any_placeholder ) {
           // The any button is disabled if any, no, or stop is in the current internal controller list
-          if( this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_any_placeholder) ||
-              this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_no_placeholder) ||
-              this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_stop_looking) ) {
-            return true;
+          if( compareList.includes(altControllerMapping.alt_controller_any_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
           } else {
-            return false;
+            returnCode = false;
           }
         } else if( n === altControllerMapping.alt_controller_no_placeholder ) {
           // The no button is disabled if no or stop is in the current internal controller list
-          if( this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_no_placeholder) ||
-              this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_stop_looking) ) {
-            return true;
+          if( compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
           } else {
-            return false;
+            returnCode = false;
           }
         } else if( n === altControllerMapping.alt_controller_stop_looking ) {
           // The stop button is disabled if no or stop is in the current internal controller list
-          if( this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_no_placeholder) ||
-              this.controllerListNumbersForInternal.includes(altControllerMapping.alt_controller_stop_looking) ) {
-                return true;
+          if( compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
           } else {
-            return false;
+            returnCode = false;
           }
         } else if( n === 0 ) {
           // Nothing disables the clear button or the user text of the list of controllers
-          return false;
+          returnCode = false;
         } else {
         // A direct controller number was passed in for the final check
         // Disable the number if the number is already there or the any, no, or stop special numbers are already present
-          if( this.controllerListNumbersForInternal.includes( n ) ||
-              this.controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_any_placeholder ) ||
-              this.controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_no_placeholder ) ||
-              this.controllerListNumbersForInternal.includes( altControllerMapping.alt_controller_stop_looking ) ) {
-            return true;
+          if( compareList.includes( n ) ||
+              compareList.includes( altControllerMapping.alt_controller_any_placeholder ) ||
+              compareList.includes( altControllerMapping.alt_controller_no_placeholder ) ||
+              compareList.includes( altControllerMapping.alt_controller_stop_looking ) ) {
+            returnCode = true;
           } else {
-          return false;
+            returnCode = false;
           }
+        }        
+        return returnCode;
+      },
+      returnControllerList( rawValue ) {
+        // Convert what was received from the refreshClient() response into a list
+        try {
+          rawValue = JSON.parse( rawValue );
+        } catch( e ) {
+          rawValue = [];
         }
+        // Convert the special number elements in the list into strings
+        rawValue = this.languageTranslationControllerList( rawValue, 1 );
+        return rawValue;
       },
       editClient(client) {
         if (currentEditingClient) {
@@ -670,7 +683,7 @@
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
-        client.editControllerListNumbers = client.controller_list_numbers;
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
         currentEditingClient = client;
 
         console.log(client.do, client.undo)
@@ -684,10 +697,7 @@
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
         client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
-        client.editControllerListNumbers = client.controller_list_numbers;
-
-        // Controllers do not directly use the client.editControllerListNumbers for the GUI, so we need to trigger a reset of the variables displayed
-        this.controllerLastName = '';
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
       },
       saveClient(client) {
         client.editing = false;
@@ -720,7 +730,7 @@
             }
             return filtered
           }, []),
-          controller_list_numbers: client.editControllerListNumbers,
+          controller_list_numbers: JSON.stringify(this.languageTranslationControllerList( client.editControllerListNumbers, 2 )),          
         }
         fetch("./api/clients/update", {
           credentials: 'include',
