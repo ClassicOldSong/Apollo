@@ -444,8 +444,7 @@
     },
     created() {
       this.refreshClients();
-	  this.refreshAltControllerLimits();
-    },
+   },
     methods: {
       switchTab(currentTab) {
         location.hash = currentTab;
@@ -453,8 +452,8 @@
         Object.assign(this, data(), { clients });
         hostInfoCache = null;
         clearTimeout(resetOTPTimeout);
-        // Need to restore the Alternate controller limits after the switch
-        this.refreshAltControllerLimits();
+        // Need to restore the Alternate controller limits after the switch; This also fixes a bug because the this.platform will also get reset without doing a refreshClient()
+        this.refreshClients();
       },
       editHost() {
         this.editingHost = !this.editingHost;
@@ -822,25 +821,6 @@
           this.refreshClients();
         });
       },
-      refreshAltControllerLimits( ) {
-        // Send request to the server to get preallocated count and if the alternate controller numbering mode is enabled
-        fetch("./api/altcontroller", { credentials: 'include' })
-          .then((response) => response.json())
-          .then((response) => {
-            if (response.status) {
-              this.altControllerCount = response.alt_controller_count;
-              this.enableAltControllerNumberingMode = response.enable_alt_controller_numbering_mode;
-            } else {
-              // Disable the alternate controller mode if the parameters can not be read
-              this.altControllerCount = 4;
-              this.enableAltControllerNumberingMode = false;
-            }
-          })
-          .catch(e => {
-            console.error(e)
-            location.reload();
-          });
-      },	  
       refreshClients() {
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
@@ -850,6 +830,10 @@
           .then((response) => {
             if (response.status && response.named_certs && response.named_certs.length) {
               this.platform = response.platform
+              // Get the alternate controller count and enable for the web page information - These parameters are not part of the state file, but the .conf file     
+              this.altControllerCount = response.alt_controller_count;
+              this.enableAltControllerNumberingMode = response.enable_alt_controller_numbering_mode;
+
               this.clients = response.named_certs.map(({
                 name,
                 uuid,

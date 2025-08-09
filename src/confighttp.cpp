@@ -872,30 +872,9 @@ namespace confighttp {
 #ifdef _WIN32
     output_tree["platform"] = "windows";
 #endif
-    output_tree["status"] = true;
-    send_response(response, output_tree);
-  }
-   
-  /**
-   * @brief Get the alternate controller number parameters that are in the config->input which the pin.html needs
-   * @param response The HTTP response object.
-   * @param request The HTTP request object.
-   *
-   * @api_examples{/api/altcontroller| GET| null}
-   */   
-   
-  void getAltController(resp_https_t response, req_https_t request) {
-    if (!authenticate(response, request)) {
-      return;
-    }
-
-    print_req(request);
-
-    nlohmann::json output_tree;
     output_tree["alt_controller_count"] = config::input.alt_controller_count;
     output_tree["enable_alt_controller_numbering_mode"] = config::input.enable_alt_controller_numbering_mode;
     output_tree["status"] = true;
-
     send_response(response, output_tree);
   }
 
@@ -1557,7 +1536,6 @@ namespace confighttp {
     server.resource["^/api/login"]["POST"] = login;
     server.resource["^/api/pin$"]["POST"] = savePin;
     server.resource["^/api/otp$"]["POST"] = getOTP;
-	server.resource["^/api/altcontroller$"]["GET"] = getAltController;
     server.resource["^/api/apps$"]["GET"] = getApps;
     server.resource["^/api/apps$"]["POST"] = saveApp;
     server.resource["^/api/apps/reorder$"]["POST"] = reorderApps;
