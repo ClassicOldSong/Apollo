@@ -872,6 +872,8 @@ namespace confighttp {
 #ifdef _WIN32
     output_tree["platform"] = "windows";
 #endif
+    output_tree["alt_controller_count"] = config::input.alt_controller_count;
+    output_tree["enable_alt_controller_numbering_mode"] = config::input.enable_alt_controller_numbering_mode;
     output_tree["status"] = true;
     send_response(response, output_tree);
   }
@@ -908,6 +910,7 @@ namespace confighttp {
       std::string uuid = input_tree.value("uuid", "");
       std::string name = input_tree.value("name", "");
       std::string display_mode = input_tree.value("display_mode", "");
+      std::string controller_list_numbers = input_tree.value("controller_list_numbers","");
       bool enable_legacy_ordering = input_tree.value("enable_legacy_ordering", true);
       bool allow_client_commands = input_tree.value("allow_client_commands", true);
       bool always_use_virtual_display = input_tree.value("always_use_virtual_display", false);
@@ -923,7 +926,8 @@ namespace confighttp {
         perm,
         enable_legacy_ordering,
         allow_client_commands,
-        always_use_virtual_display
+        always_use_virtual_display,
+        controller_list_numbers
       );
       send_response(response, output_tree);
     } catch (std::exception &e) {
