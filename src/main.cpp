@@ -324,7 +324,6 @@ int main(int argc, char *argv[]) {
   if (video::probe_encoders()) {
 #ifdef _WIN32
     bool allow_probing = video::allow_encoder_probing();
-    bool probe_result = false;
     // Create a temporary virtual display for encoder capability probing
     if (proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       std::string probe_uuid_str = PROBE_DISPLAY_UUID;
