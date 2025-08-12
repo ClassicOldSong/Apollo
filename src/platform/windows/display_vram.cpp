@@ -770,9 +770,15 @@ namespace platf::dxgi {
         return -1;
       }
 
-      status = dxgi->SetGPUThreadPriority(7);
+      status = dxgi->SetGPUThreadPriority(0x4000001E);
       if (FAILED(status)) {
-        BOOST_LOG(warning) << "Failed to increase encoding GPU thread priority. Please run application as administrator for optimal performance.";
+        BOOST_LOG(info) << "Failed to request absoloute encoding GPU thread priority. Trying relative priority.";
+        status = dxgi->SetGPUThreadPriority(7);
+        if (FAILED(status)) {
+          BOOST_LOG(warning) << "Failed to request relative encoding GPU thread priority. Please run application as administrator for optimal performance.";
+        } else {
+          BOOST_LOG(info) << "Relative encoding GPU thread priority request success.";
+        }
       }
 
       auto default_color_vectors = ::video::color_vectors_from_colorspace(::video::colorspace_e::rec601, false);
