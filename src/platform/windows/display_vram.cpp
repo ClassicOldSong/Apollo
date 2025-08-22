@@ -7,7 +7,7 @@
 
 // platform includes
 #include <d3dcompiler.h>
-#include <DirectXMath.h>
+#include <directxmath.h>
 
 extern "C" {
 #include <libavcodec/avcodec.h>

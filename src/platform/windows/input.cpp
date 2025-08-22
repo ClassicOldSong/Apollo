@@ -3,6 +3,7 @@
  * @brief Definitions for input handling on Windows.
  */
 #define WINVER 0x0A00
+
 // platform includes
 #include <windows.h>
 

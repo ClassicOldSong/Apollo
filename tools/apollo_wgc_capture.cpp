@@ -29,15 +29,15 @@
 // platform includes
 #include <d3d11.h>
 #include <dxgi1_2.h>
-#include <inspectable.h>  // For IInspectable
-#include <ShellScalingApi.h>  // For DPI awareness
-#include <Windows.Graphics.Capture.Interop.h>
-#include <Windows.h>
+#include <inspectable.h>  // for iinspectable
+#include <shellscalingapi.h>  // for dpi awareness
+#include <windows.graphics.capture.interop.h>
+#include <windows.h>
 #include <winrt/base.h>
-#include <winrt/Windows.Foundation.h>
-#include <winrt/Windows.Foundation.Metadata.h>  // For ApiInformation
-#include <winrt/Windows.Graphics.Capture.h>
-#include <winrt/Windows.Graphics.DirectX.Direct3D11.h>
+#include <winrt/windows.foundation.h>
+#include <winrt/windows.foundation.metadata.h>  // for apiinformation
+#include <winrt/windows.graphics.capture.h>
+#include <winrt/windows.graphics.directx.direct3d11.h>
 
 // Manual declaration for CreateDirect3D11DeviceFromDXGIDevice if missing
 extern "C" {

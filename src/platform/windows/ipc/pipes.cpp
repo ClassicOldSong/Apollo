@@ -27,7 +27,7 @@
 #include <AclAPI.h>
 #include <combaseapi.h>
 #include <sddl.h>
-#include <Windows.h>
+#include <windows.h>
 #include <winrt/base.h>
 
 // local includes
