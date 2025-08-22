@@ -7,7 +7,7 @@
 #include "utils.h"
 
 // platform includes
-#include <Audioclient.h>
+#include <audioclient.h>
 #include <codecvt>
 #include <iostream>
 #include <locale>

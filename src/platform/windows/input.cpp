@@ -3,9 +3,8 @@
  * @brief Definitions for input handling on Windows.
  */
 #define WINVER 0x0A00
-
 // platform includes
-#include <Windows.h>
+#include <windows.h>
 
 // standard includes
 #include <cmath>
@@ -1603,8 +1602,8 @@ namespace platf {
     uint16_t y = touch.y * 943;
     uint8_t touchData[] = {
       (uint8_t) (x & 0xFF),  // Low 8 bits of X
-      (uint8_t) ((x >> 8 & 0x0F) | (y & 0x0F) << 4),  // High 4 bits of X and low 4 bits of Y
-      (uint8_t) (y >> 4 & 0xFF)  // High 8 bits of Y
+      (uint8_t) (((x >> 8) & 0x0F) | ((y & 0x0F) << 4)),  // High 4 bits of X and low 4 bits of Y
+      (uint8_t) (((y >> 4) & 0xFF))  // High 8 bits of Y
     };
 
     report.sCurrentTouch.bPacketCounter++;
