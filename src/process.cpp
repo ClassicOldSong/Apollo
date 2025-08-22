@@ -394,7 +394,7 @@ namespace proc {
     _env["APOLLO_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
     _env["APOLLO_CLIENT_ENABLE_SOPS"] = launch_session->enable_sops ? "true" : "false";
 
-    int channelCount = launch_session->surround_info & (65535);
+    int channelCount = launch_session->surround_info & 65535;
     switch (channelCount) {
       case 2:
         _env["SUNSHINE_CLIENT_AUDIO_CONFIGURATION"] = "2.0";
