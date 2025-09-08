@@ -186,6 +186,32 @@
                 &plus; {{ $t('config.add') }}
               </button>
             </div>
+            <!-- Only enable these settings if the alternate controller numbering is enabled --->
+            <template v-if="enableAltControllerNumberingMode === true" >
+              <!-- : This holds the text and numerical values for the controllers and is used by the front end -->
+              <div class="mb-3 mt-2">
+                <label for="controllerListTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_order_list') }}</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="controllerListTextForUsersLabel"
+                  v-model="client.editControllerListNumbers"
+                  placeholder="[]"
+                  :readonly=true
+                  :disabled=" checkControllerDisable( client, 0 )"
+                />
+              </div>			
+              <div class="form-text pre-wrap">
+			    <p v-html="$t('pin.alt_controller_order_list_desc')"></p>
+              </div>
+			  <div class="align-items-top d-flex flex-row justify-content-center">
+                <button v-for="n in altControllerCount" v-on:click="buttonControllerListAction( client, n )" :disabled="checkControllerDisable( client, n )"> {{ n }} </button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_any_placeholder )"  :disabled="checkControllerDisable( client, alt_controller_any_placeholder )">{{ $t('pin.alt_controller_order_list_any_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_no_placeholder )" :disabled="checkControllerDisable( client, alt_controller_no_placeholder )">{{ $t('pin.alt_controller_order_list_new_non_preallocated_button') }}</button>
+                <button v-on:click="buttonControllerListAction( client, alt_controller_stop_looking )"  :disabled="checkControllerDisable( client, alt_controller_stop_looking )">{{ $t('pin.alt_controller_order_list_stop_looking_button') }}</button> 
+                <button v-on:click="buttonControllerListAction( client, 0 )">{{ $t('pin.alt_controller_order_list_clear_button') }}</button>
+              </div>			  
+            </template>			
           </div>
           <div v-else class="list-group-item d-flex align-items-center">
             <div class="p-2 flex-grow-1 d-flex align-items-center">
@@ -304,6 +330,15 @@
     _all: 0x071F1F00
   };
 
+  const altControllerMapping = {
+    // Number representing any preallocated controller
+    alt_controller_any_placeholder: 999,
+    // Number representing to stop looking for controllers
+    alt_controller_stop_looking: 998,    
+    // Number representing to look for a non-preallocated controller
+    alt_controller_no_placeholder: 1000
+  };
+  
   const permissionGroups = [
     { name: 'Action', permissions: [
       {
@@ -370,7 +405,15 @@
       clients: [],
       showApplyMessage: false,
       unpairAllPressed: false,
-      unpairAllStatus: null
+      unpairAllStatus: null,
+      // Will be read in from the refreshClients() 
+      altControllerCount: 4,
+      // Will be read in from the refreshClients() 
+      enableAltControllerNumberingMode: false,
+      // Constants for the special numbers of the controllers for conditions
+      alt_controller_any_placeholder: altControllerMapping.alt_controller_any_placeholder,
+      alt_controller_stop_looking: altControllerMapping.alt_controller_stop_looking,
+      alt_controller_no_placeholder: altControllerMapping.alt_controller_no_placeholder
     }
   }
 
@@ -396,7 +439,7 @@
     },
     created() {
       this.refreshClients();
-    },
+   },
     methods: {
       switchTab(currentTab) {
         location.hash = currentTab;
@@ -404,6 +447,8 @@
         Object.assign(this, data(), { clients });
         hostInfoCache = null;
         clearTimeout(resetOTPTimeout);
+        // Need to restore the Alternate controller limits after the switch; This also fixes a bug because the this.platform will also get reset without doing a refreshClient()
+        this.refreshClients();
       },
       editHost() {
         this.editingHost = !this.editingHost;
@@ -522,6 +567,109 @@
       removeCmd(arr, idx) {
         arr.splice(idx, 1);
       },
+      languageTranslationControllerList( list, mode ) {
+        const newlist = [];
+        // Go through all of the elements in the list and replace the special numbers with text
+        for( const element of list ) {
+          // Go from numbers to string elements - Typically after reading from the state file or after adding a new number
+          if( mode === 1 )
+          {
+            if( element === altControllerMapping.alt_controller_any_placeholder ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
+            } else if( element === altControllerMapping.alt_controller_no_placeholder ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button'));
+            } else if (element === altControllerMapping.alt_controller_stop_looking ) {
+              newlist.push(this.i18n.t('pin.alt_controller_order_list_stop_looking_button'));
+            } else {
+              newlist.push(element);
+            }
+          }
+          if( mode === 2 )
+          {
+            // Go from string elements to numbers - Typically when saving to the state file
+            if( element === this.i18n.t('pin.alt_controller_order_list_any_preallocated_button') ) {
+              newlist.push( altControllerMapping.alt_controller_any_placeholder );
+            } else if( element === this.i18n.t('pin.alt_controller_order_list_new_non_preallocated_button') ) {
+              newlist.push(altControllerMapping.alt_controller_no_placeholder );
+            } else if (element === this.i18n.t('pin.alt_controller_order_list_stop_looking_button') ) {
+              newlist.push(altControllerMapping.alt_controller_stop_looking);
+            } else {
+              newlist.push(element);
+            }         
+          }
+        }
+      return newlist;
+      },
+      buttonControllerListAction( client, n ) {
+        if( n === 0 ) {
+          // Clear the internal number list
+          client.editControllerListNumbers.splice(0);
+        } else {
+          // Just add the passed number to the list
+          client.editControllerListNumbers.push( n );
+        }
+        // Replace the number element with the string element for ease of use by the user
+        client.editControllerListNumbers = this.languageTranslationControllerList( client.editControllerListNumbers, 1 ); 
+        return;
+      },
+      checkControllerDisable( client, n ) {
+        let returnCode = false;
+        // Create list to do the number comparison against
+        const compareList = this.languageTranslationControllerList( client.editControllerListNumbers, 2 );
+        
+        if( n === altControllerMapping.alt_controller_any_placeholder ) {
+          // The any button is disabled if any, no, or stop is in the current internal controller list
+          if( compareList.includes(altControllerMapping.alt_controller_any_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        } else if( n === altControllerMapping.alt_controller_no_placeholder ) {
+          // The no button is disabled if no or stop is in the current internal controller list
+          if( compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        } else if( n === altControllerMapping.alt_controller_stop_looking ) {
+          // The stop button is disabled if no or stop is in the current internal controller list
+          if( compareList.includes(altControllerMapping.alt_controller_no_placeholder) ||
+              compareList.includes(altControllerMapping.alt_controller_stop_looking) ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        } else if( n === 0 ) {
+          // Nothing disables the clear button or the user text of the list of controllers
+          returnCode = false;
+        } else {
+        // A direct controller number was passed in for the final check
+        // Disable the number if the number is already there or the any, no, or stop special numbers are already present
+          if( compareList.includes( n ) ||
+              compareList.includes( altControllerMapping.alt_controller_any_placeholder ) ||
+              compareList.includes( altControllerMapping.alt_controller_no_placeholder ) ||
+              compareList.includes( altControllerMapping.alt_controller_stop_looking ) ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        }        
+        return returnCode;
+      },
+      returnControllerList( rawValue ) {
+        // Convert what was received from the refreshClient() response into a list
+        try {
+          rawValue = JSON.parse( rawValue );
+        } catch( e ) {
+          rawValue = [];
+        }
+        // Convert the special number elements in the list into strings
+        rawValue = this.languageTranslationControllerList( rawValue, 1 );
+        return rawValue;
+      },
       editClient(client) {
         if (currentEditingClient) {
           this.cancelEdit(currentEditingClient);
@@ -535,6 +683,7 @@
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
         currentEditingClient = client;
 
         console.log(client.do, client.undo)
@@ -548,6 +697,7 @@
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
         client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
       },
       saveClient(client) {
         client.editing = false;
@@ -579,7 +729,8 @@
               })
             }
             return filtered
-          }, [])
+          }, []),
+          controller_list_numbers: JSON.stringify(this.languageTranslationControllerList( client.editControllerListNumbers, 2 )),          
         }
         fetch("./api/clients/update", {
           credentials: 'include',
@@ -692,6 +843,10 @@
           .then((response) => {
             if (response.status && response.named_certs && response.named_certs.length) {
               this.platform = response.platform
+              // Get the alternate controller count and enable for the web page information - These parameters are not part of the state file, but the .conf file     
+              this.altControllerCount = response.alt_controller_count;
+              this.enableAltControllerNumberingMode = response.enable_alt_controller_numbering_mode;
+
               this.clients = response.named_certs.map(({
                 name,
                 uuid,
@@ -702,7 +857,8 @@
                 undo,
                 allow_client_commands,
                 always_use_virtual_display,
-                enable_legacy_ordering
+                enable_legacy_ordering,
+                controller_list_numbers
               }) => {
                 const permInt = parseInt(perm, 10);
                 return {
@@ -716,7 +872,8 @@
                   undo,
                   allow_client_commands,
                   enable_legacy_ordering,
-                  always_use_virtual_display
+                  always_use_virtual_display,
+                  controller_list_numbers
                 }
               })
               currentEditingClient = null;
