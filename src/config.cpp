@@ -582,6 +582,7 @@ namespace config {
     true, // forward_rumble
     false, // alt_controller enable
     4, // alt_controller_count
+    "strict", // alt_controller_mode
   };
 
   sunshine_t sunshine {
@@ -1292,6 +1293,7 @@ namespace config {
     bool_f(vars, "enable_input_only_mode", input.enable_input_only_mode);
     bool_f(vars, "enable_alt_controller_numbering_mode", input.enable_alt_controller_numbering_mode);
     int_between_f(vars, "alt_controller_count", input.alt_controller_count, {1, 16});  // CORRESPONDS TO MAX_GAMEPADS = 16 in common.h on /src/platform/common.h
+    string_restricted_f(vars, "alt_controller_mode", input.alt_controller_mode, {"strict"sv, "shared"sv,"bothcontrollermodes"sv});
 
     bool_f(vars, "hide_tray_controls", sunshine.hide_tray_controls);
     bool_f(vars, "enable_pairing", sunshine.enable_pairing);

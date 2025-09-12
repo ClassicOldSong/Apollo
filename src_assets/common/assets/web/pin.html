@@ -189,6 +189,7 @@
             <!-- Only enable these settings if the alternate controller numbering is enabled --->
             <template v-if="enableAltControllerNumberingMode === true" >
               <!-- : This holds the text and numerical values for the controllers and is used by the front end -->
+              <hr>
               <div class="mb-3 mt-2">
                 <label for="controllerListTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_order_list') }}</label>
                 <input
@@ -200,18 +201,99 @@
                   :readonly=true
                   :disabled=" checkControllerDisable( client, 0 )"
                 />
-              </div>			
-              <div class="form-text pre-wrap">
-			    <p v-html="$t('pin.alt_controller_order_list_desc')"></p>
               </div>
-			  <div class="align-items-top d-flex flex-row justify-content-center">
+              <div class="align-items-top d-flex flex-row justify-content-center">
                 <button v-for="n in altControllerCount" v-on:click="buttonControllerListAction( client, n )" :disabled="checkControllerDisable( client, n )"> {{ n }} </button>
                 <button v-on:click="buttonControllerListAction( client, alt_controller_any_placeholder )"  :disabled="checkControllerDisable( client, alt_controller_any_placeholder )">{{ $t('pin.alt_controller_order_list_any_preallocated_button') }}</button>
                 <button v-on:click="buttonControllerListAction( client, alt_controller_no_placeholder )" :disabled="checkControllerDisable( client, alt_controller_no_placeholder )">{{ $t('pin.alt_controller_order_list_new_non_preallocated_button') }}</button>
                 <button v-on:click="buttonControllerListAction( client, alt_controller_stop_looking )"  :disabled="checkControllerDisable( client, alt_controller_stop_looking )">{{ $t('pin.alt_controller_order_list_stop_looking_button') }}</button> 
                 <button v-on:click="buttonControllerListAction( client, 0 )">{{ $t('pin.alt_controller_order_list_clear_button') }}</button>
-              </div>			  
-            </template>			
+              </div>
+              <div class="form-text pre-wrap">
+                <p v-html="$t('pin.alt_controller_order_list_desc')"></p>
+              </div>
+              <!-- : This holds the text and numerical values for the shared controllers and is used by the front end -->
+              <hr>
+              <div class="mb-3 mt-2">
+                <label for="controllerListSharedTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_shared_list') }}</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="controllerListSharedTextForUsersLabel"
+                  v-model="client.editControllerListShared"
+                  placeholder="[]"
+                  :readonly=true
+                  :disabled=" checkControllerSharedDisable( client, 0 )"
+                />
+              </div>			
+              <div class="form-text pre-wrap">
+                <div class="align-items-top d-flex flex-row justify-content-center">
+                  <button v-for="n in altControllerCount" v-on:click="buttonControllerSharedListAction( client, n )" :disabled="checkControllerSharedDisable( client, n )"> {{ n }} </button>
+                  <button v-on:click="buttonControllerSharedListAction( client, -1 )">{{ $t('pin.alt_controller_shared_list_no_change_controller_button') }}</button>
+                  <button v-on:click="buttonControllerSharedListAction( client, -2 )">{{ $t('pin.alt_controller_shared_list_remove_controller_button') }}</button>
+                  <button v-on:click="buttonControllerSharedListAction( client, 0 )">{{ $t('pin.alt_controller_shared_list_clear_button') }}</button>
+                </div>              
+                <p v-html="$t('pin.alt_controller_shared_list_desc')"></p>
+              </div>
+              <!-- Jitter Joystick Text Entry -->
+              <hr>
+              <div class="mb-3 mt-2">
+                <label for="alt_controller_jitter_joysticks_text_entry" class="form-label">{{ $t('pin.alt_controller_jitter_joysticks_text_entry') }}</label>
+                <div class="align-items-top d-flex flex-row">
+                  <input
+                    type="text"
+                    id="alt_controller_jitter_joysticks_text_entry"
+                    v-model="client.editJitterJoysticks"
+                    placeholder="0"
+                    @input="validateJitterJoysticks"
+                    maxlength="10"
+                  />
+                  <button v-on:click="buttonControllerJitterJoysticksListAction( client, parseInt(client.editJitterJoysticks) )" :disabled="checkControllerJitterJoysticksDisable( client, client.editControllerListJitterJoysticks )">{{ $t('pin.alt_controller_jitter_joysticks_list_add_button') }}</button>
+                </div>
+                <div class="form-text pre-wrap"><p v-html="$t('pin.alt_controller_jitter_joysticks_desc')"></p></div>
+              </div>
+              <!-- : This holds the list for the jitter joystick entry -->
+              <div class="mb-3 mt-2">
+                <label for="controllerListJitterJoysticksTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_jitter_joysticks_list') }}</label>
+                <div class="align-items-top d-flex flex-row">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="controllerListJitterJoysticksTextForUsersLabel"
+                    v-model="client.editControllerListJitterJoysticks"
+                    placeholder="[]"
+                    :readonly=true
+                    :disabled=" checkControllerJitterJoysticksDisable( client, -1 )"
+                  />
+                  <button v-on:click="buttonControllerJitterJoysticksListAction( client, -1 )">{{ $t('pin.alt_controller_jitter_joysticks_list_clear_button') }}</button>
+                </div>
+              </div>
+              <div class="form-text pre-wrap">
+			    <p v-html="$t('pin.alt_controller_jitter_joysticks_list_desc')"></p>
+              </div>
+              <!-- : This holds the number list for the swap joystick enable/disable -->
+              <hr>
+              <div class="mb-3 mt-2">
+                <label for="controllerListSwapJoysticksTextForUsersLabel" class="form-label">{{ $t('pin.alt_controller_swap_joysticks_list') }}</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="controllerListSwapJoysticksTextForUsersLabel"
+                  v-model="client.editControllerListSwapJoysticks"
+                  placeholder="[]"
+                  :readonly=true
+                  :disabled="checkControllerSwapJoysticksDisable( client, -1 )"
+                />
+              </div>
+              <div class="align-items-top d-flex flex-row justify-content-center">
+                <button v-on:click="buttonControllerSwapJoysticksListAction( client, 1 )" :disabled="checkControllerSwapJoysticksDisable( client, 1 )"> {{ $t('pin.alt_controller_swap_joysticks_list_enable_button') }} </button>
+                <button v-on:click="buttonControllerSwapJoysticksListAction( client, 0 )" :disabled="checkControllerSwapJoysticksDisable( client, 0 )"> {{ $t('pin.alt_controller_swap_joysticks_list_disable_button') }} </button>
+                <button v-on:click="buttonControllerSwapJoysticksListAction( client, -1 )">{{ $t('pin.alt_controller_swap_joysticks_list_clear_button') }}</button>
+              </div>              
+              <div class="form-text pre-wrap">
+                <p v-html="$t('pin.alt_controller_swap_joysticks_list_desc')"></p>
+              </div>
+            </template>
           </div>
           <div v-else class="list-group-item d-flex align-items-center">
             <div class="p-2 flex-grow-1 d-flex align-items-center">
@@ -336,7 +418,14 @@
     // Number representing to stop looking for controllers
     alt_controller_stop_looking: 998,    
     // Number representing to look for a non-preallocated controller
-    alt_controller_no_placeholder: 1000
+    alt_controller_no_placeholder: 1000,
+    // Number representing the no change controller for shared list
+    alt_controller_shared_list_no_change_controller: -1,
+    // Number representing the remove controller for shared list
+    alt_controller_shared_list_remove_controller: -2,
+    // Number representing the enable swap joysticks for the swap list
+    alt_controller_swap_joysticks_list_disable: 0,
+    alt_controller_swap_joysticks_list_enable: 1
   };
   
   const permissionGroups = [
@@ -410,10 +499,19 @@
       altControllerCount: 4,
       // Will be read in from the refreshClients() 
       enableAltControllerNumberingMode: false,
+      // Will be read in from the refreshClients()
+      altControllerMode: 'strict',
       // Constants for the special numbers of the controllers for conditions
       alt_controller_any_placeholder: altControllerMapping.alt_controller_any_placeholder,
       alt_controller_stop_looking: altControllerMapping.alt_controller_stop_looking,
-      alt_controller_no_placeholder: altControllerMapping.alt_controller_no_placeholder
+      alt_controller_no_placeholder: altControllerMapping.alt_controller_no_placeholder,
+      // Number representing the no change controller for shared list
+      alt_controller_shared_list_no_change_controller: altControllerMapping.alt_controller_shared_list_no_change_controller,
+      // Number representing the remove controller for shared list
+      alt_controller_shared_list_remove_controller: altControllerMapping.alt_controller_shared_list_remove_controller,
+      // Number representing the enable swap joysticks for the swap list
+      alt_controller_swap_joysticks_list_disable: altControllerMapping.alt_controller_swap_joysticks_list_disable,
+      alt_controller_swap_joysticks_list_enable: altControllerMapping.alt_controller_swap_joysticks_list_enable
     }
   }
 
@@ -572,8 +670,7 @@
         // Go through all of the elements in the list and replace the special numbers with text
         for( const element of list ) {
           // Go from numbers to string elements - Typically after reading from the state file or after adding a new number
-          if( mode === 1 )
-          {
+          if( mode === 1 ) {
             if( element === altControllerMapping.alt_controller_any_placeholder ) {
               newlist.push(this.i18n.t('pin.alt_controller_order_list_any_preallocated_button'));
             } else if( element === altControllerMapping.alt_controller_no_placeholder ) {
@@ -584,8 +681,7 @@
               newlist.push(element);
             }
           }
-          if( mode === 2 )
-          {
+          if( mode === 2 ) {
             // Go from string elements to numbers - Typically when saving to the state file
             if( element === this.i18n.t('pin.alt_controller_order_list_any_preallocated_button') ) {
               newlist.push( altControllerMapping.alt_controller_any_placeholder );
@@ -595,7 +691,50 @@
               newlist.push(altControllerMapping.alt_controller_stop_looking);
             } else {
               newlist.push(element);
-            }         
+            }
+          }
+          // Shared List - Go from string to numbers
+          if( mode == 4 ) {
+            if( element === this.i18n.t('pin.alt_controller_shared_list_no_change_controller_button') ) {
+              newlist.push( altControllerMapping.alt_controller_shared_list_no_change_controller );
+            }
+            else if ( element === this.i18n.t('pin.alt_controller_shared_list_remove_controller_button') ) {
+              newlist.push( altControllerMapping.alt_controller_shared_list_remove_controller );
+            } else {
+              newlist.push(element);
+            }
+          }
+          // Shared List - Go from numbers to string
+          if( mode === 3 ) {
+            if( element === altControllerMapping.alt_controller_shared_list_no_change_controller ) {
+              newlist.push(this.i18n.t('pin.alt_controller_shared_list_no_change_controller_button' ) );
+            } else if ( element === altControllerMapping.alt_controller_shared_list_remove_controller ) {
+              newlist.push(this.i18n.t('pin.alt_controller_shared_list_remove_controller_button' ) );
+            } else {
+              newlist.push(element);
+            }
+          }
+          // SwapJoystick - Enable and disable - Go from string to numbers
+          if( mode == 6 ) {
+            if( element === this.i18n.t('pin.alt_controller_swap_joysticks_list_enable_button' ) ) {
+              newlist.push( altControllerMapping.alt_controller_swap_joysticks_list_enable );
+            }
+            else if ( element === this.i18n.t('pin.alt_controller_swap_joysticks_list_disable_button' ) ) {
+              newlist.push( altControllerMapping.alt_controller_swap_joysticks_list_disable );
+            } else {
+              newlist.push(element);
+            }
+          }
+          // SwapJoystick -- Enable and disable - Go from numbers to string
+          if( mode == 5 ) {
+            if( element === altControllerMapping.alt_controller_swap_joysticks_list_enable ) {
+               newlist.push(this.i18n.t('pin.alt_controller_swap_joysticks_list_enable_button' ) );
+            }
+            else if ( element === altControllerMapping.alt_controller_swap_joysticks_list_disable ) {
+               newlist.push(this.i18n.t('pin.alt_controller_swap_joysticks_list_disable_button' ) );
+            } else {
+              newlist.push(element);
+            }
           }
         }
       return newlist;
@@ -610,6 +749,39 @@
         }
         // Replace the number element with the string element for ease of use by the user
         client.editControllerListNumbers = this.languageTranslationControllerList( client.editControllerListNumbers, 1 ); 
+        return;
+      },
+      buttonControllerSharedListAction( client, n ) {
+        if( n === 0 ) {
+          // Clear the internal number list
+          client.editControllerListShared.splice(0);
+        } else {
+          // Just add the passed number to the list
+          client.editControllerListShared.push( n );
+        }
+        client.editControllerListShared = this.languageTranslationControllerList( client.editControllerListShared, 3);
+        return;
+      },
+      buttonControllerJitterJoysticksListAction( client, n ) {
+        if( n === -1 ) {
+          // Clear the internal number list
+          client.editControllerListJitterJoysticks.splice(0);
+        } else {
+          // Just add the passed number to the list
+          client.editControllerListJitterJoysticks.push( n );
+        }
+        return;
+      },
+      buttonControllerSwapJoysticksListAction( client, n ) {
+        if( n === -1 ) {
+          // Clear the internal number list
+          client.editControllerListSwapJoysticks.splice(0);
+        } else {
+          // Just add the passed number to the list
+          client.editControllerListSwapJoysticks.push( n );
+        }
+        // Replace the number element with the string element for ease of use by the user
+        client.editControllerListSwapJoysticks = this.languageTranslationControllerList( client.editControllerListSwapJoysticks, 5 );
         return;
       },
       checkControllerDisable( client, n ) {
@@ -659,7 +831,58 @@
         }        
         return returnCode;
       },
-      returnControllerList( rawValue ) {
+      checkControllerSharedDisable( client, n ) {
+        let returnCode = false;
+        // Create list to do the shared comparison against
+        const compareList = client.editControllerListShared;
+        if( n === 0 ) {
+          // Nothing disables the clear button or the user text of the list of controllers
+          returnCode = false;
+        } else {
+        // Disable the number if there are over 15 elements
+          if( compareList.length > 15 ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        }
+        return returnCode;
+      },
+      checkControllerSwapJoysticksDisable( client, n ) {
+        let returnCode = false;
+        // Create list to do the shared comparison against
+        const compareList = client.editControllerListSwapJoysticks;
+        if( n === -1 ) {
+          // Nothing disables the clear button or the user text of the list of controllers
+          returnCode = false;
+        } else {
+        // Disable the number if there are over 15 elements
+          if( compareList.length > 15 ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        }
+        return returnCode;
+      },
+      checkControllerJitterJoysticksDisable( client, n ) {
+        let returnCode = false;
+        // Create list to do the shared comparison against
+        const compareList = client.editControllerListJitterJoysticks;
+        if( n === -1 ) {
+          // Nothing disables the clear button or the user text of the list of controllers
+          returnCode = false;
+        } else {
+        // Disable the number if there are over 15 elements
+          if( compareList.length > 15 ) {
+            returnCode = true;
+          } else {
+            returnCode = false;
+          }
+        }        
+        return returnCode;
+      },      
+      returnControllerList( rawValue, mode ) {
         // Convert what was received from the refreshClient() response into a list
         try {
           rawValue = JSON.parse( rawValue );
@@ -667,7 +890,18 @@
           rawValue = [];
         }
         // Convert the special number elements in the list into strings
-        rawValue = this.languageTranslationControllerList( rawValue, 1 );
+        if( mode === 0 ) {
+          rawValue = this.languageTranslationControllerList( rawValue, 1 );
+        }
+        // Convert shared elements in the list into strings
+        if( mode === 1 ) {
+           rawValue = this.languageTranslationControllerList( rawValue, 3 );
+        }
+        // Convert swap joystick elements in the list into strings
+        if( mode === 2 ) {
+          rawValue = this.languageTranslationControllerList( rawValue, 5 );
+        }
+        // Any other mode means no conversion
         return rawValue;
       },
       editClient(client) {
@@ -683,7 +917,10 @@
         client.editDisplayMode = client.display_mode;
         client.edit_do = JSON.parse(JSON.stringify(client.do || []));
         client.edit_undo = JSON.parse(JSON.stringify(client.undo || []));
-        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers, 0 );
+        client.editControllerListShared = this.returnControllerList( client.controller_list_shared, 1 );
+        client.editControllerListJitterJoysticks = this.returnControllerList( client.controller_list_jitter_joysticks, -1 );
+        client.editControllerListSwapJoysticks = this.returnControllerList( client.controller_list_swap_joysticks, 2 );
         currentEditingClient = client;
 
         console.log(client.do, client.undo)
@@ -697,7 +934,10 @@
         client.editAllowClientCommands = client.allow_client_commands;
         client.editEnableLegacyOrdering = client.enable_legacy_ordering;
         client.editAlwaysUseVirtualDisplay = client.always_use_virtual_display;
-        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers );
+        client.editControllerListNumbers = this.returnControllerList( client.controller_list_numbers, 0 );
+        client.editControllerListShared = this.returnControllerList( client.controller_list_shared, 1 );
+        client.editControllerListJitterJoysticks = this.returnControllerList( client.controller_list_jitter_joysticks, -1 );
+        client.editControllerListSwapJoysticks = this.returnControllerList( client.controller_list_swap_joysticks, 2 );
       },
       saveClient(client) {
         client.editing = false;
@@ -730,7 +970,10 @@
             }
             return filtered
           }, []),
-          controller_list_numbers: JSON.stringify(this.languageTranslationControllerList( client.editControllerListNumbers, 2 )),          
+          controller_list_numbers: JSON.stringify(this.languageTranslationControllerList( client.editControllerListNumbers, 2 )),
+          controller_list_shared: JSON.stringify(this.languageTranslationControllerList( client.editControllerListShared,4 )),
+          controller_list_jitter_joysticks: JSON.stringify(client.editControllerListJitterJoysticks),
+          controller_list_swap_joysticks: JSON.stringify(this.languageTranslationControllerList(client.editControllerListSwapJoysticks,6)),
         }
         fetch("./api/clients/update", {
           credentials: 'include',
@@ -788,6 +1031,15 @@
 
         event.target.reportValidity();
       },
+      validateJitterJoysticks(event) {
+        const value = parseInt( event.target.value.trim() );
+        if (value < 0 || value > 32000 ) {
+          event.target.setCustomValidity(this.i18n.t('pin.pin.alt_controller_jitter_joysticks_error'));
+        } else {
+          event.target.setCustomValidity('');
+        }
+        event.target.reportValidity();
+      },
       disconnectClient(uuid) {
         fetch("./api/clients/disconnect", {
           credentials: 'include',
@@ -843,7 +1095,7 @@
               // Get the alternate controller count and enable for the web page information - These parameters are not part of the state file, but the .conf file     
               this.altControllerCount = response.alt_controller_count;
               this.enableAltControllerNumberingMode = response.enable_alt_controller_numbering_mode;
-
+              this.altControllerMode = response.alt_controller_mode;
               this.clients = response.named_certs.map(({
                 name,
                 uuid,
@@ -855,7 +1107,10 @@
                 allow_client_commands,
                 always_use_virtual_display,
                 enable_legacy_ordering,
-                controller_list_numbers
+                controller_list_numbers,
+                controller_list_shared,
+                controller_list_jitter_joysticks,
+                controller_list_swap_joysticks
               }) => {
                 const permInt = parseInt(perm, 10);
                 return {
@@ -870,7 +1125,10 @@
                   allow_client_commands,
                   enable_legacy_ordering,
                   always_use_virtual_display,
-                  controller_list_numbers
+                  controller_list_numbers,
+                  controller_list_shared,
+                  controller_list_jitter_joysticks,
+                  controller_list_swap_joysticks
                 }
               })
               currentEditingClient = null;

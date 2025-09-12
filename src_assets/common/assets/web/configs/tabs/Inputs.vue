@@ -196,16 +196,26 @@ const config = ref(props.config)
               v-model="config.enable_alt_controller_numbering_mode"
               default="false"
     ></Checkbox>
-
     <template v-if="config.enable_alt_controller_numbering_mode === 'enabled'">
       <template v-if="platform === 'windows'">
-
         <!-- alt_controller_count-->
+        <hr>
         <div class="mb-3">
           <label for="alt_controller_count" class="form-label">{{ $t('config.alt_controller_count') }}</label>
           <input type="text" class="form-control" id="alt_controller_count" placeholder="4"
                  v-model="config.alt_controller_count" />
           <div class="form-text pre-wrap">{{ $t('config.alt_controller_count_desc') }}<br></div>
+        </div>
+        <!-- Alt Controller Mode -->
+        <hr>
+        <div class="mb-3">
+          <label for="alt_controller_mode" class="form-label">{{ $t('config.alt_controller_mode') }}</label>
+          <select id="alt_controller_mode" class="form-select" v-model="config.alt_controller_mode">
+            <option value="strict">{{ $t('config.alt_controller_mode_strict') }}</option>
+            <option value="shared">{{ $t('config.alt_controller_mode_shared') }}</option>
+            <option value="bothcontrollermodes">{{ $t('config.alt_controller_mode_bothcontrollermodes') }}</option>
+          </select>
+          <div class="form-text pre-wrap">{{ $t('config.alt_controller_mode_desc') }}</div>
         </div>
       </template>
     </template>

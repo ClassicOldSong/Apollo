@@ -254,7 +254,9 @@ namespace nvhttp {
         named_cert_node["allow_client_commands"] = named_cert_p->allow_client_commands;
         named_cert_node["always_use_virtual_display"] = named_cert_p->always_use_virtual_display;
         named_cert_node["controller_list_numbers"] = named_cert_p->controller_list_numbers;
-
+        named_cert_node["controller_list_shared"] = named_cert_p->controller_list_shared;
+        named_cert_node["controller_list_jitter_joysticks"] = named_cert_p->controller_list_jitter_joysticks;
+        named_cert_node["controller_list_swap_joysticks"] = named_cert_p->controller_list_swap_joysticks;
         // Add "do" commands if available.
         if (!named_cert_p->do_cmds.empty()) {
           nlohmann::json do_cmds_node = nlohmann::json::array();
@@ -277,7 +279,7 @@ namespace nvhttp {
       }
     }
 
-	update_global_controller_info();
+    update_global_controller_info();
     root["root"]["named_devices"] = named_cert_nodes;
 
     try {
@@ -335,6 +337,9 @@ namespace nvhttp {
             named_cert_p->allow_client_commands = true;
             named_cert_p->always_use_virtual_display = false;
             named_cert_p->controller_list_numbers = "";
+            named_cert_p->controller_list_shared = "";
+            named_cert_p->controller_list_jitter_joysticks = "";
+            named_cert_p->controller_list_swap_joysticks = "";
 
             client.named_devices.emplace_back(named_cert_p);
           }
@@ -359,6 +364,10 @@ namespace nvhttp {
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
         // Load Controller List
         named_cert_p->controller_list_numbers = el.value("controller_list_numbers", "");
+        named_cert_p->controller_list_shared = el.value("controller_list_shared", "");
+        named_cert_p->controller_list_jitter_joysticks = el.value("controller_list_jitter_joysticks","");
+        named_cert_p->controller_list_swap_joysticks = el.value("controller_list_swap_joysticks","");
+
         client.named_devices.emplace_back(named_cert_p);
       }
     }
@@ -1035,6 +1044,9 @@ namespace nvhttp {
       named_cert_node["allow_client_commands"] = named_cert->allow_client_commands;
       named_cert_node["always_use_virtual_display"] = named_cert->always_use_virtual_display;
       named_cert_node["controller_list_numbers"] = named_cert->controller_list_numbers;
+      named_cert_node["controller_list_shared"] = named_cert->controller_list_shared;
+      named_cert_node["controller_list_jitter_joysticks"] = named_cert->controller_list_jitter_joysticks;
+      named_cert_node["controller_list_swap_joysticks"] = named_cert->controller_list_swap_joysticks;
       // Add "do" commands if available
       if (!named_cert->do_cmds.empty()) {
         nlohmann::json do_cmds_node = nlohmann::json::array();
@@ -1828,7 +1840,10 @@ namespace nvhttp {
     const bool enable_legacy_ordering,
     const bool allow_client_commands,
     const bool always_use_virtual_display,
-    const std::string& controller_list_numbers
+    const std::string& controller_list_numbers,
+    const std::string& controller_list_shared,
+    const std::string& controller_list_jitter_joysticks,
+    const std::string& controller_list_swap_joysticks
   ) {
     find_and_udpate_session_info(uuid, name, newPerm);
     update_global_controller_info();
@@ -1847,6 +1862,9 @@ namespace nvhttp {
         named_cert_p->allow_client_commands = allow_client_commands;
         named_cert_p->always_use_virtual_display = always_use_virtual_display;
         named_cert_p->controller_list_numbers = controller_list_numbers;
+        named_cert_p->controller_list_shared = controller_list_shared;
+        named_cert_p->controller_list_jitter_joysticks = controller_list_jitter_joysticks;
+        named_cert_p->controller_list_swap_joysticks = controller_list_swap_joysticks;
         save_state();
         return true;
       }
@@ -1889,11 +1907,17 @@ namespace nvhttp {
     client_t &client = client_root;
     std::string_view uuid;
     std::string controller_list_numbers;
+    std::string controller_list_shared;
+    std::string controller_list_jitter_joysticks;
+    std::string controller_list_swap_joysticks;
 
     struct config::sDeviceNameOrder sCurrent;
-    std::vector< struct config::sDeviceNameOrder >VectorAlternateGamepadParameterTemp;		
+    std::vector< struct config::sDeviceNameOrder >VectorAlternateGamepadParameterTemp;
 
     std::vector<int> Numbers;
+    std::vector<int> Shared;
+    std::vector<int> vJitterJoysticks;
+    std::vector<int> vSwapJoysticks;
 
    get_all_clients();
 
@@ -1901,10 +1925,31 @@ namespace nvhttp {
     // Get the uuid and the controller_list_numbers
     for (auto it = client.named_devices.begin(); it != client.named_devices.end(); it++) {
       controller_list_numbers = ((*it)->controller_list_numbers);
+      controller_list_shared = ((*it)->controller_list_shared);
+      controller_list_jitter_joysticks = ((*it)->controller_list_jitter_joysticks);
+      controller_list_swap_joysticks = ((*it)->controller_list_swap_joysticks);
       uuid = ((*it)->uuid);
       try {
         nlohmann::json J = nlohmann::json::parse(controller_list_numbers);
         Numbers = J.get<std::vector<int>>();
+      }
+      catch (std::exception& e) {
+      }
+      try { 
+        nlohmann::json JShared = nlohmann::json::parse(controller_list_shared);
+        Shared = JShared.get<std::vector<int>>();
+      }
+      catch (std::exception& e) {
+      }
+      try { 
+        nlohmann::json JShared = nlohmann::json::parse(controller_list_jitter_joysticks);
+         vJitterJoysticks = JShared.get<std::vector<int>>();
+      }
+      catch (std::exception& e) {
+      }
+      try { 
+        nlohmann::json JShared = nlohmann::json::parse(controller_list_swap_joysticks);
+         vSwapJoysticks = JShared.get<std::vector<int>>();
       }
       catch (std::exception& e) {
       }
@@ -1915,7 +1960,13 @@ namespace nvhttp {
       sCurrent.sDeviceName = (*it)->name;
       sCurrent.sOrder = (*it)->controller_list_numbers;
       sCurrent.vOrder = Numbers;
+      sCurrent.sShared = (*it)->controller_list_shared;
+      sCurrent.vShared = Shared;
       sCurrent.sUuid = (*it)->uuid;
+      sCurrent.sJitterJoysticks = (*it)->controller_list_jitter_joysticks;
+      sCurrent.vJitterJoysticks = vJitterJoysticks;
+      sCurrent.sSwapJoysticks = (*it)->controller_list_swap_joysticks;
+      sCurrent.vSwapJoysticks = vSwapJoysticks;
 
       for( int i= 0; i < sCurrent.vOrder.size(); i = i + 1 ) {
       }

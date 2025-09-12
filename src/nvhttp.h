@@ -281,6 +281,9 @@ namespace nvhttp {
     const bool enable_legacy_ordering,
     const bool allow_client_commands,
     const bool always_use_virtual_display,
-	const std::string& controller_list_numbers
+    const std::string& controller_list_numbers,
+    const std::string& controller_list_shared,
+    const std::string& controller_list_jitter_joysticks,
+    const std::string& controller_list_swap_joysticks
   );
 }  // namespace nvhttp

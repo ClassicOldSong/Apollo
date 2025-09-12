@@ -216,6 +216,7 @@ namespace config {
     // Alternate Controller Numbering Mode
     bool enable_alt_controller_numbering_mode;
     int alt_controller_count;
+    std::string alt_controller_mode;
   };
 
   namespace flag {
@@ -296,6 +297,12 @@ namespace config {
     std::string sDeviceName;
     std::string sOrder;
     std::vector < int > vOrder;
+    std::string sShared;
+    std::vector < int > vShared;
+    std::string sJitterJoysticks;
+    std::vector < int > vJitterJoysticks;
+    std::string sSwapJoysticks;
+    std::vector < int > vSwapJoysticks;
     std::string sUuid;
   };
   

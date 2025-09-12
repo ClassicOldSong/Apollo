@@ -108,6 +108,9 @@ namespace crypto {
     bool allow_client_commands;
     bool always_use_virtual_display;
     std::string controller_list_numbers;
+    std::string controller_list_shared;
+    std::string controller_list_jitter_joysticks;
+    std::string controller_list_swap_joysticks;
   };
 
   using p_named_cert_t = std::shared_ptr<named_cert_t>;
