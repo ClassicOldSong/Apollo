@@ -221,14 +221,6 @@ onMounted(() => {
               default="true"
     ></Checkbox>
 
-    <!-- Hide Tray Controls -->
-    <Checkbox class="mb-3"
-              id="hide_tray_controls"
-              locale-prefix="config"
-              v-model="config.hide_tray_controls"
-              default="false"
-    ></Checkbox>
-
     <!-- Notify Pre-Releases -->
     <Checkbox class="mb-3"
               id="notify_pre_releases"
@@ -243,6 +235,14 @@ onMounted(() => {
               locale-prefix="config"
               v-model="config.system_tray"
               default="true"
+    ></Checkbox>
+
+    <!-- Hide Tray Controls -->
+    <Checkbox class="mb-3"
+              id="hide_tray_controls"
+              locale-prefix="config"
+              v-model="config.hide_tray_controls"
+              default="false"
     ></Checkbox>
   </div>
 </template>

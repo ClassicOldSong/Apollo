@@ -11,6 +11,8 @@
                     <i class="fab fa-fw fa-github"></i> {{ $t('resource_card.github_discussions') }}</a>
                 <a class="btn btn-secondary m-1" href="https://github.com/ClassicOldSong/Apollo/wiki" target="_blank">
                     <i class="fab fa-fw fa-github"></i> {{ $t('resource_card.github_wiki') }}</a>
+                <a class="btn btn-secondary m-1" href="https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic" target="_blank">
+                    <i class="fab fa-fw fa-github"></i> {{ $t('resource_card.github_stuttering_clinic') }}</a>
             </div>
         </div>
     </div>

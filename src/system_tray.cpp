@@ -441,37 +441,6 @@ namespace system_tray {
     BOOST_LOG(info) << "System tray thread ended"sv;
   }
 
-  // void run_tray() {
-  //   // create the system tray
-  // #if defined(__APPLE__) || defined(__MACH__)
-  //   // macOS requires that UI elements be created on the main thread
-  //   // creating tray using dispatch queue does not work, although the code doesn't actually throw any (visible) errors
-
-  //   // dispatch_async(dispatch_get_main_queue(), ^{
-  //   //   system_tray();
-  //   // });
-
-  //   BOOST_LOG(info) << "system_tray() is not yet implemented for this platform."sv;
-  // #else  // Windows, Linux
-  //   // create tray in separate thread
-
-  // #ifdef _WIN32
-  //   std::string tmp_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
-  //   static const std::string title_str = utf8ToAcp(tmp_str);
-  // #else
-  //   static const std::string title_str = "Open Apollo (" + config::nvhttp.sunshine_name + ":" + std::to_string(net::map_port(confighttp::PORT_HTTPS)) + ")";
-  // #endif
-  //   tray.menu[0].text = title_str.c_str();
-
-  //   if (config::sunshine.hide_tray_controls) {
-  //     tray.menu[1].text = nullptr;
-  //   }
-
-  //   std::thread tray_thread(system_tray);
-  //   tray_thread.detach();
-  // #endif
-  // }
-
   int init_tray_threaded() {
     if (tray_thread_running) {
       BOOST_LOG(warning) << "Tray thread is already running"sv;
