@@ -254,11 +254,15 @@ namespace platf::dxgi {
           frame_pacing_group_frames = 0;
           status = capture_e::timeout;
         } else {
-          timer->sleep_for(sleep_period);
-          sleep_overshoot_logger.first_point(sleep_target);
-          sleep_overshoot_logger.second_point_now_and_log();
+          bool elastic = false;
+          if (sleep_period >= 2ms) {
+            elastic = true;
+            timer->sleep_for(sleep_period - 2ms);
+            sleep_overshoot_logger.first_point(sleep_target);
+            sleep_overshoot_logger.second_point_now_and_log();
+          }
 
-          status = snapshot(pull_free_image_cb, img_out, 0ms, *cursor);
+          status = snapshot(pull_free_image_cb, img_out, elastic ? 2ms : std::chrono::duration_cast<std::chrono::milliseconds>(sleep_period), *cursor);
 
           if (status == capture_e::ok && img_out) {
             frame_pacing_group_frames += 1;
