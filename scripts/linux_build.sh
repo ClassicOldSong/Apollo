@@ -1,8 +1,16 @@
 #!/bin/bash
 set -e
 
+# Version requirements - centralized for easy maintenance
+cmake_min="3.25.0"
+target_cmake_version="3.30.1"
+doxygen_min="1.10.0"
+_doxygen_min="${doxygen_min//\./_}"  # Convert dots to underscores for URL
+doxygen_max="1.12.0"
+
 # Default value for arguments
 appimage_build=0
+cuda_patches=0
 num_processors=$(nproc)
 publisher_name="Third Party Publisher"
 publisher_website=""
@@ -13,6 +21,55 @@ skip_libva=0
 skip_package=0
 sudo_cmd="sudo"
 ubuntu_test_repo=0
+step="all"
+
+# common variables
+gcc_alternative_files=(
+  "gcc"
+  "g++"
+  "gcov"
+  "gcc-ar"
+  "gcc-ranlib"
+)
+
+# Reusable function to detect nvcc path
+function detect_nvcc_path() {
+  local nvcc_path=""
+
+  # First check for system-installed CUDA
+  nvcc_path=$(command -v nvcc 2>/dev/null) || true
+  if [ -n "$nvcc_path" ]; then
+    echo "$nvcc_path"
+    return 0
+  fi
+
+  # Then check for locally installed CUDA in build directory
+  if [ -f "${build_dir}/cuda/bin/nvcc" ]; then
+    echo "${build_dir}/cuda/bin/nvcc"
+    return 0
+  fi
+
+  # No CUDA found
+  return 1
+}
+
+# Reusable function to setup NVM environment
+function setup_nvm_environment() {
+  # Only setup NVM if it should be used for this distro
+  if [ "$nvm_node" == 1 ]; then
+    # Check if NVM is installed and source it
+    if [ -f "$HOME/.nvm/nvm.sh" ]; then
+      # shellcheck source=/dev/null
+      source "$HOME/.nvm/nvm.sh"
+      # Use the default node version installed by NVM
+      nvm use default 2>/dev/null || nvm use node 2>/dev/null || true
+      echo "Using NVM Node.js version: $(node --version 2>/dev/null || echo 'not available')"
+      echo "Using NVM npm version: $(npm --version 2>/dev/null || echo 'not available')"
+    else
+      echo "NVM not found, using system Node.js if available"
+    fi
+  fi
+}
 
 function _usage() {
   local exit_code=$1
@@ -28,6 +85,7 @@ Options:
   -h, --help               Display this help message.
   -s, --sudo-off           Disable sudo command.
   --appimage-build         Compile for AppImage, this will not create the AppImage, just the executable.
+  --cuda-patches           Apply cuda patches.
   --num-processors         The number of processors to use for compilation. Default is the value of 'nproc'.
   --publisher-name         The name of the publisher (not developer) of the application.
   --publisher-website      The URL of the publisher's website.
@@ -38,6 +96,16 @@ Options:
   --skip-libva             Skip libva installation. This will automatically be enabled if passing --appimage-build.
   --skip-package           Skip creating DEB, or RPM package.
   --ubuntu-test-repo       Install ppa:ubuntu-toolchain-r/test repo on Ubuntu.
+  --step                   Which step(s) to run: deps, cmake, validation, build, package, cleanup, or all (default: all)
+
+Steps:
+  deps                     Install dependencies only
+  cmake                    Run cmake configure only
+  validation               Run validation commands only
+  build                    Build the project only
+  package                  Create packages only
+  cleanup                  Cleanup alternatives and backups only
+  all                      Run all steps (default)
 EOF
 
   exit "$exit_code"
@@ -54,6 +122,9 @@ while getopts ":hs-:" opt; do
         appimage-build)
           appimage_build=1
           skip_libva=1
+          ;;
+        cuda-patches)
+          cuda_patches=1
           ;;
         num-processors=*)
           num_processors="${OPTARG#*=}"
@@ -73,6 +144,9 @@ while getopts ":hs-:" opt; do
         skip-package) skip_package=1 ;;
         sudo-off) sudo_cmd="" ;;
         ubuntu-test-repo) ubuntu_test_repo=1 ;;
+        step=*)
+          step="${OPTARG#*=}"
+          ;;
         *)
           echo "Invalid option: --${OPTARG}" 1>&2
           _usage 1
@@ -185,7 +259,15 @@ function add_debian_based_deps() {
   fi
 }
 
+function add_test_ppa() {
+  if [ "$ubuntu_test_repo" == 1 ]; then
+    $package_install_command "software-properties-common"
+    ${sudo_cmd} add-apt-repository ppa:ubuntu-toolchain-r/test -y
+  fi
+}
+
 function add_debian_deps() {
+  add_test_ppa
   add_debian_based_deps
   dependencies+=(
     "libayatana-appindicator3-dev"
@@ -193,11 +275,7 @@ function add_debian_deps() {
 }
 
 function add_ubuntu_deps() {
-  if [ "$ubuntu_test_repo" == 1 ]; then
-    # allow newer gcc
-    ${sudo_cmd} add-apt-repository ppa:ubuntu-toolchain-r/test -y
-  fi
-
+  add_test_ppa
   add_debian_based_deps
   dependencies+=(
     "libappindicator3-dev"
@@ -252,15 +330,8 @@ function add_fedora_deps() {
 }
 
 function install_cuda() {
-  nvcc_path=$(command -v nvcc 2>/dev/null) || true
-  if [ -n "$nvcc_path" ]; then
-    echo "found system cuda"
-    return
-  fi
-  # check if we need to install cuda
-  if [ -f "${build_dir}/cuda/bin/nvcc" ]; then
-    nvcc_path="${build_dir}/cuda/bin/nvcc"
-    echo "found local cuda"
+  # Check if CUDA is already available
+  if detect_nvcc_path > /dev/null 2>&1; then
     return
   fi
 
@@ -297,7 +368,24 @@ function install_cuda() {
   chmod a+x "${build_dir}/cuda.run"
   "${build_dir}/cuda.run" --silent --toolkit --toolkitpath="${build_dir}/cuda" --no-opengl-libs --no-man-page --no-drm
   rm "${build_dir}/cuda.run"
-  nvcc_path="${build_dir}/cuda/bin/nvcc"
+
+  # run cuda patches
+  if [ "$cuda_patches" == 1 ]; then
+    echo "Applying CUDA patches"
+    local patch_dir="${script_dir}/../packaging/linux/patches/${architecture}"
+    if [ -d "$patch_dir" ]; then
+      for patch in "$patch_dir"/*.patch; do
+        echo "Applying patch: $patch"
+        patch -p2 \
+          --backup \
+          --directory="${build_dir}/cuda" \
+          --verbose \
+          < "$patch"
+      done
+    else
+      echo "No patches found for architecture: $architecture"
+    fi
+  fi
 }
 
 function check_version() {
@@ -334,38 +422,8 @@ if [[ "$(printf '%s\n' "$installed_version" "$min_version" | sort -V | head -n1)
   fi
 }
 
-function run_install() {
-  # prepare CMAKE args
-  cmake_args=(
-    "-B=build"
-    "-G=Ninja"
-    "-S=."
-    "-DBUILD_WERROR=ON"
-    "-DCMAKE_BUILD_TYPE=Release"
-    "-DCMAKE_INSTALL_PREFIX=/usr"
-    "-DSUNSHINE_ASSETS_DIR=share/sunshine"
-    "-DSUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine"
-    "-DSUNSHINE_ENABLE_WAYLAND=ON"
-    "-DSUNSHINE_ENABLE_X11=ON"
-    "-DSUNSHINE_ENABLE_DRM=ON"
-    "-DBUILD_TESTS=false"
-    "-DBUILD_DOCS=false"
-    )
-
-  if [ "$appimage_build" == 1 ]; then
-    cmake_args+=("-DSUNSHINE_BUILD_APPIMAGE=ON")
-  fi
-
-  # Publisher metadata
-  if [ -n "$publisher_name" ]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_NAME='${publisher_name}'")
-  fi
-  if [ -n "$publisher_website" ]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_WEBSITE='${publisher_website}'")
-  fi
-  if [ -n "$publisher_issue_url" ]; then
-    cmake_args+=("-DSUNSHINE_PUBLISHER_ISSUE_URL='${publisher_issue_url}'")
-  fi
+function run_step_deps() {
+  echo "Running step: Install dependencies"
 
   # Update the package list
   $package_update_command
@@ -376,29 +434,17 @@ function run_install() {
     add_debian_deps
   elif [ "$distro" == "ubuntu" ]; then
     add_ubuntu_deps
-  elif [ "$distro" == "fedora" ] && [ "$version" == "41" ]; then
-    add_fedora_deps
-    ${sudo_cmd} dnf group install "development-tools" -y
-  elif [ "$distro" == "fedora" ] && [ "$version" <= "40" ]; then
+  elif [ "$distro" == "fedora" ]; then
     add_fedora_deps
     ${sudo_cmd} dnf group install "$dev_tools_group" -y
   fi
-
 
   # Install the dependencies
   $package_install_command "${dependencies[@]}"
 
   # reload the environment
   # shellcheck source=/dev/null
- # source ~/.bashrc
-   
-  gcc_alternative_files=(
-    "gcc"
-    "g++"
-    "gcov"
-    "gcc-ar"
-    "gcc-ranlib"
-  )
+  source ~/.bashrc
 
   #set gcc version based on distros
   if [ "$distro" == "arch" ]; then
@@ -421,8 +467,6 @@ function run_install() {
   fi
 
   # compile cmake if the version is too low
-  cmake_min="3.25.0"
-  target_cmake_version="3.30.1"
   if ! check_version "cmake" "$cmake_min" "inf"; then
     cmake_prefix="https://github.com/Kitware/CMake/releases/download/v"
     if [ "$architecture" == "x86_64" ]; then
@@ -439,9 +483,6 @@ function run_install() {
   fi
 
   # compile doxygen if version is too low
-  doxygen_min="1.10.0"
-  _doxygen_min="1_10_0"
-  doxygen_max="1.12.0"
   if ! check_version "doxygen" "$doxygen_min" "$doxygen_max"; then
     if [ "${SUNSHINE_COMPILE_DOXYGEN}" == "true" ]; then
       echo "Compiling doxygen"
@@ -457,7 +498,7 @@ function run_install() {
       popd
     else
       echo "Doxygen version not in range, skipping docs"
-      cmake_args+=("-DBUILD_DOCS=OFF")
+      # Note: cmake_args will be set in cmake step
     fi
   fi
 
@@ -476,8 +517,64 @@ function run_install() {
   # run the cuda install
   if [ "$skip_cuda" == 0 ]; then
     install_cuda
+  fi
+}
+
+function run_step_cmake() {
+  echo "Running step: CMake configure"
+
+  # Setup NVM environment if needed (for web UI builds)
+  setup_nvm_environment
+
+  # Detect CUDA path using the reusable function
+  nvcc_path=""
+  if [ "$skip_cuda" == 0 ]; then
+    nvcc_path=$(detect_nvcc_path)
+  fi
+
+  # prepare CMAKE args
+  cmake_args=(
+    "-B=build"
+    "-G=Ninja"
+    "-S=."
+    "-DBUILD_WERROR=ON"
+    "-DCMAKE_BUILD_TYPE=Release"
+    "-DCMAKE_INSTALL_PREFIX=/usr"
+    "-DSUNSHINE_ASSETS_DIR=share/sunshine"
+    "-DSUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine"
+    "-DSUNSHINE_ENABLE_WAYLAND=ON"
+    "-DSUNSHINE_ENABLE_X11=ON"
+    "-DSUNSHINE_ENABLE_DRM=ON"
+  )
+
+  if [ "$appimage_build" == 1 ]; then
+    cmake_args+=("-DSUNSHINE_BUILD_APPIMAGE=ON")
+  fi
+
+  # Publisher metadata
+  if [ -n "$publisher_name" ]; then
+    cmake_args+=("-DSUNSHINE_PUBLISHER_NAME='${publisher_name}'")
+  fi
+  if [ -n "$publisher_website" ]; then
+    cmake_args+=("-DSUNSHINE_PUBLISHER_WEBSITE='${publisher_website}'")
+  fi
+  if [ -n "$publisher_issue_url" ]; then
+    cmake_args+=("-DSUNSHINE_PUBLISHER_ISSUE_URL='${publisher_issue_url}'")
+  fi
+
+  # Handle doxygen docs flag
+  if ! check_version "doxygen" "$doxygen_min" "$doxygen_max"; then
+    if [ "${SUNSHINE_COMPILE_DOXYGEN}" != "true" ]; then
+      cmake_args+=("-DBUILD_DOCS=OFF")
+    fi
+  fi
+
+  # Handle CUDA
+  if [ "$skip_cuda" == 0 ]; then
     cmake_args+=("-DSUNSHINE_ENABLE_CUDA=ON")
-    cmake_args+=("-DCMAKE_CUDA_COMPILER:PATH=$nvcc_path")
+    if [ -n "$nvcc_path" ]; then
+      cmake_args+=("-DCMAKE_CUDA_COMPILER:PATH=$nvcc_path")
+    fi
   else
     cmake_args+=("-DSUNSHINE_ENABLE_CUDA=OFF")
   fi
@@ -487,6 +584,10 @@ function run_install() {
   echo "cmake args:"
   echo "${cmake_args[@]}"
   cmake "${cmake_args[@]}"
+}
+
+function run_step_validation() {
+  echo "Running step: Validation"
 
   # Run appstream validation, etc.
   appstreamcli validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
@@ -495,9 +596,20 @@ function run_install() {
   if [ "$appimage_build" == 0 ]; then
     desktop-file-validate "build/dev.lizardbyte.app.Sunshine.terminal.desktop"
   fi
+}
+
+function run_step_build() {
+  echo "Running step: Build"
+
+  # Setup NVM environment if needed (for web UI builds)
+  setup_nvm_environment
 
   # Build the project
   ninja -C "build"
+}
+
+function run_step_package() {
+  echo "Running step: Package"
 
   # Create the package
   if [ "$skip_package" == 0 ]; then
@@ -507,6 +619,10 @@ function run_install() {
       cpack -G RPM --config ./build/CPackConfig.cmake
     fi
   fi
+}
+
+function run_step_cleanup() {
+  echo "Running step: Cleanup"
 
   if [ "$skip_cleanup" == 0 ]; then
     # Restore the original gcc alternatives
@@ -527,6 +643,42 @@ function run_install() {
   fi
 }
 
+function run_install() {
+  case "$step" in
+    deps)
+      run_step_deps
+      ;;
+    cmake)
+      run_step_cmake
+      ;;
+    validation)
+      run_step_validation
+      ;;
+    build)
+      run_step_build
+      ;;
+    package)
+      run_step_package
+      ;;
+    cleanup)
+      run_step_cleanup
+      ;;
+    all)
+      run_step_deps
+      run_step_cmake
+      run_step_validation
+      run_step_build
+      run_step_package
+      run_step_cleanup
+      ;;
+    *)
+      echo "Invalid step: $step"
+      echo "Valid steps are: deps, cmake, validation, build, package, cleanup, all"
+      exit 1
+      ;;
+  esac
+}
+
 # Determine the OS and call the appropriate function
 cat /etc/os-release
 
@@ -542,27 +694,26 @@ elif grep -q "Debian GNU/Linux 12 (bookworm)" /etc/os-release; then
   version="12"
   package_update_command="${sudo_cmd} apt-get update"
   package_install_command="${sudo_cmd} apt-get install -y"
-  cuda_version="12.0.0"
-  cuda_build="525.60.13"
-  gcc_version="12"
-  nvm_node=0
-elif grep -q "PLATFORM_ID=\"platform:f40\"" /etc/os-release; then
-  distro="fedora"
-  version="40"
-  package_update_command="${sudo_cmd} dnf update -y"
-  package_install_command="${sudo_cmd} dnf install -y"
-  cuda_version=12.6.3
-  cuda_build=560.35.05
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
   gcc_version="13"
   nvm_node=0
-  dev_tools_group="Development Tools"
+elif grep -q "Debian GNU/Linux 13 (trixie)" /etc/os-release; then
+  distro="debian"
+  version="13"
+  package_update_command="${sudo_cmd} apt-get update"
+  package_install_command="${sudo_cmd} apt-get install -y"
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
+  gcc_version="14"
+  nvm_node=0
 elif grep -q "PLATFORM_ID=\"platform:f41\"" /etc/os-release; then
   distro="fedora"
   version="41"
   package_update_command="${sudo_cmd} dnf update -y"
   package_install_command="${sudo_cmd} dnf install -y"
-  cuda_version=12.6.3
-  cuda_build=560.35.05
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
   gcc_version="13"
   nvm_node=0
   dev_tools_group="development-tools"
@@ -571,8 +722,8 @@ elif grep -q "PLATFORM_ID=\"platform:f42\"" /etc/os-release; then
   version="42"
   package_update_command="${sudo_cmd} dnf update -y"
   package_install_command="${sudo_cmd} dnf install -y"
-  cuda_version=12.8.1
-  cuda_build=570.124.06
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
   gcc_version="14"
   nvm_node=0
   dev_tools_group="development-tools"
@@ -581,27 +732,27 @@ elif grep -q "Ubuntu 22.04" /etc/os-release; then
   version="22.04"
   package_update_command="${sudo_cmd} apt-get update"
   package_install_command="${sudo_cmd} apt-get install -y"
-  cuda_version="11.8.0"
-  cuda_build="520.61.05"
-  gcc_version="11"
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
+  gcc_version="13"
   nvm_node=1
 elif grep -q "Ubuntu 24.04" /etc/os-release; then
   distro="ubuntu"
   version="24.04"
   package_update_command="${sudo_cmd} apt-get update"
   package_install_command="${sudo_cmd} apt-get install -y"
-  cuda_version="11.8.0"
-  cuda_build="520.61.05"
-  gcc_version="11"
-  nvm_node=0
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
+  gcc_version="14"
+  nvm_node=1
 elif grep -q "Ubuntu 25.04" /etc/os-release; then
   distro="ubuntu"
   version="25.04"
   package_update_command="${sudo_cmd} apt-get update"
   package_install_command="${sudo_cmd} apt-get install -y"
-  cuda_version="11.8.0"
-  cuda_build="520.61.05"
-  gcc_version="11"
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
+  gcc_version="14"
   nvm_node=0
 else
   echo "Unsupported Distro or Version"

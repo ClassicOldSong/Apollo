@@ -39,6 +39,7 @@ class @PROJECT_NAME@ < Formula
 
   on_linux do
     depends_on "avahi"
+    depends_on "gnu-which"
     depends_on "libayatana-appindicator"
     depends_on "libcap"
     depends_on "libdrm"
@@ -57,6 +58,16 @@ class @PROJECT_NAME@ < Formula
     depends_on "pulseaudio"
     depends_on "systemd"
     depends_on "wayland"
+  end
+
+  fails_with :clang do
+    build 1400
+    cause "Requires C++23 support"
+  end
+
+  fails_with :gcc do
+    version "12" # fails with GCC 12.x and earlier
+    cause "Requires C++23 support"
   end
 
   def install
@@ -106,7 +117,6 @@ class @PROJECT_NAME@ < Formula
     end
 
     args << "-DCUDA_FAIL_ON_MISSING=OFF" if OS.linux?
-    args << "-DSUNSHINE_ENABLE_TRAY=OFF" if OS.mac?
 
     system "cmake", "-S", ".", "-B", "build", "-G", "Unix Makefiles",
             *std_cmake_args,
