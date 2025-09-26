@@ -44,11 +44,14 @@
 </body>
 
 <script type="module">
-  import { createApp, ref } from "vue"
+  import { createApp, ref, onMounted } from "vue"
+  import { loadAutoTheme } from './theme'
   import { initApp } from './init'
 
   let app = createApp({
     setup() {
+      loadAutoTheme()
+
       const error = ref('');
       const success = ref(false);
       const loading = ref(false);
