@@ -60,7 +60,7 @@ In short, ICC color correction should be totally useless while streaming HDR. It
 
 It's very complicated to explain why HDR is a total mess, and why enabling HDR makes the image appear dark/yellow. If it's your first time got HDR streaming working, and thinks HDR looks awful, you're right, but that's not Apollo's fault, it's your device that tone mapped SDR content to the maximum of the capability of its screen, there's no headroom for anything beyond that actual peak brightness for HDR. For details, please take a look [here](https://github.com/ClassicOldSong/Apollo/issues/164).
 
-For client devies, usually Apple products that have HDR capability can be trusted to have good results, other than that, your luck depends.
+For client devices, usually Apple products that have HDR capability can be trusted to have good results, other than that, your luck depends.
 
 <details>
 <summary>DEPRECATION ALERT</summary>
