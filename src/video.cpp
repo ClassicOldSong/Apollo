@@ -2013,7 +2013,12 @@ namespace video {
       if (!requested_idr_frame || images->peek()) {
         if (auto img = images->pop(max_frametime)) {
           frame_timestamp = img->frame_timestamp;
-          auto time_diff = *frame_timestamp - encode_frame_timestamp;
+          if (!frame_timestamp) {
+            frame_timestamp = std::chrono::steady_clock::now();
+          }
+
+          auto current_timestamp = *frame_timestamp;
+          auto time_diff = current_timestamp - encode_frame_timestamp;
 
           // If new frame comes in way too fast, just drop
           if (time_diff < -frame_variation_threshold) {
@@ -2028,7 +2033,7 @@ namespace video {
           if (time_diff < frame_variation_threshold) {
             *frame_timestamp = encode_frame_timestamp;
           } else {
-            encode_frame_timestamp = *frame_timestamp;
+            encode_frame_timestamp = current_timestamp;
           }
 
           encode_frame_timestamp += encode_frame_threshold;
