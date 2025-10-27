@@ -157,6 +157,15 @@ No real time chat support will ever be provided for Apollo and Artemis. Includin
 
 [Releases](https://github.com/ClassicOldSong/Apollo/releases)
 
+### Chocolatey Install Method
+
+You can also install the apollo steaming server with chocolatey.
+
+1. [Install Chocolatey if you don't have it](https://chocolatey.org/install)
+2. run `choco upgrade apollo -y` (same command can be used to upgrade, add to a scheduled task to automate updates)
+
+See more details on the chocolatey package [here](https://community.chocolatey.org/packages/apollo)
+
 ## Disclaimer
 
 I got kicked from Moonlight and Sunshine's Discord server and banned from Sunshine's GitHub repo literally for helping people out.
