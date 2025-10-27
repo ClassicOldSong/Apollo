@@ -155,7 +155,40 @@ No real time chat support will ever be provided for Apollo and Artemis. Includin
 
 ## Downloads
 
+### Direct Download
+
+**Recommended**
+
 [Releases](https://github.com/ClassicOldSong/Apollo/releases)
+
+### WinGet
+
+**Note:** Community maintained
+
+In an elevated PowerShell window, run
+
+```pwsh
+winget install Apollo
+
+```
+
+You'll need WinGet installed first.
+
+### Chocolatey
+
+**Note:** Community maintained
+
+You can also install the apollo steaming server with chocolatey.
+
+Install Chocolatey if you don't have it, then run the following command in an elevated PowerShell/CMD window:
+
+```pwsh
+choco upgrade apollo -y 
+```
+
+Same command can be used to upgrade, add to a scheduled task to automate updates.
+
+See more details on the chocolatey package [here](https://community.chocolatey.org/packages/apollo)
 
 ## Disclaimer
 
