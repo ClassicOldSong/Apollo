@@ -178,7 +178,7 @@ You'll need WinGet installed first.
 
 **Note:** Community maintained
 
-You can also install the apollo steaming server with chocolatey.
+You can also install the apollo streaming server with chocolatey.
 
 Install Chocolatey if you don't have it, then run the following command in an elevated PowerShell/CMD window:
 
