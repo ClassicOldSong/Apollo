@@ -168,7 +168,7 @@ No real time chat support will ever be provided for Apollo and Artemis. Includin
 In an elevated PowerShell window, run
 
 ```pwsh
-winget install Apollo
+winget install ClassicOldSong.Apollo
 
 ```
 
