@@ -12,6 +12,7 @@
 
 // local includes
 #include "audio.h"
+#include "auto_bitrate.h"
 #include "crypto.h"
 #include "video.h"
 
@@ -36,6 +37,7 @@ namespace stream {
     uint32_t encryptionFlagsEnabled;
 
     std::optional<int> gcmap;
+    bool autoBitrateEnabled;
   };
 
   namespace session {

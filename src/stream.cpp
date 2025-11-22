@@ -363,6 +363,8 @@ namespace stream {
 
     boost::asio::ip::address localAddress;
 
+    std::unique_ptr<auto_bitrate::AutoBitrateController> auto_bitrate_controller;
+
     struct {
       std::string ping_payload;
 
@@ -374,6 +376,7 @@ namespace stream {
 
       safe::mail_raw_t::event_t<bool> idr_events;
       safe::mail_raw_t::event_t<std::pair<int64_t, int64_t>> invalidate_ref_frames_events;
+      safe::mail_raw_t::event_t<bool> bitrate_update_event;
 
       std::unique_ptr<platf::deinit_t> qos;
     } video;
@@ -954,6 +957,41 @@ namespace stream {
         << "time in milli since last report [" << t.count() << ']' << std::endl
         << "last good frame [" << lastGoodFrame << ']' << std::endl
         << "---end stats---";
+
+      // Handle auto bitrate adjustment if enabled
+      if (session->config.autoBitrateEnabled && t.count() > 0) {
+        // Calculate frame loss percentage
+        // Framerate is stored as fps * 1000 (e.g., 60000 for 60fps)
+        float framerate = session->config.monitor.framerate / 1000.0f;
+        float expectedFrames = framerate * (t.count() / 1000.0f);
+        if (expectedFrames > 0) {
+          float frameLossPercent = (count / expectedFrames) * 100.0f;
+
+          // Initialize controller if not already done
+          if (!session->auto_bitrate_controller) {
+            int initialBitrate = session->config.monitor.bitrate;
+            int minBitrate = 500;
+            int maxBitrate = (config::video.max_bitrate > 0) ? config::video.max_bitrate : 150000;
+            session->auto_bitrate_controller = std::make_unique<auto_bitrate::AutoBitrateController>(
+                initialBitrate, minBitrate, maxBitrate);
+            BOOST_LOG(info) << "AutoBitrate: Initialized with bitrate " << initialBitrate << " kbps";
+          }
+
+          // Update network metrics
+          session->auto_bitrate_controller->updateNetworkMetrics(frameLossPercent, t.count());
+
+          // Check for bitrate adjustment
+          auto newBitrate = session->auto_bitrate_controller->getAdjustedBitrate();
+          if (newBitrate.has_value()) {
+            // Store new bitrate for video thread to apply
+            session->config.monitor.bitrate = newBitrate.value();
+            // Signal video thread to update bitrate
+            if (session->video.bitrate_update_event) {
+              session->video.bitrate_update_event->raise(true);
+            }
+          }
+        }
+      }
     });
 
     server->map(packetTypes[IDX_REQUEST_IDR_FRAME], [&](session_t *session, const std::string_view &payload) {
@@ -2172,6 +2210,7 @@ namespace stream {
 
       session->video.idr_events = mail->event<bool>(mail::idr);
       session->video.invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
+      session->video.bitrate_update_event = mail->event<bool>(mail::bitrate_update);
       session->video.lowseq = 0;
       session->video.ping_payload = launch_session.av_ping_payload;
       if (config.encryptionFlagsEnabled & SS_ENC_VIDEO) {

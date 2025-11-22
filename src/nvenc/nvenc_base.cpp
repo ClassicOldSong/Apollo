@@ -452,6 +452,8 @@ namespace nvenc {
     }
 
     encoder_state = {};
+    stored_nvenc_config = config;
+    stored_framerate = client_config.framerate;
     fail_guard.disable();
     return true;
   }
@@ -606,6 +608,53 @@ namespace nvenc {
       }
     }
 
+    return true;
+  }
+
+  bool nvenc_base::reconfigure_bitrate(uint32_t new_bitrate_kbps) {
+    if (!encoder || !nvenc) {
+      BOOST_LOG(error) << "NvEnc: Cannot reconfigure bitrate, encoder not initialized";
+      return false;
+    }
+
+    // Get current encode parameters
+    NV_ENC_INITIALIZE_PARAMS init_params = {min_struct_version(NV_ENC_INITIALIZE_PARAMS_VER)};
+    if (nvenc_failed(nvenc->nvEncGetEncodeParams(encoder, &init_params))) {
+      BOOST_LOG(error) << "NvEnc: Failed to get encode params for bitrate reconfiguration: " << last_nvenc_error_string;
+      return false;
+    }
+
+    // Update bitrate (convert from kbps to bps)
+    init_params.encodeConfig->rcParams.averageBitRate = new_bitrate_kbps * 1000;
+
+    // Update VBV buffer size proportionally if supported
+    auto get_encoder_cap = [&](NV_ENC_CAPS cap) {
+      NV_ENC_CAPS_PARAM param = {min_struct_version(NV_ENC_CAPS_PARAM_VER), cap};
+      int value = 0;
+      nvenc->nvEncGetEncodeCaps(encoder, init_params.encodeGUID, &param, &value);
+      return value;
+    };
+
+    if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_CUSTOM_VBV_BUF_SIZE)) {
+      init_params.encodeConfig->rcParams.vbvBufferSize = new_bitrate_kbps * 1000 / stored_framerate;
+      if (stored_nvenc_config.vbv_percentage_increase > 0) {
+        init_params.encodeConfig->rcParams.vbvBufferSize += init_params.encodeConfig->rcParams.vbvBufferSize * stored_nvenc_config.vbv_percentage_increase / 100;
+      }
+    }
+
+    // Reconfigure encoder without resetting it
+    NV_ENC_RECONFIGURE_PARAMS reconfigure_params = {min_struct_version(NV_ENC_RECONFIGURE_PARAMS_VER)};
+    reconfigure_params.resetEncoder = 0;  // Don't reset encoder
+    reconfigure_params.forceIDR = 0;      // Don't force IDR (optional, set to 1 for better quality)
+    reconfigure_params.reInitEncodeParams = init_params;
+
+    NVENCSTATUS status = nvenc->nvEncReconfigureEncoder(encoder, &reconfigure_params);
+    if (nvenc_failed(status)) {
+      BOOST_LOG(error) << "NvEnc: Failed to reconfigure bitrate: " << last_nvenc_error_string;
+      return false;
+    }
+
+    BOOST_LOG(info) << "NvEnc: Bitrate reconfigured to " << new_bitrate_kbps << " kbps";
     return true;
   }
 

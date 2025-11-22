@@ -1047,6 +1047,15 @@ namespace rtsp_stream {
         configuredBitrateKbps = config.monitor.bitrate;
       }
 
+      // Parse auto bitrate flag
+      try {
+        auto autoBitrateValue = util::from_view(args.at("x-ml-video.autoBitrateEnabled"sv));
+        config.autoBitrateEnabled = (autoBitrateValue == 1);
+      } catch (std::out_of_range &) {
+        // Attribute not present, default to false for backward compatibility
+        config.autoBitrateEnabled = false;
+      }
+
       BOOST_LOG(info) << "Client Requested bitrate is [" << configuredBitrateKbps << "kbps]";
 
       if (config::video.max_bitrate > 0) {

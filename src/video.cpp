@@ -430,6 +430,13 @@ namespace video {
       return result;
     }
 
+    bool reconfigure_bitrate(uint32_t new_bitrate_kbps) override {
+      if (!device || !device->nvenc) {
+        return false;
+      }
+      return device->nvenc->reconfigure_bitrate(new_bitrate_kbps);
+    }
+
   private:
     std::unique_ptr<platf::nvenc_encode_device_t> device;
     bool force_idr = false;
@@ -1946,6 +1953,7 @@ namespace video {
     auto packets = mail::man->queue<packet_t>(mail::video_packets);
     auto idr_events = mail->event<bool>(mail::idr);
     auto invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
+    auto bitrate_update_events = mail->event<bool>(mail::bitrate_update);
 
     {
       // Load a dummy image into the AVFrame to ensure we have something to encode
@@ -2005,6 +2013,16 @@ namespace video {
 
       if (requested_idr_frame) {
         session->request_idr_frame();
+      }
+
+      // Handle bitrate updates
+      if (bitrate_update_events->peek()) {
+        bitrate_update_events->pop();
+        if (session->reconfigure_bitrate(config.bitrate)) {
+          BOOST_LOG(info) << "Video: Bitrate updated to " << config.bitrate << " kbps";
+        } else {
+          BOOST_LOG(warning) << "Video: Failed to update bitrate to " << config.bitrate << " kbps";
+        }
       }
 
       std::optional<std::chrono::steady_clock::time_point> frame_timestamp;

@@ -213,6 +213,15 @@ namespace video {
     virtual void request_normal_frame() = 0;
 
     virtual void invalidate_ref_frames(int64_t first_frame, int64_t last_frame) = 0;
+
+    /**
+     * @brief Reconfigure encoder bitrate at runtime.
+     * @param new_bitrate_kbps New bitrate in kilobits per second.
+     * @return `true` on success, `false` on error or if not supported.
+     */
+    virtual bool reconfigure_bitrate(uint32_t new_bitrate_kbps) {
+      return false;  // Default: not supported
+    }
   };
 
   // encoders
