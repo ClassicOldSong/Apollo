@@ -32,6 +32,15 @@ namespace stream {
   constexpr auto CONTROL_PORT = 10;
   constexpr auto AUDIO_STREAM_PORT = 11;
 
+  // Forward declarations
+  struct config_t;
+  struct broadcast_ctx_t;
+  struct audio_fec_packet_t;
+
+  namespace session {
+    enum class state_e : int;
+  }  // namespace session
+
   struct session_t {
     config_t config;
 
@@ -54,7 +63,7 @@ namespace stream {
       std::string ping_payload;
 
       int lowseq;
-      udp::endpoint peer;
+      boost::asio::ip::udp::endpoint peer;
 
       std::optional<crypto::cipher::gcm_t> cipher;
       std::uint64_t gcm_iv_counter;
@@ -74,7 +83,7 @@ namespace stream {
       // avRiKeyId == util::endian::big(First (sizeof(avRiKeyId)) bytes of launch_session->iv)
       std::uint32_t avRiKeyId;
       std::uint32_t timestamp;
-      udp::endpoint peer;
+      boost::asio::ip::udp::endpoint peer;
 
       util::buffer_t<char> shards;
       util::buffer_t<uint8_t *> shards_p;
