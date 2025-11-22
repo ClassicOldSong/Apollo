@@ -464,6 +464,8 @@ namespace nvenc {
 
     encoder_state = {};
     stored_nvenc_config = config;
+    stored_encode_config = enc_config;  // Store encode config for reconfiguration
+    stored_encode_guid = init_params.encodeGUID;  // Store encode GUID for reconfiguration
     // Store framerate in fps*1000 format for consistency with NVENC API expectations
     // client_config.framerate may be in fps format (if normalized in rtsp.cpp line 1039 when > 4000)
     // or fps*1000 format. Normalize to fps*1000 format for stored_framerate.
@@ -638,27 +640,17 @@ namespace nvenc {
       return false;
     }
 
-    // Get current encode parameters
-    NV_ENC_INITIALIZE_PARAMS init_params = {min_struct_version(NV_ENC_INITIALIZE_PARAMS_VER)};
-    if (nvenc_failed(nvenc->nvEncGetEncodeParams(encoder, &init_params))) {
-      BOOST_LOG(error) << "NvEnc: Failed to get encode params for bitrate reconfiguration: " << last_nvenc_error_string;
-      return false;
-    }
-
-    // Verify encodeConfig is populated by the API
-    if (!init_params.encodeConfig) {
-      BOOST_LOG(error) << "NvEnc: encodeConfig is null after nvEncGetEncodeParams";
-      return false;
-    }
+    // Use stored encode config (NVENC API doesn't have a function to get current params)
+    NV_ENC_CONFIG enc_config = stored_encode_config;
 
     // Update bitrate (convert from kbps to bps)
-    init_params.encodeConfig->rcParams.averageBitRate = new_bitrate_kbps * 1000;
+    enc_config.rcParams.averageBitRate = new_bitrate_kbps * 1000;
 
     // Update VBV buffer size proportionally if supported
     auto get_encoder_cap = [&](NV_ENC_CAPS cap) {
       NV_ENC_CAPS_PARAM param = {min_struct_version(NV_ENC_CAPS_PARAM_VER), cap};
       int value = 0;
-      nvenc->nvEncGetEncodeCaps(encoder, init_params.encodeGUID, &param, &value);
+      nvenc->nvEncGetEncodeCaps(encoder, stored_encode_guid, &param, &value);
       return value;
     };
 
@@ -666,13 +658,22 @@ namespace nvenc {
       // VBV buffer size formula: bitrate_bps / framerate_fps
       // stored_framerate is in fps*1000 format, so convert to fps for the calculation
       int framerate_fps = stored_framerate / 1000;
-      init_params.encodeConfig->rcParams.vbvBufferSize = new_bitrate_kbps * 1000 / framerate_fps;
+      enc_config.rcParams.vbvBufferSize = new_bitrate_kbps * 1000 / framerate_fps;
       if (stored_nvenc_config.vbv_percentage_increase > 0) {
-        init_params.encodeConfig->rcParams.vbvBufferSize += init_params.encodeConfig->rcParams.vbvBufferSize * stored_nvenc_config.vbv_percentage_increase / 100;
+        enc_config.rcParams.vbvBufferSize += enc_config.rcParams.vbvBufferSize * stored_nvenc_config.vbv_percentage_increase / 100;
       }
     } else if (stored_framerate == 0) {
       BOOST_LOG(warning) << "NvEnc: Cannot update VBV buffer size, framerate not initialized";
     }
+
+    // Prepare reconfiguration parameters
+    NV_ENC_INITIALIZE_PARAMS init_params = {min_struct_version(NV_ENC_INITIALIZE_PARAMS_VER)};
+    init_params.encodeGUID = stored_encode_guid;
+    init_params.encodeConfig = &enc_config;
+    init_params.encodeWidth = encoder_params.width;
+    init_params.encodeHeight = encoder_params.height;
+    init_params.darWidth = encoder_params.width;
+    init_params.darHeight = encoder_params.height;
 
     // Reconfigure encoder without resetting it
     NV_ENC_RECONFIGURE_PARAMS reconfigure_params = {min_struct_version(NV_ENC_RECONFIGURE_PARAMS_VER)};

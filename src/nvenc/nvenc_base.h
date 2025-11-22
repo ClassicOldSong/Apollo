@@ -161,6 +161,8 @@ namespace nvenc {
     // Stored config for bitrate reconfiguration
     nvenc_config stored_nvenc_config;
     int stored_framerate = 0;
+    NV_ENC_CONFIG stored_encode_config = {};  // Store encode config for reconfiguration
+    GUID stored_encode_guid = {};  // Store encode GUID for reconfiguration
   };
 
 }  // namespace nvenc
