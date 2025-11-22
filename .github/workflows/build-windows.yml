@@ -53,7 +53,8 @@ jobs:
           export PATH="/c/msys64/ucrt64/bin:$PATH"
           cmake -B build -G Ninja -S . \
             -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-            -DBUILD_WERROR=ON
+            -DBUILD_WERROR=ON \
+            -DBUILD_DOCS=OFF
 
       - name: Build
         shell: bash
