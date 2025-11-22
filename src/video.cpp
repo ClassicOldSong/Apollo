@@ -1953,7 +1953,7 @@ namespace video {
     auto packets = mail::man->queue<packet_t>(mail::video_packets);
     auto idr_events = mail->event<bool>(mail::idr);
     auto invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
-    auto bitrate_update_events = mail->event<bool>(mail::bitrate_update);
+    auto bitrate_update_events = mail->event<int>(mail::bitrate_update);
 
     {
       // Load a dummy image into the AVFrame to ensure we have something to encode
@@ -2017,11 +2017,12 @@ namespace video {
 
       // Handle bitrate updates
       if (bitrate_update_events->peek()) {
-        bitrate_update_events->pop();
-        if (session->reconfigure_bitrate(config.bitrate)) {
-          BOOST_LOG(info) << "Video: Bitrate updated to " << config.bitrate << " kbps";
-        } else {
-          BOOST_LOG(warning) << "Video: Failed to update bitrate to " << config.bitrate << " kbps";
+        if (auto newBitrate = bitrate_update_events->pop()) {
+          if (session->reconfigure_bitrate(*newBitrate)) {
+            BOOST_LOG(info) << "Video: Bitrate updated to " << *newBitrate << " kbps";
+          } else {
+            BOOST_LOG(warning) << "Video: Failed to update bitrate to " << *newBitrate << " kbps";
+          }
         }
       }
 

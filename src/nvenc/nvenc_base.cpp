@@ -223,7 +223,10 @@ namespace nvenc {
     init_params.darWidth = encoder_params.width;
     init_params.encodeHeight = encoder_params.height;
     init_params.darHeight = encoder_params.height;
-    init_params.frameRateNum = client_config.framerate;
+    // NVENC expects framerate in fps*1000 format. client_config.framerate may be in fps format
+    // (if normalized in rtsp.cpp line 1039) or fps*1000 format. Normalize to fps*1000 format.
+    int framerate_for_nvenc = (client_config.framerate > 1000) ? client_config.framerate : client_config.framerate * 1000;
+    init_params.frameRateNum = framerate_for_nvenc;
     init_params.frameRateDen = 1;
 
     NV_ENC_PRESET_CONFIG preset_config = {min_struct_version(NV_ENC_PRESET_CONFIG_VER), {min_struct_version(NV_ENC_CONFIG_VER, 7, 8)}};
@@ -248,7 +251,10 @@ namespace nvenc {
     enc_config.rcParams.averageBitRate = client_config.bitrate * 1000;
 
     if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_CUSTOM_VBV_BUF_SIZE)) {
-      enc_config.rcParams.vbvBufferSize = client_config.bitrate * 1000 / client_config.framerate;
+      // VBV buffer size formula: bitrate_bps / framerate_fps
+      // framerate_for_nvenc is in fps*1000 format, so convert to fps for the calculation
+      int framerate_fps = framerate_for_nvenc / 1000;
+      enc_config.rcParams.vbvBufferSize = client_config.bitrate * 1000 / framerate_fps;
       if (config.vbv_percentage_increase > 0) {
         enc_config.rcParams.vbvBufferSize += enc_config.rcParams.vbvBufferSize * config.vbv_percentage_increase / 100;
       }
@@ -453,7 +459,14 @@ namespace nvenc {
 
     encoder_state = {};
     stored_nvenc_config = config;
-    stored_framerate = client_config.framerate;
+    // Store framerate in fps*1000 format for consistency with NVENC API expectations
+    // client_config.framerate may be in fps format (if normalized in rtsp.cpp line 1039)
+    // or fps*1000 format. Normalize to fps*1000 format for stored_framerate.
+    if (client_config.framerate > 1000) {
+      stored_framerate = client_config.framerate;  // Already in fps*1000 format
+    } else {
+      stored_framerate = client_config.framerate * 1000;  // Convert from fps to fps*1000
+    }
     fail_guard.disable();
     return true;
   }
@@ -624,6 +637,12 @@ namespace nvenc {
       return false;
     }
 
+    // Verify encodeConfig is populated by the API
+    if (!init_params.encodeConfig) {
+      BOOST_LOG(error) << "NvEnc: encodeConfig is null after nvEncGetEncodeParams";
+      return false;
+    }
+
     // Update bitrate (convert from kbps to bps)
     init_params.encodeConfig->rcParams.averageBitRate = new_bitrate_kbps * 1000;
 
@@ -635,11 +654,16 @@ namespace nvenc {
       return value;
     };
 
-    if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_CUSTOM_VBV_BUF_SIZE)) {
-      init_params.encodeConfig->rcParams.vbvBufferSize = new_bitrate_kbps * 1000 / stored_framerate;
+    if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_CUSTOM_VBV_BUF_SIZE) && stored_framerate > 0) {
+      // VBV buffer size formula: bitrate_bps / framerate_fps
+      // stored_framerate is in fps*1000 format, so convert to fps for the calculation
+      int framerate_fps = stored_framerate / 1000;
+      init_params.encodeConfig->rcParams.vbvBufferSize = new_bitrate_kbps * 1000 / framerate_fps;
       if (stored_nvenc_config.vbv_percentage_increase > 0) {
         init_params.encodeConfig->rcParams.vbvBufferSize += init_params.encodeConfig->rcParams.vbvBufferSize * stored_nvenc_config.vbv_percentage_increase / 100;
       }
+    } else if (stored_framerate == 0) {
+      BOOST_LOG(warning) << "NvEnc: Cannot update VBV buffer size, framerate not initialized";
     }
 
     // Reconfigure encoder without resetting it

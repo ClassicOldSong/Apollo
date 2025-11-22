@@ -1024,6 +1024,7 @@ namespace rtsp_stream {
       config.monitor.enableIntraRefresh = util::from_view(args.at("x-ss-video[0].intraRefresh"sv));
 
       if (config::video.limit_framerate) {
+        // session.fps is in fps format (not fps*1000), so store it as-is
         config.monitor.encodingFramerate = session.fps;
       } else {
         if (config.monitor.framerate > 1000) {

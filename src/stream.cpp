@@ -376,7 +376,7 @@ namespace stream {
 
       safe::mail_raw_t::event_t<bool> idr_events;
       safe::mail_raw_t::event_t<std::pair<int64_t, int64_t>> invalidate_ref_frames_events;
-      safe::mail_raw_t::event_t<bool> bitrate_update_event;
+      safe::mail_raw_t::event_t<int> bitrate_update_event;
 
       std::unique_ptr<platf::deinit_t> qos;
     } video;
@@ -961,11 +961,37 @@ namespace stream {
       // Handle auto bitrate adjustment if enabled
       if (session->config.autoBitrateEnabled && t.count() > 0) {
         // Calculate frame loss percentage
-        // Framerate is stored as fps * 1000 (e.g., 60000 for 60fps)
-        float framerate = session->config.monitor.framerate / 1000.0f;
+        // encodingFramerate format depends on config::video.limit_framerate:
+        // - If limit_framerate is true: encodingFramerate is in fps format (from session.fps)
+        // - If limit_framerate is false: encodingFramerate is in fps*1000 format
+        // framerate (after RTSP normalization) may be in fps format (if it was > 4000)
+        // or still in fps*1000 format (if it was <= 4000)
+        float framerate;
+        if (session->config.monitor.encodingFramerate > 0) {
+          // Check if encodingFramerate is in fps*1000 format (> 1000) or fps format (<= 1000)
+          if (session->config.monitor.encodingFramerate > 1000) {
+            // encodingFramerate is in fps*1000 format, normalize to fps
+            framerate = session->config.monitor.encodingFramerate / 1000.0f;
+          } else {
+            // encodingFramerate is already in fps format (when limit_framerate is true)
+            framerate = static_cast<float>(session->config.monitor.encodingFramerate);
+          }
+        } else {
+          // Fallback: check if framerate is in fps*1000 format
+          if (session->config.monitor.framerate > 1000) {
+            framerate = session->config.monitor.framerate / 1000.0f;
+          } else {
+            framerate = static_cast<float>(session->config.monitor.framerate);
+          }
+        }
         float expectedFrames = framerate * (t.count() / 1000.0f);
         if (expectedFrames > 0) {
-          float frameLossPercent = (count / expectedFrames) * 100.0f;
+          // Validate frame loss count is non-negative to prevent incorrect bitrate adjustments
+          // Negative values can occur due to data corruption or counter issues
+          int32_t validCount = std::max(0, count);
+          float frameLossPercent = (validCount / expectedFrames) * 100.0f;
+          // Clamp to non-negative to ensure valid percentage
+          frameLossPercent = std::max(0.0f, frameLossPercent);
 
           // Initialize controller if not already done
           if (!session->auto_bitrate_controller) {
@@ -985,9 +1011,10 @@ namespace stream {
           if (newBitrate.has_value()) {
             // Store new bitrate for video thread to apply
             session->config.monitor.bitrate = newBitrate.value();
-            // Signal video thread to update bitrate
+            // Signal video thread to update bitrate with the new value
+            // Pass the bitrate value through the event since config is copied by value
             if (session->video.bitrate_update_event) {
-              session->video.bitrate_update_event->raise(true);
+              session->video.bitrate_update_event->raise(newBitrate.value());
             }
           }
         }
@@ -2210,7 +2237,7 @@ namespace stream {
 
       session->video.idr_events = mail->event<bool>(mail::idr);
       session->video.invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
-      session->video.bitrate_update_event = mail->event<bool>(mail::bitrate_update);
+      session->video.bitrate_update_event = mail->event<int>(mail::bitrate_update);
       session->video.lowseq = 0;
       session->video.ping_payload = launch_session.av_ping_payload;
       if (config.encryptionFlagsEnabled & SS_ENC_VIDEO) {

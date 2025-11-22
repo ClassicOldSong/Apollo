@@ -19,6 +19,9 @@ namespace auto_bitrate {
   }
 
   void AutoBitrateController::updateNetworkMetrics(float frameLossPercent, int timeSinceLastReportMs) {
+    // Clamp frame loss percentage to non-negative to handle data corruption or counter issues
+    // Negative values would incorrectly trigger good network conditions
+    frameLossPercent = std::max(0.0f, frameLossPercent);
     metrics.frameLossPercent = frameLossPercent;
 
     auto now = std::chrono::steady_clock::now();
@@ -91,6 +94,7 @@ namespace auto_bitrate {
             currentBitrateKbps = newBitrate;
             metrics.lastAdjustment = now;
             metrics.consecutiveGoodIntervals = 0;
+            metrics.consecutivePoorIntervals = 0;  // Reset poor intervals counter for consistency
             return newBitrate;
           }
         }
