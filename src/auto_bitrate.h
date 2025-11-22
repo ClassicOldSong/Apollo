@@ -35,8 +35,24 @@ namespace auto_bitrate {
      * @param initialBitrate Initial bitrate in kbps
      * @param minBitrate Minimum allowed bitrate in kbps (default: 500)
      * @param maxBitrate Maximum allowed bitrate in kbps (default: 150000)
+     * @param poorNetworkThreshold Frame loss percentage threshold for poor network (default: 5.0%)
+     * @param goodNetworkThreshold Frame loss percentage threshold for good network (default: 1.0%)
+     * @param increaseFactor Multiplier for bitrate increase (default: 1.2)
+     * @param decreaseFactor Multiplier for bitrate decrease (default: 0.8)
+     * @param stabilityWindowMs Time window for stability check in milliseconds (default: 5000)
+     * @param minConsecutiveGoodIntervals Minimum consecutive good intervals before increase (default: 3)
      */
-    AutoBitrateController(int initialBitrate, int minBitrate = 500, int maxBitrate = 150000);
+    AutoBitrateController(
+      int initialBitrate,
+      int minBitrate = 500,
+      int maxBitrate = 150000,
+      float poorNetworkThreshold = 5.0f,
+      float goodNetworkThreshold = 1.0f,
+      float increaseFactor = 1.2f,
+      float decreaseFactor = 0.8f,
+      int stabilityWindowMs = 5000,
+      int minConsecutiveGoodIntervals = 3
+    );
 
     /**
      * @brief Update network metrics with latest frame loss statistics.
@@ -71,14 +87,14 @@ namespace auto_bitrate {
     int minBitrateKbps;
     int maxBitrateKbps;
 
-    // Algorithm parameters
-    static constexpr float INCREASE_FACTOR = 2.0f;
-    static constexpr float DECREASE_FACTOR = 0.5f;
-    static constexpr int STABILITY_WINDOW_MS = 5000;  // 5 seconds
+    // Algorithm parameters (configurable)
+    float increaseFactor;
+    float decreaseFactor;
+    int stabilityWindowMs;
     static constexpr int ADJUSTMENT_INTERVAL_MS = 2000;  // Check every 2 seconds
-    static constexpr float POOR_NETWORK_THRESHOLD = 5.0f;  // 5% frame loss
-    static constexpr float GOOD_NETWORK_THRESHOLD = 1.0f;  // 1% frame loss
-    static constexpr int MIN_CONSECUTIVE_GOOD_INTERVALS = 3;  // 3 intervals before increase
+    float poorNetworkThreshold;
+    float goodNetworkThreshold;
+    int minConsecutiveGoodIntervals;
 
     NetworkMetrics metrics;
     std::chrono::steady_clock::time_point lastCheckTime;

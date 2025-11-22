@@ -8,11 +8,26 @@
 
 namespace auto_bitrate {
 
-  AutoBitrateController::AutoBitrateController(int initialBitrate, int minBitrate, int maxBitrate)
+  AutoBitrateController::AutoBitrateController(
+      int initialBitrate,
+      int minBitrate,
+      int maxBitrate,
+      float poorNetworkThreshold,
+      float goodNetworkThreshold,
+      float increaseFactor,
+      float decreaseFactor,
+      int stabilityWindowMs,
+      int minConsecutiveGoodIntervals)
       : currentBitrateKbps(initialBitrate),
         baseBitrateKbps(initialBitrate),
         minBitrateKbps(minBitrate),
         maxBitrateKbps(maxBitrate),
+        increaseFactor(increaseFactor),
+        decreaseFactor(decreaseFactor),
+        stabilityWindowMs(stabilityWindowMs),
+        poorNetworkThreshold(poorNetworkThreshold),
+        goodNetworkThreshold(goodNetworkThreshold),
+        minConsecutiveGoodIntervals(minConsecutiveGoodIntervals),
         lastCheckTime(std::chrono::steady_clock::now()) {
     metrics.lastAdjustment = std::chrono::steady_clock::now();
     metrics.lastPoorCondition = std::chrono::steady_clock::now();
@@ -27,11 +42,11 @@ namespace auto_bitrate {
     auto now = std::chrono::steady_clock::now();
 
     // Update consecutive interval counters
-    if (frameLossPercent > POOR_NETWORK_THRESHOLD) {
+    if (frameLossPercent > poorNetworkThreshold) {
       metrics.consecutivePoorIntervals++;
       metrics.consecutiveGoodIntervals = 0;
       metrics.lastPoorCondition = now;
-    } else if (frameLossPercent < GOOD_NETWORK_THRESHOLD) {
+    } else if (frameLossPercent < goodNetworkThreshold) {
       metrics.consecutiveGoodIntervals++;
       metrics.consecutivePoorIntervals = 0;
     } else {
@@ -53,14 +68,14 @@ namespace auto_bitrate {
     lastCheckTime = now;
 
     // Check for poor network conditions - immediate decrease
-    if (metrics.frameLossPercent > POOR_NETWORK_THRESHOLD) {
+    if (metrics.frameLossPercent > poorNetworkThreshold) {
       // Check if we've already adjusted recently (avoid rapid oscillations)
       auto timeSinceLastAdjustment = std::chrono::duration_cast<std::chrono::milliseconds>(now - metrics.lastAdjustment).count();
       if (timeSinceLastAdjustment < ADJUSTMENT_INTERVAL_MS) {
         return std::nullopt;
       }
 
-      int newBitrate = static_cast<int>(currentBitrateKbps * DECREASE_FACTOR);
+      int newBitrate = static_cast<int>(currentBitrateKbps * decreaseFactor);
       newBitrate = std::max(newBitrate, minBitrateKbps);
 
       if (newBitrate != currentBitrateKbps) {
@@ -74,18 +89,18 @@ namespace auto_bitrate {
       }
     }
     // Check for good network conditions - increase after stability period
-    else if (metrics.frameLossPercent < GOOD_NETWORK_THRESHOLD) {
+    else if (metrics.frameLossPercent < goodNetworkThreshold) {
       // Require consecutive good intervals and stability window
-      if (metrics.consecutiveGoodIntervals >= MIN_CONSECUTIVE_GOOD_INTERVALS) {
+      if (metrics.consecutiveGoodIntervals >= minConsecutiveGoodIntervals) {
         auto timeSinceLastPoor = std::chrono::duration_cast<std::chrono::milliseconds>(now - metrics.lastPoorCondition).count();
-        if (timeSinceLastPoor >= STABILITY_WINDOW_MS) {
+        if (timeSinceLastPoor >= stabilityWindowMs) {
           // Check if we've already adjusted recently
           auto timeSinceLastAdjustment = std::chrono::duration_cast<std::chrono::milliseconds>(now - metrics.lastAdjustment).count();
           if (timeSinceLastAdjustment < ADJUSTMENT_INTERVAL_MS) {
             return std::nullopt;
           }
 
-          int newBitrate = static_cast<int>(currentBitrateKbps * INCREASE_FACTOR);
+          int newBitrate = static_cast<int>(currentBitrateKbps * increaseFactor);
           newBitrate = std::min(newBitrate, maxBitrateKbps);
 
           if (newBitrate != currentBitrateKbps) {

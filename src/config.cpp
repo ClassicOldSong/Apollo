@@ -516,6 +516,17 @@ namespace config {
     "1920x1080x60",  // fallback_mode
     false, // isolated Display
     false, // ignore_encoder_probe_failure
+
+    {
+      500,      // min_bitrate
+      150000,   // max_bitrate
+      5.0f,     // poor_network_threshold
+      1.0f,     // good_network_threshold
+      1.2f,     // increase_factor
+      0.8f,     // decrease_factor
+      5000,     // stability_window_ms
+      3         // min_consecutive_good_intervals
+    }  // auto_bitrate
   };
 
   audio_t audio {
@@ -878,6 +889,21 @@ namespace config {
     input = to_bool(tmp);
   }
 
+  void float_f(std::unordered_map<std::string, std::string> &vars, const std::string &name, float &input) {
+    std::string tmp;
+    string_f(vars, name, tmp);
+
+    if (tmp.empty()) {
+      return;
+    }
+
+    try {
+      input = std::stof(tmp);
+    } catch (const std::exception &) {
+      // Invalid float, keep default
+    }
+  }
+
   void double_f(std::unordered_map<std::string, std::string> &vars, const std::string &name, double &input) {
     std::string tmp;
     string_f(vars, name, tmp);
@@ -1127,6 +1153,16 @@ namespace config {
     bool_f(vars, "nvenc_opengl_vulkan_on_dxgi", video.nv_opengl_vulkan_on_dxgi);
     bool_f(vars, "nvenc_latency_over_power", video.nv_sunshine_high_power_mode);
 
+    // Auto bitrate configuration
+    int_between_f(vars, "auto_bitrate_min_bitrate", video.auto_bitrate.min_bitrate, {100, 150000});
+    int_between_f(vars, "auto_bitrate_max_bitrate", video.auto_bitrate.max_bitrate, {100, 150000});
+    float_f(vars, "auto_bitrate_poor_network_threshold", video.auto_bitrate.poor_network_threshold);
+    float_f(vars, "auto_bitrate_good_network_threshold", video.auto_bitrate.good_network_threshold);
+    float_f(vars, "auto_bitrate_increase_factor", video.auto_bitrate.increase_factor);
+    float_f(vars, "auto_bitrate_decrease_factor", video.auto_bitrate.decrease_factor);
+    int_f(vars, "auto_bitrate_stability_window_ms", video.auto_bitrate.stability_window_ms);
+    int_between_f(vars, "auto_bitrate_min_consecutive_good_intervals", video.auto_bitrate.min_consecutive_good_intervals, {1, 10});
+
 #if !defined(__ANDROID__) && !defined(__APPLE__)
     video.nv_legacy.preset = video.nv.quality_preset + 11;
     video.nv_legacy.multipass = video.nv.two_pass == nvenc::nvenc_two_pass::quarter_resolution ? NV_ENC_TWO_PASS_QUARTER_RESOLUTION :
@@ -1201,6 +1237,21 @@ namespace config {
       int value = 0;
       int_between_f(vars, "dd_wa_hdr_toggle_delay", value, {0, 3000});
       video.dd.wa.hdr_toggle_delay = std::chrono::milliseconds {value};
+    }
+
+    // Validate auto bitrate thresholds
+    if (video.auto_bitrate.good_network_threshold >= video.auto_bitrate.poor_network_threshold) {
+      BOOST_LOG(warning) << "auto_bitrate_good_network_threshold must be less than poor_network_threshold, using defaults";
+      video.auto_bitrate.good_network_threshold = 1.0f;
+      video.auto_bitrate.poor_network_threshold = 5.0f;
+    }
+
+    // Validate min < max bitrate
+    if (video.auto_bitrate.min_bitrate >= video.auto_bitrate.max_bitrate) {
+      BOOST_LOG(warning) << "auto_bitrate_min_bitrate must be less than max_bitrate, using defaults";
+      video.auto_bitrate.min_bitrate = 500;
+      video.auto_bitrate.max_bitrate = 150000;
+    }
     }
 
     int_f(vars, "max_bitrate", video.max_bitrate);

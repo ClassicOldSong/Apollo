@@ -828,11 +828,24 @@ namespace stream {
           // Initialize controller if not already done
           if (!session->auto_bitrate_controller) {
             int initialBitrate = session->config.monitor.bitrate;
-            int minBitrate = 500;
-            int maxBitrate = (config::video.max_bitrate > 0) ? config::video.max_bitrate : 150000;
+            int minBitrate = config::video.auto_bitrate.min_bitrate;
+            int maxBitrate = (config::video.max_bitrate > 0)
+              ? std::min(config::video.max_bitrate, config::video.auto_bitrate.max_bitrate)
+              : config::video.auto_bitrate.max_bitrate;
+            
             session->auto_bitrate_controller = std::make_unique<auto_bitrate::AutoBitrateController>(
-                initialBitrate, minBitrate, maxBitrate);
-            BOOST_LOG(info) << "AutoBitrate: Initialized with bitrate " << initialBitrate << " kbps";
+                initialBitrate,
+                minBitrate,
+                maxBitrate,
+                config::video.auto_bitrate.poor_network_threshold,
+                config::video.auto_bitrate.good_network_threshold,
+                config::video.auto_bitrate.increase_factor,
+                config::video.auto_bitrate.decrease_factor,
+                config::video.auto_bitrate.stability_window_ms,
+                config::video.auto_bitrate.min_consecutive_good_intervals
+            );
+            BOOST_LOG(info) << "AutoBitrate: Initialized with bitrate " << initialBitrate
+                            << " kbps, min=" << minBitrate << ", max=" << maxBitrate;
           }
 
           // Update network metrics

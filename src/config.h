@@ -149,6 +149,17 @@ namespace config {
     std::string fallback_mode;
     bool isolated_virtual_display_option;
     bool ignore_encoder_probe_failure;
+
+    struct auto_bitrate_t {
+      int min_bitrate = 500;
+      int max_bitrate = 150000;
+      float poor_network_threshold = 5.0f;
+      float good_network_threshold = 1.0f;
+      float increase_factor = 1.2f;
+      float decrease_factor = 0.8f;
+      int stability_window_ms = 5000;
+      int min_consecutive_good_intervals = 3;
+    } auto_bitrate;
   };
 
   struct audio_t {
