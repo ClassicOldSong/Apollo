@@ -91,7 +91,7 @@ jobs:
           file: ./docker/archlinux.dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-archlinux
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BRANCH=${{ steps.build-args.outputs.BRANCH }}
@@ -176,7 +176,7 @@ jobs:
           file: ./docker/debian-trixie.dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-debian-trixie
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BRANCH=${{ steps.build-args.outputs.BRANCH }}
@@ -260,7 +260,7 @@ jobs:
           file: ./docker/ubuntu-22.04.dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-ubuntu-22.04
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BRANCH=${{ steps.build-args.outputs.BRANCH }}
@@ -344,7 +344,7 @@ jobs:
           file: ./docker/ubuntu-24.04.dockerfile
           platforms: ${{ matrix.platform }}
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-ubuntu-24.04
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             BRANCH=${{ steps.build-args.outputs.BRANCH }}
