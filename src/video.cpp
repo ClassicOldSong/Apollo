@@ -2020,7 +2020,7 @@ namespace video {
       if (bitrate_update_events->peek()) {
         if (auto newBitrate = bitrate_update_events->pop()) {
           // Cast channel_data to session_t* to access config and auto_bitrate_controller
-          auto stream_session = static_cast<session_t *>(channel_data);
+          auto stream_session = static_cast<stream::session_t *>(channel_data);
           if (session->reconfigure_bitrate(*newBitrate)) {
             // Update config only after successful reconfiguration
             stream_session->config.monitor.bitrate = *newBitrate;
