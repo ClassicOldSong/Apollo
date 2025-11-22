@@ -44,18 +44,6 @@ jobs:
             cuda_version: "12.9.1"
             cuda_build: "575.57.08"
             nvm_node: false
-          - distro: fedora
-            version: "41"
-            gcc_version: "13"
-            cuda_version: "12.9.1"
-            cuda_build: "575.57.08"
-            nvm_node: false
-          - distro: fedora
-            version: "42"
-            gcc_version: "14"
-            cuda_version: "12.9.1"
-            cuda_build: "575.57.08"
-            nvm_node: false
 
     steps:
       - name: Checkout repository

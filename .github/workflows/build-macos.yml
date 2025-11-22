@@ -20,9 +20,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - version: "12"
-            runner: macos-12
-            xcode: "14.2"
           - version: "13"
             runner: macos-13
             xcode: "15.0"
