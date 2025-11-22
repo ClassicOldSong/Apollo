@@ -28,6 +28,7 @@ extern "C" {
 #include "logging.h"
 #include "nvenc/nvenc_base.h"
 #include "platform/common.h"
+#include "stream.h"
 #include "sync.h"
 #include "video.h"
 
@@ -2018,10 +2019,19 @@ namespace video {
       // Handle bitrate updates
       if (bitrate_update_events->peek()) {
         if (auto newBitrate = bitrate_update_events->pop()) {
+          // Cast channel_data to session_t* to access config and auto_bitrate_controller
+          auto stream_session = static_cast<session_t *>(channel_data);
           if (session->reconfigure_bitrate(*newBitrate)) {
+            // Update config only after successful reconfiguration
+            stream_session->config.monitor.bitrate = *newBitrate;
             BOOST_LOG(info) << "Video: Bitrate updated to " << *newBitrate << " kbps";
           } else {
-            BOOST_LOG(warning) << "Video: Failed to update bitrate to " << *newBitrate << " kbps";
+            // Reset controller to current config value (last successfully applied bitrate)
+            // to keep it in sync with the actual encoder state
+            if (stream_session->auto_bitrate_controller) {
+              stream_session->auto_bitrate_controller->reset(stream_session->config.monitor.bitrate);
+            }
+            BOOST_LOG(warning) << "Video: Failed to update bitrate to " << *newBitrate << " kbps, reset controller to " << stream_session->config.monitor.bitrate << " kbps";
           }
         }
       }
