@@ -1,0 +1,156 @@
+name: Build Linux Native
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-linux-native:
+    name: Build on ${{ matrix.distro }} ${{ matrix.version }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            version: "22.04"
+            runner: ubuntu-22.04
+            gcc_version: "13"
+            skip_cuda: false
+          - distro: ubuntu
+            version: "24.04"
+            runner: ubuntu-24.04
+            gcc_version: "14"
+            skip_cuda: false
+          - distro: ubuntu
+            version: "22.04"
+            runner: ubuntu-22.04
+            gcc_version: "13"
+            skip_cuda: true
+            suffix: "-no-cuda"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            appstream \
+            appstream-util \
+            build-essential \
+            cmake \
+            desktop-file-utils \
+            git \
+            graphviz \
+            libcap-dev \
+            libcurl4-openssl-dev \
+            libdrm-dev \
+            libevdev-dev \
+            libgbm-dev \
+            libminiupnpc-dev \
+            libnotify-dev \
+            libnuma-dev \
+            libopus-dev \
+            libpulse-dev \
+            libssl-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxcb-shm0-dev \
+            libxcb-xfixes0-dev \
+            libxcb1-dev \
+            libxfixes-dev \
+            libxrandr-dev \
+            libxtst-dev \
+            ninja-build \
+            npm \
+            udev \
+            wget \
+            xvfb
+
+      - name: Install libva-dev
+        if: matrix.skip_cuda == false
+        run: |
+          sudo apt-get install -y libva-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install GCC ${{ matrix.gcc_version }}
+        run: |
+          sudo apt-get install -y gcc-${{ matrix.gcc_version }} g++-${{ matrix.gcc_version }}
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-${{ matrix.gcc_version }} 100 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-${{ matrix.gcc_version }} \
+            --slave /usr/bin/gcov gcov /usr/bin/gcov-${{ matrix.gcc_version }} \
+            --slave /usr/bin/gcc-ar gcc-ar /usr/bin/gcc-ar-${{ matrix.gcc_version }} \
+            --slave /usr/bin/gcc-ranlib gcc-ranlib /usr/bin/gcc-ranlib-${{ matrix.gcc_version }}
+
+      - name: Install CMake (if needed)
+        run: |
+          CMAKE_VERSION=$(cmake --version | head -n1 | cut -d' ' -f3)
+          CMAKE_MIN="3.25.0"
+          if [ "$(printf '%s\n' "$CMAKE_MIN" "$CMAKE_VERSION" | sort -V | head -n1)" != "$CMAKE_MIN" ]; then
+            wget https://github.com/Kitware/CMake/releases/download/v3.30.1/cmake-3.30.1-linux-x86_64.sh
+            sudo sh cmake-3.30.1-linux-x86_64.sh --skip-license --prefix=/usr/local
+          fi
+
+      - name: Configure CMake
+        run: |
+          CMAKE_ARGS=(
+            -B build
+            -G Ninja
+            -S .
+            -DBUILD_WERROR=ON
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+            -DCMAKE_INSTALL_PREFIX=/usr
+            -DSUNSHINE_ASSETS_DIR=share/sunshine
+            -DSUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine
+            -DSUNSHINE_ENABLE_WAYLAND=ON
+            -DSUNSHINE_ENABLE_X11=ON
+            -DSUNSHINE_ENABLE_DRM=ON
+          )
+          if [ "${{ matrix.skip_cuda }}" == "true" ]; then
+            CMAKE_ARGS+=(-DSUNSHINE_ENABLE_CUDA=OFF)
+          else
+            CMAKE_ARGS+=(-DSUNSHINE_ENABLE_CUDA=ON)
+          fi
+          cmake "${CMAKE_ARGS[@]}"
+
+      - name: Build
+        run: |
+          ninja -C build
+
+      - name: Run tests
+        run: |
+          export DISPLAY=:1
+          Xvfb ${DISPLAY} -screen 0 1024x768x24 &
+          sleep 2
+          cd build/tests
+          ./test_sunshine --gtest_color=yes || true
+
+      - name: Package
+        run: |
+          cpack -G DEB --config ./build/CPackConfig.cmake
+
+      - name: Upload DEB package
+        uses: actions/upload-artifact@v4
+        with:
+          name: apollo-${{ matrix.distro }}-${{ matrix.version }}${{ matrix.suffix || '' }}-amd64
+          path: build/*.deb
+          retention-days: 30
+          if-no-files-found: error
+

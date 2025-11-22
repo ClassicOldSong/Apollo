@@ -1,0 +1,124 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-linux:
+    name: Build on ${{ matrix.distro }} ${{ matrix.version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu
+            version: "22.04"
+            gcc_version: "13"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: true
+          - distro: ubuntu
+            version: "24.04"
+            gcc_version: "14"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: true
+          - distro: debian
+            version: "12"
+            gcc_version: "13"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: false
+          - distro: debian
+            version: "13"
+            gcc_version: "14"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: false
+          - distro: fedora
+            version: "41"
+            gcc_version: "13"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: false
+          - distro: fedora
+            version: "42"
+            gcc_version: "14"
+            cuda_version: "12.9.1"
+            cuda_build: "575.57.08"
+            nvm_node: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine architecture
+        id: arch
+        run: |
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "x86_64" ]; then
+            echo "arch=x86_64" >> $GITHUB_OUTPUT
+            echo "platform=linux/amd64" >> $GITHUB_OUTPUT
+          elif [ "$ARCH" = "aarch64" ]; then
+            echo "arch=aarch64" >> $GITHUB_OUTPUT
+            echo "platform=linux/arm64" >> $GITHUB_OUTPUT
+          else
+            echo "Unsupported architecture: $ARCH"
+            exit 1
+          fi
+
+      - name: Determine Dockerfile path
+        id: dockerfile
+        run: |
+          if [ "${{ matrix.distro }}" == "debian" ] && [ "${{ matrix.version }}" == "13" ]; then
+            echo "dockerfile=./docker/debian-trixie.dockerfile" >> $GITHUB_OUTPUT
+            echo "tag=trixie" >> $GITHUB_OUTPUT
+          else
+            echo "dockerfile=./docker/${{ matrix.distro }}-${{ matrix.version }}.dockerfile" >> $GITHUB_OUTPUT
+            echo "tag=${{ matrix.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ steps.dockerfile.outputs.dockerfile }}
+          platforms: ${{ steps.arch.outputs.platform }}
+          push: false
+          load: true
+          tags: apollo-build:${{ matrix.distro }}-${{ matrix.version }}
+          build-args: |
+            BASE=${{ matrix.distro }}
+            TAG=${{ steps.dockerfile.outputs.tag }}
+            BRANCH=${{ github.ref_name }}
+            BUILD_VERSION=${{ github.ref_type == 'tag' && github.ref_name || '' }}
+            COMMIT=${{ github.sha }}
+
+      - name: Extract artifacts from Docker
+        run: |
+          docker create --name apollo-container apollo-build:${{ matrix.distro }}-${{ matrix.version }}
+          docker cp apollo-container:/artifacts ./artifacts
+          docker rm apollo-container
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apollo-${{ matrix.distro }}-${{ matrix.version }}-${{ steps.arch.outputs.arch }}
+          path: artifacts/*
+          retention-days: 30
+          if-no-files-found: error
+

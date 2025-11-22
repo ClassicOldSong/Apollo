@@ -1,0 +1,113 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-windows:
+    name: Build on Windows
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        generator: ["Visual Studio 17 2022", "Ninja"]
+        include:
+          - generator: "Visual Studio 17 2022"
+            build_system: "MSBuild"
+          - generator: "Ninja"
+            build_system: "Ninja"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install MSYS2
+        if: matrix.generator == 'Ninja'
+        uses: msys2/setup-msys2@v2
+        with:
+          install: |
+            git
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-cppwinrt
+            mingw-w64-ucrt-x86_64-curl-winssl
+            mingw-w64-ucrt-x86_64-MinHook
+            mingw-w64-ucrt-x86_64-miniupnpc
+            mingw-w64-ucrt-x86_64-nodejs
+            mingw-w64-ucrt-x86_64-nsis
+            mingw-w64-ucrt-x86_64-onevpl
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-opus
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-nlohmann_json
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup MSBuild
+        if: matrix.build_system == 'MSBuild'
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          if [ "${{ matrix.generator }}" == "Ninja" ]; then
+            export PATH="/c/msys64/ucrt64/bin:$PATH"
+            cmake -B build -G "${{ matrix.generator }}" -S . \
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+              -DBUILD_WERROR=ON
+          else
+            cmake -B build -G "${{ matrix.generator }}" -S . \
+              -A x64 \
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+              -DBUILD_WERROR=ON
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.build_system }}" == "Ninja" ]; then
+            export PATH="/c/msys64/ucrt64/bin:$PATH"
+            cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+          else
+            cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+          fi
+
+      - name: Package
+        shell: bash
+        run: |
+          if [ "${{ matrix.build_system }}" == "Ninja" ]; then
+            export PATH="/c/msys64/ucrt64/bin:$PATH"
+          fi
+          cmake --build build --target package --config ${{ env.BUILD_TYPE }}
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: apollo-windows-${{ matrix.build_system }}-installer
+          path: build/*.exe
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Upload ZIP package
+        uses: actions/upload-artifact@v4
+        with:
+          name: apollo-windows-${{ matrix.build_system }}-zip
+          path: build/*.zip
+          retention-days: 30
+          if-no-files-found: warn
+

@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Wait for build workflows
+        run: |
+          echo "Waiting for build workflows to complete..."
+          sleep 600  # Wait 10 minutes for builds to complete
+
+      - name: Download artifacts from workflow runs
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: ${{ github.event.repository.name == 'Apollo' && 'build-linux.yml' || 'build-linux.yml' }}
+          commit: ${{ github.ref }}
+          path: artifacts
+          if_no_artifact_found: ignore
+
+      - name: Download artifacts from Linux Native workflow
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build-linux-native.yml
+          commit: ${{ github.ref }}
+          path: artifacts
+          if_no_artifact_found: ignore
+
+      - name: Download artifacts from Windows workflow
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build-windows.yml
+          commit: ${{ github.ref }}
+          path: artifacts
+          if_no_artifact_found: ignore
+
+      - name: Download artifacts from macOS workflow
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: build-macos.yml
+          commit: ${{ github.ref }}
+          path: artifacts
+          if_no_artifact_found: ignore
+
+      - name: List downloaded artifacts
+        run: |
+          find artifacts -type f 2>/dev/null | head -20 || echo "No artifacts found"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

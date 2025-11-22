@@ -1,0 +1,91 @@
+name: Build macOS
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build-macos:
+    name: Build on macOS ${{ matrix.version }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: "12"
+            runner: macos-12
+            xcode: "14.2"
+          - version: "13"
+            runner: macos-13
+            xcode: "15.0"
+          - version: "14"
+            runner: macos-14
+            xcode: "15.1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.xcode }}
+
+      - name: Install Homebrew dependencies
+        run: |
+          brew install \
+            boost \
+            cmake \
+            miniupnpc \
+            ninja \
+            node \
+            openssl@3 \
+            opus \
+            pkg-config
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Fix OpenSSL symlink
+        run: |
+          if [ "$(uname -m)" = "x86_64" ]; then
+            ln -s /usr/local/opt/openssl/include/openssl /usr/local/include/openssl || true
+          else
+            ln -s /opt/homebrew/opt/openssl/include/openssl /opt/homebrew/include/openssl || true
+          fi
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja -S . \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DBUILD_WERROR=ON
+
+      - name: Build
+        run: |
+          cmake --build build --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Package
+        run: |
+          cmake --build build --target package --config ${{ env.BUILD_TYPE }}
+
+      - name: Upload DragNDrop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: apollo-macos-${{ matrix.version }}-dmg
+          path: build/*.dmg
+          retention-days: 30
+          if-no-files-found: error
+
