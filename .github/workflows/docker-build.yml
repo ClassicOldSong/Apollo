@@ -69,11 +69,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=ref,event=branch,suffix=-archlinux
+            type=ref,event=pr,suffix=-archlinux
+            type=semver,pattern={{version}},suffix=-archlinux
+            type=semver,pattern={{major}}.{{minor}},suffix=-archlinux
+            type=sha,prefix=sha-,suffix=-archlinux
             type=raw,value=archlinux,enable={{is_default_branch}}
 
       - name: Set build arguments
@@ -155,11 +155,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=ref,event=branch,suffix=-debian-trixie
+            type=ref,event=pr,suffix=-debian-trixie
+            type=semver,pattern={{version}},suffix=-debian-trixie
+            type=semver,pattern={{major}}.{{minor}},suffix=-debian-trixie
+            type=sha,prefix=sha-,suffix=-debian-trixie
             type=raw,value=debian-trixie,enable={{is_default_branch}}
 
       - name: Set build arguments
@@ -239,11 +239,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=ref,event=branch,suffix=-ubuntu-22.04
+            type=ref,event=pr,suffix=-ubuntu-22.04
+            type=semver,pattern={{version}},suffix=-ubuntu-22.04
+            type=semver,pattern={{major}}.{{minor}},suffix=-ubuntu-22.04
+            type=sha,prefix=sha-,suffix=-ubuntu-22.04
             type=raw,value=ubuntu-22.04,enable={{is_default_branch}}
 
       - name: Set build arguments
@@ -323,11 +323,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix={{branch}}-
+            type=ref,event=branch,suffix=-ubuntu-24.04
+            type=ref,event=pr,suffix=-ubuntu-24.04
+            type=semver,pattern={{version}},suffix=-ubuntu-24.04
+            type=semver,pattern={{major}}.{{minor}},suffix=-ubuntu-24.04
+            type=sha,prefix=sha-,suffix=-ubuntu-24.04
             type=raw,value=ubuntu-24.04,enable={{is_default_branch}}
 
       - name: Set build arguments

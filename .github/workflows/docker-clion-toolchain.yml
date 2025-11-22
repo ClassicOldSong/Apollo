@@ -50,9 +50,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
+            type=ref,event=branch,suffix=-clion-toolchain
+            type=ref,event=pr,suffix=-clion-toolchain
+            type=sha,prefix=sha-,suffix=-clion-toolchain
             type=raw,value=clion-toolchain,enable={{is_default_branch}}
 
       - name: Build and push
@@ -62,7 +62,7 @@ jobs:
           file: ./docker/clion-toolchain.dockerfile
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}-clion-toolchain
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
