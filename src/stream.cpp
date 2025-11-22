@@ -884,8 +884,8 @@ namespace stream {
         // encodingFramerate format depends on config::video.limit_framerate:
         // - If limit_framerate is true: encodingFramerate is in fps format (from session.fps)
         // - If limit_framerate is false: encodingFramerate is in fps*1000 format
-        // framerate (after RTSP normalization) may be in fps format (if it was > 4000)
-        // or still in fps*1000 format (if it was <= 4000)
+        // framerate (after RTSP normalization): values > 1000 are in fps*1000 format,
+        // values <= 1000 are in fps format
         float framerate;
         if (session->config.monitor.encodingFramerate > 0) {
           // Check if encodingFramerate is in fps*1000 format (> 1000) or fps format (<= 1000)
@@ -898,12 +898,12 @@ namespace stream {
           }
         } else {
           // Fallback: check if framerate is in fps*1000 format
-          // After RTSP normalization (rtsp.cpp line 1039-1041), framerate > 4000 means it was normalized to fps format,
-          // while <= 4000 means it's still in fps*1000 format. Use 4000 threshold to match normalization logic.
-          if (session->config.monitor.framerate > 4000) {
-            framerate = static_cast<float>(session->config.monitor.framerate);
-          } else {
+          // After RTSP normalization, values > 1000 are in fps*1000 format (divide by 1000),
+          // while values <= 1000 are in fps format (use as-is). Use 1000 threshold to match encodingFramerate logic.
+          if (session->config.monitor.framerate > 1000) {
             framerate = session->config.monitor.framerate / 1000.0f;
+          } else {
+            framerate = static_cast<float>(session->config.monitor.framerate);
           }
         }
         float expectedFrames = framerate * (t.count() / 1000.0f);
