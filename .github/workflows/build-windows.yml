@@ -55,3 +55,36 @@ jobs:
         MSYSTEM: MINGW64
       run: |
         ninja -C build
+
+    - name: Package (ZIP)
+      shell: msys2 {0}
+      run: |
+        cpack -G ZIP --config ./build/CPackConfig.cmake
+
+    - name: Package (NSIS Installer)
+      shell: msys2 {0}
+      run: |
+        cpack -G NSIS --config ./build/CPackConfig.cmake
+
+    - name: List build artifacts
+      shell: msys2 {0}
+      run: |
+        echo "=== Build directory contents ==="
+        ls -la build/ || echo "Build directory not found"
+        echo ""
+        echo "=== CPack artifacts directory ==="
+        ls -la build/cpack_artifacts/ || echo "cpack_artifacts directory not found"
+        echo ""
+        echo "=== Executable location ==="
+        ls -la build/sunshine.exe || echo "sunshine.exe not found in build directory"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: |
+          build/cpack_artifacts/*.exe
+          build/cpack_artifacts/*.zip
+          build/sunshine.exe
+        retention-days: 30
+        if-no-files-found: warn
