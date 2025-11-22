@@ -53,6 +53,8 @@ extern "C" {
 #define IDX_SET_CLIPBOARD 16
 #define IDX_FILE_TRANSFER_NONCE_REQUEST 17
 #define IDX_SET_ADAPTIVE_TRIGGERS 18
+#define IDX_AUTO_BITRATE_UPDATE 19
+#define IDX_AUTO_BITRATE_ACK 20
 
 static const short packetTypes[] = {
   0x0305,  // Start A
@@ -74,6 +76,8 @@ static const short packetTypes[] = {
   0x3001,  // Set Clipboard (Apollo protocol extension)
   0x3002,  // File transfer nonce request (Apollo protocol extension)
   0x5503,  // Set Adaptive triggers (Sunshine protocol extension)
+  0x3003,  // Auto bitrate update (Apollo protocol extension)
+  0x3004,  // Auto bitrate ack (Apollo protocol extension)
 };
 
 namespace asio = boost::asio;
@@ -217,6 +221,22 @@ namespace stream {
 
     // Sunshine protocol extension
     SS_HDR_METADATA metadata;
+  };
+
+  struct control_auto_bitrate_update_t {
+    control_header_v2 header;
+
+    std::uint32_t targetKbps;      // Little-endian target bitrate in Kbps
+    std::uint8_t connectionStatus;  // 0 = OKAY, 1 = POOR
+    std::uint8_t reserved[3];
+  };
+
+  struct control_auto_bitrate_ack_t {
+    control_header_v2 header;
+
+    std::uint32_t appliedKbps;  // Little-endian applied bitrate in Kbps
+    std::uint8_t result;       // 0 = success, 1 = rejected (too low), 2 = rejected (too high), 3 = encoder error
+    std::uint8_t reserved[3];
   };
 
   typedef struct control_encrypted_t {
@@ -374,6 +394,7 @@ namespace stream {
 
       safe::mail_raw_t::event_t<bool> idr_events;
       safe::mail_raw_t::event_t<std::pair<int64_t, int64_t>> invalidate_ref_frames_events;
+      safe::mail_raw_t::event_t<std::uint32_t> bitrate_update_events;
 
       std::unique_ptr<platf::deinit_t> qos;
     } video;
@@ -927,6 +948,49 @@ namespace stream {
     return 0;
   }
 
+  int sendAutoBitrateAck(session_t *session, std::uint32_t appliedKbps, std::uint8_t result) {
+    if (!session->control.peer) {
+      BOOST_LOG(warning) << "Couldn't send AutoBitrateAck, still waiting for PING from Moonlight"sv;
+      return -1;
+    }
+
+    control_auto_bitrate_ack_t plaintext {};
+    plaintext.header.type = packetTypes[IDX_AUTO_BITRATE_ACK];
+    plaintext.header.payloadLength = sizeof(control_auto_bitrate_ack_t) - sizeof(control_header_v2);
+
+    plaintext.appliedKbps = util::endian::little(appliedKbps);
+    plaintext.result = result;
+
+    std::array<std::uint8_t, sizeof(control_encrypted_t) + crypto::cipher::round_to_pkcs7_padded(sizeof(plaintext)) + crypto::cipher::tag_size>
+      encrypted_payload;
+
+    auto payload = encode_control(session, util::view(plaintext), encrypted_payload);
+    if (session->broadcast_ref->control_server.send(payload, session->control.peer)) {
+      TUPLE_2D(port, addr, platf::from_sockaddr_ex((sockaddr *) &session->control.peer->address.address));
+      BOOST_LOG(warning) << "Couldn't send AutoBitrateAck to ["sv << addr << ':' << port << ']';
+
+      return -1;
+    }
+
+    BOOST_LOG(debug) << "Sent AutoBitrateAck: " << appliedKbps << " Kbps, result: " << (int)result;
+    return 0;
+  }
+
+  void applyBitrateChange(session_t *session, std::uint32_t targetKbps, std::uint8_t connectionStatus) {
+    // Update session config
+    auto oldBitrate = session->config.monitor.bitrate;
+    session->config.monitor.bitrate = targetKbps;
+
+    // Emit event to video pipeline
+    session->video.bitrate_update_events->raise(targetKbps);
+
+    BOOST_LOG(info) << "Bitrate update: " << oldBitrate << " -> " << targetKbps
+                    << " Kbps (status: " << (connectionStatus ? "POOR" : "OKAY") << ")";
+
+    // Send ack
+    sendAutoBitrateAck(session, targetKbps, 0); // result = success
+  }
+
   void controlBroadcastThread(control_server_t *server) {
     server->map(packetTypes[IDX_PERIODIC_PING], [](session_t *session, const std::string_view &payload) {
       BOOST_LOG(verbose) << "type [IDX_PERIODIC_PING]"sv;
@@ -1050,6 +1114,47 @@ namespace stream {
         BOOST_LOG(debug) << "Permission File Upload deined for [" << session->device_name << "]";
         return;
       }
+    });
+
+    server->map(packetTypes[IDX_AUTO_BITRATE_UPDATE], [server](session_t *session, const std::string_view &payload) {
+      if (payload.size() < sizeof(control_auto_bitrate_update_t) - sizeof(control_header_v2)) {
+        BOOST_LOG(warning) << "AutoBitrateUpdate packet too small";
+        return;
+      }
+
+      auto *update = (control_auto_bitrate_update_t *)payload.data();
+      auto targetKbps = util::endian::little(update->targetKbps);
+      auto connectionStatus = update->connectionStatus;
+
+      // Validate connection status
+      if (connectionStatus > 1) {
+        BOOST_LOG(warning) << "AutoBitrateUpdate rejected: invalid connection status " << (int)connectionStatus;
+        return;
+      }
+
+      // Validate minimum bitrate (500 Kbps floor)
+      if (targetKbps < 500) {
+        BOOST_LOG(warning) << "AutoBitrateUpdate rejected: below minimum (500 Kbps), requested: " << targetKbps;
+        sendAutoBitrateAck(session, targetKbps, 1); // result = rejected (too low)
+        return;
+      }
+
+      // Check host max bitrate limit
+      auto maxBitrate = config::video.max_bitrate;
+      if (maxBitrate > 0 && targetKbps > maxBitrate) {
+        BOOST_LOG(warning) << "AutoBitrateUpdate rejected: above host limit (" << maxBitrate << " Kbps), requested: " << targetKbps;
+        sendAutoBitrateAck(session, targetKbps, 2); // result = rejected (too high)
+        return;
+      }
+
+      // Check session state
+      if (session::state(*session) != session::state_e::RUNNING) {
+        BOOST_LOG(warning) << "AutoBitrateUpdate rejected: session not in RUNNING state";
+        return;
+      }
+
+      // Apply bitrate change
+      applyBitrateChange(session, targetKbps, connectionStatus);
     });
 
     server->map(packetTypes[IDX_ENCRYPTED], [server](session_t *session, const std::string_view &payload) {
@@ -2172,6 +2277,7 @@ namespace stream {
 
       session->video.idr_events = mail->event<bool>(mail::idr);
       session->video.invalidate_ref_frames_events = mail->event<std::pair<int64_t, int64_t>>(mail::invalidate_ref_frames);
+      session->video.bitrate_update_events = mail->event<std::uint32_t>(mail::bitrate_update);
       session->video.lowseq = 0;
       session->video.ping_payload = launch_session.av_ping_payload;
       if (config.encryptionFlagsEnabled & SS_ENC_VIDEO) {

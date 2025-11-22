@@ -1998,6 +1998,24 @@ namespace video {
         }
       }
 
+      // Handle bitrate updates
+      auto bitrate_update_events = mail->event<std::uint32_t>(mail::bitrate_update);
+      if (bitrate_update_events->peek()) {
+        auto newBitrate = bitrate_update_events->pop();
+        BOOST_LOG(info) << "Applying bitrate update to encoder: " << newBitrate << " Kbps";
+
+        // Update config for reinit
+        config.bitrate = newBitrate;
+
+        // Use reinit to apply bitrate change
+        // TODO: Add fast-path reconfigure support for encoders that support it
+        BOOST_LOG(debug) << "Triggering encoder reinit for bitrate change";
+        reinit_event.raise(true);
+
+        // Request IDR frame after bitrate change
+        requested_idr_frame = true;
+      }
+
       if (idr_events->peek()) {
         requested_idr_frame = true;
         idr_events->pop();

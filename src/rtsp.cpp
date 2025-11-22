@@ -860,12 +860,13 @@ namespace rtsp_stream {
   }
 
   void cmd_setup(rtsp_server_t *server, tcp::socket &sock, launch_session_t &session, msg_t &&req) {
-    OPTION_ITEM options[4] {};
+    OPTION_ITEM options[5] {};
 
     auto &seqn = options[0];
     auto &session_option = options[1];
     auto &port_option = options[2];
     auto &payload_option = options[3];
+    auto &features_option = options[4];
 
     seqn.option = const_cast<char *>("CSeq");
 
@@ -914,6 +915,16 @@ namespace rtsp_stream {
     }
 
     port_option.next = &payload_option;
+
+    // Add Apollo feature flags (only on control channel to avoid duplication)
+    if (type == "control"sv) {
+      payload_option.next = &features_option;
+      features_option.option = const_cast<char *>("x-apollo-features");
+      features_option.content = const_cast<char *>("DYNAMIC_BITRATE=1");
+      features_option.next = nullptr;
+    } else {
+      payload_option.next = nullptr;
+    }
 
     respond(sock, session, &seqn, 200, "OK", req->sequenceNumber, {});
   }
