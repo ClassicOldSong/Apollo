@@ -1027,11 +1027,9 @@ namespace rtsp_stream {
         // session.fps is in fps format (not fps*1000), so store it as-is
         config.monitor.encodingFramerate = session.fps;
       } else {
-        if (config.monitor.framerate > 1000) {
-          config.monitor.encodingFramerate = config.monitor.framerate;
-        } else {
-          config.monitor.encodingFramerate = config.monitor.framerate * 1000;
-        }
+        // config.monitor.framerate is always in fps*1000 format at this point (from client)
+        // The normalization to fps format happens later (line 1039-1041) if framerate > 4000
+        config.monitor.encodingFramerate = config.monitor.framerate;
       }
 
       // When fractional refresh rate requested from client side, it should be well above 1000fps

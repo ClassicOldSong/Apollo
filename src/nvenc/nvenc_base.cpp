@@ -224,8 +224,9 @@ namespace nvenc {
     init_params.encodeHeight = encoder_params.height;
     init_params.darHeight = encoder_params.height;
     // NVENC expects framerate in fps*1000 format. client_config.framerate may be in fps format
-    // (if normalized in rtsp.cpp line 1039) or fps*1000 format. Normalize to fps*1000 format.
-    int framerate_for_nvenc = (client_config.framerate > 1000) ? client_config.framerate : client_config.framerate * 1000;
+    // (if normalized in rtsp.cpp line 1039 when > 4000) or fps*1000 format. Normalize to fps*1000 format.
+    // Use 4000 threshold to match the normalization logic in rtsp.cpp
+    int framerate_for_nvenc = (client_config.framerate > 4000) ? client_config.framerate * 1000 : client_config.framerate;
     init_params.frameRateNum = framerate_for_nvenc;
     init_params.frameRateDen = 1;
 
@@ -460,12 +461,13 @@ namespace nvenc {
     encoder_state = {};
     stored_nvenc_config = config;
     // Store framerate in fps*1000 format for consistency with NVENC API expectations
-    // client_config.framerate may be in fps format (if normalized in rtsp.cpp line 1039)
+    // client_config.framerate may be in fps format (if normalized in rtsp.cpp line 1039 when > 4000)
     // or fps*1000 format. Normalize to fps*1000 format for stored_framerate.
-    if (client_config.framerate > 1000) {
-      stored_framerate = client_config.framerate;  // Already in fps*1000 format
-    } else {
+    // Use 4000 threshold to match the normalization logic in rtsp.cpp
+    if (client_config.framerate > 4000) {
       stored_framerate = client_config.framerate * 1000;  // Convert from fps to fps*1000
+    } else {
+      stored_framerate = client_config.framerate;  // Already in fps*1000 format
     }
     fail_guard.disable();
     return true;

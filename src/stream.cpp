@@ -978,10 +978,12 @@ namespace stream {
           }
         } else {
           // Fallback: check if framerate is in fps*1000 format
-          if (session->config.monitor.framerate > 1000) {
-            framerate = session->config.monitor.framerate / 1000.0f;
-          } else {
+          // After RTSP normalization (rtsp.cpp line 1039-1041), framerate > 4000 means it was normalized to fps format,
+          // while <= 4000 means it's still in fps*1000 format. Use 4000 threshold to match normalization logic.
+          if (session->config.monitor.framerate > 4000) {
             framerate = static_cast<float>(session->config.monitor.framerate);
+          } else {
+            framerate = session->config.monitor.framerate / 1000.0f;
           }
         }
         float expectedFrames = framerate * (t.count() / 1000.0f);
