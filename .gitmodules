@@ -64,5 +64,5 @@
 	branch = master
 [submodule "third-party/moonlight-common-c"]
 	path = third-party/moonlight-common-c
-	url = https://github.com/ClassicOldSong/moonlight-common-c
-	branch = master
+	url = https://github.com/AlexWorland/moonlight-common-c
+	branch = auto-bitrate-feature
