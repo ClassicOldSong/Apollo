@@ -1252,7 +1252,6 @@ namespace config {
       video.auto_bitrate.min_bitrate = 500;
       video.auto_bitrate.max_bitrate = 150000;
     }
-    }
 
     int_f(vars, "max_bitrate", video.max_bitrate);
     double_between_f(vars, "minimum_fps_target", video.minimum_fps_target, {0.0, 1000.0});
