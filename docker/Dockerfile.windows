@@ -1,0 +1,53 @@
+# syntax=docker/dockerfile:1
+# Windows container for building Apollo Windows executables and installers
+# Requires Windows host machine with Docker Desktop configured for Windows containers
+
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+
+# Set up environment
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Chocolatey (Windows package manager)
+RUN powershell -Command \
+    Set-ExecutionPolicy Bypass -Scope Process -Force; \
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; \
+    iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); \
+    choco feature enable -n allowGlobalConfirmation
+
+# Install MSYS2 via Chocolatey
+RUN choco install msys2 -y --params '/NoUpdate'
+
+# Set environment variables for MSYS2
+ENV MSYS2_PATH=C:\tools\msys64
+ENV PATH="${MSYS2_PATH}\usr\bin;${MSYS2_PATH}\mingw64\bin;${PATH}"
+
+# Update MSYS2 and install build dependencies
+# Note: MSYS2 pacman commands need to be run in bash
+RUN powershell -Command \
+    $msys2Bash = 'C:\tools\msys64\usr\bin\bash.exe'; \
+    & $msys2Bash -lc 'pacman -Syu --noconfirm'; \
+    & $msys2Bash -lc 'pacman -S --noconfirm \
+        git \
+        mingw-w64-ucrt-x86_64-boost \
+        mingw-w64-ucrt-x86_64-cmake \
+        mingw-w64-ucrt-x86_64-cppwinrt \
+        mingw-w64-ucrt-x86_64-curl-winssl \
+        mingw-w64-ucrt-x86_64-MinHook \
+        mingw-w64-ucrt-x86_64-miniupnpc \
+        mingw-w64-ucrt-x86_64-nodejs \
+        mingw-w64-ucrt-x86_64-nsis \
+        mingw-w64-ucrt-x86_64-onevpl \
+        mingw-w64-ucrt-x86_64-openssl \
+        mingw-w64-ucrt-x86_64-opus \
+        mingw-w64-ucrt-x86_64-toolchain \
+        mingw-w64-ucrt-x86_64-nlohmann_json'
+
+# Set working directory
+WORKDIR C:\workspace
+
+# Copy build script
+COPY docker/windows-build.ps1 C:\build.ps1
+
+# Default command runs the build script
+CMD ["powershell", "-File", "C:\\build.ps1"]
+

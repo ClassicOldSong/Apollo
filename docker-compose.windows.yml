@@ -1,0 +1,28 @@
+version: '3.8'
+
+# Docker Compose configuration for Windows container builds
+# Usage: docker-compose -f docker-compose.windows.yml build
+#        docker-compose -f docker-compose.windows.yml run --rm apollo-windows-build
+
+services:
+  apollo-windows-build:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.windows
+    image: apollo-windows-builder:latest
+    container_name: apollo-windows-build
+    volumes:
+      # Mount the entire apollo directory
+      - .:C:\workspace
+    working_dir: C:\workspace
+    # Environment variables
+    environment:
+      - CMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE:-Release}
+      - BUILD_TESTS=${BUILD_TESTS:-OFF}
+    # Keep container running for interactive use
+    stdin_open: true
+    tty: true
+    # Override command to keep container alive for interactive use
+    # Remove this line to run the build automatically
+    # command: powershell
+
