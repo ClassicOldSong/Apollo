@@ -1,20 +1,51 @@
-# Apollo
+# Apollo Linux
+
+> **Fork of [Apollo](https://github.com/ClassicOldSong/Apollo) with Linux Virtual Display support**
 
 Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, native client resolution, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
 
 Major features:
 
 - [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
+- [x] **Linux Virtual Display support using EVDI** *(new in this fork!)*
 - [x] Permission management for clients
 - [x] Clipboard sync
 - [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
 - [x] Input only mode
 
+## Linux Virtual Display Support
+
+This fork adds **real virtual display support for Linux** using [EVDI](https://github.com/DisplayLink/evdi) (Extensible Virtual Display Interface). 
+
+### Features
+- Creates isolated virtual displays that don't mirror your physical monitor
+- Supports resolutions up to 4K (3840x2160)
+- Dynamic loading of EVDI library (no hard dependency)
+- Automatic EVDI module loading on boot
+- Works with AMD, Intel, and Nvidia GPUs via VAAPI
+
+### Requirements
+- `evdi-dkms` package (for the kernel module)
+- `libevdi` library
+
+### Installation on Arch/CachyOS
+
+```bash
+# Install EVDI
+sudo pacman -S evdi-dkms
+
+# Build and install Apollo
+makepkg -si
+```
+
+The install script will automatically:
+- Set up required capabilities (`cap_sys_admin`)
+- Load the EVDI kernel module
+- Configure automatic module loading on boot
+
 ## Usage
 
 Refer to LizardByte's documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine) for now.
-
-Currently Virtual Display support is Windows only, Linux support is planned and will be implemented in the future.
 
 ## About Permission System
 
