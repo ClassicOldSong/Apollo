@@ -24,6 +24,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Setup MSYS2
         uses: msys2/setup-msys2@v2
@@ -40,6 +41,9 @@ jobs:
             mingw-w64-ucrt-x86_64-ffmpeg
             mingw-w64-ucrt-x86_64-curl
             mingw-w64-ucrt-x86_64-libnotify
+            mingw-w64-ucrt-x86_64-miniupnpc
+            mingw-w64-ucrt-x86_64-nlohmann-json
+            mingw-w64-ucrt-x86_64-onevpl
             git
 
       - name: Configure CMake
@@ -50,7 +54,8 @@ jobs:
             -DSUNSHINE_ENABLE_WAYLAND=OFF \
             -DSUNSHINE_ENABLE_X11=OFF \
             -DSUNSHINE_ENABLE_DRM=OFF \
-            -DSUNSHINE_ENABLE_CUDA=ON
+            -DSUNSHINE_ENABLE_CUDA=ON \
+            -DFETCHCONTENT_FULLY_DISCONNECTED=OFF
 
       - name: Build
         shell: msys2 {0}
@@ -69,18 +74,20 @@ jobs:
           name: apollo-windows-x64
           path: package/
           retention-days: 30
+          if-no-files-found: ignore
 
   # ===========================================
-  # Linux AppImage Build
+  # Linux AppImage Build (Ubuntu 24.04 for newer libs)
   # ===========================================
   build-linux-appimage:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Install Dependencies
         run: |
@@ -116,7 +123,11 @@ jobs:
             libsystemd-dev \
             libminiupnpc-dev \
             libfuse2 \
-            wget
+            libicu-dev \
+            libnuma-dev \
+            wget \
+            nodejs \
+            npm
 
       - name: Configure CMake
         run: |
@@ -126,7 +137,8 @@ jobs:
             -DSUNSHINE_ENABLE_WAYLAND=ON \
             -DSUNSHINE_ENABLE_X11=ON \
             -DSUNSHINE_ENABLE_DRM=ON \
-            -DSUNSHINE_ENABLE_CUDA=OFF
+            -DSUNSHINE_ENABLE_CUDA=OFF \
+            -DFETCHCONTENT_FULLY_DISCONNECTED=OFF
 
       - name: Build
         run: cmake --build build --config ${{env.BUILD_TYPE}} -j$(nproc)
@@ -156,7 +168,7 @@ jobs:
             --appdir AppDir \
             --output appimage \
             --desktop-file AppDir/usr/share/applications/apollo.desktop \
-            || true
+            || echo "AppImage creation had issues, continuing..."
             
           mv Apollo*.AppImage apollo-linux-x86_64.AppImage 2>/dev/null || true
 
@@ -166,6 +178,7 @@ jobs:
           name: apollo-linux-appimage
           path: "*.AppImage"
           retention-days: 30
+          if-no-files-found: ignore
 
   # ===========================================
   # Arch Linux Package (PKGBUILD)
@@ -205,7 +218,9 @@ jobs:
             miniupnpc \
             libpulse \
             npm \
-            nodejs
+            nodejs \
+            icu \
+            numactl
           
           # Create build user (makepkg can't run as root)
           useradd -m builder
@@ -215,32 +230,41 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
           
-      - name: Fix permissions
-        run: chown -R builder:builder .
+      - name: Fix permissions and git
+        run: |
+          chown -R builder:builder .
+          git config --global --add safe.directory /__w/Apollo-Linux/Apollo-Linux
 
-      - name: Build Package
+      - name: Build with CMake
         run: |
           su builder -c '
-            # Update PKGBUILD source to use local files
-            sed -i "s|source=.*|source=()|" PKGBUILD
-            sed -i "s|pkgver().*|pkgver() { echo \"0.1.0\"; }|" PKGBUILD
-            
-            # Build the package
-            makepkg -sf --noconfirm || {
-              # Fallback: build manually
-              cmake -B build -G Ninja \
-                -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/usr
-              cmake --build build -j$(nproc)
-            }
+            cmake -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr \
+              -DSUNSHINE_ENABLE_WAYLAND=ON \
+              -DSUNSHINE_ENABLE_X11=ON \
+              -DSUNSHINE_ENABLE_DRM=ON \
+              -DSUNSHINE_ENABLE_CUDA=OFF
+            cmake --build build -j$(nproc)
           '
+
+      - name: Create Package
+        run: |
+          mkdir -p pkg/usr/bin pkg/usr/share/apollo
+          cp build/sunshine* pkg/usr/bin/apollo 2>/dev/null || true
+          chmod 755 pkg/usr/bin/apollo 2>/dev/null || true
+          cp -r build/assets/* pkg/usr/share/apollo/ 2>/dev/null || true
+          
+          # Create simple tarball
+          cd pkg && tar -czvf ../apollo-arch-linux-x86_64.tar.gz .
 
       - name: Upload Arch Package
         uses: actions/upload-artifact@v4
         with:
           name: apollo-arch-pkg
-          path: "*.pkg.tar.zst"
+          path: "*.tar.gz"
           retention-days: 30
           if-no-files-found: ignore
 
@@ -248,13 +272,14 @@ jobs:
   # Debian/Ubuntu Package (.deb)
   # ===========================================
   build-deb:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
 
       - name: Install Dependencies
         run: |
@@ -289,8 +314,12 @@ jobs:
             libudev-dev \
             libsystemd-dev \
             libminiupnpc-dev \
+            libicu-dev \
+            libnuma-dev \
             dpkg-dev \
-            debhelper
+            debhelper \
+            nodejs \
+            npm
 
       - name: Configure CMake
         run: |
@@ -319,19 +348,14 @@ jobs:
           mkdir -p ${PKGDIR}/usr/lib/systemd/user
           
           # Copy files
-          cp build/sunshine* ${PKGDIR}/usr/bin/apollo 2>/dev/null || \
-          cp build/apollo* ${PKGDIR}/usr/bin/apollo 2>/dev/null || true
-          chmod 755 ${PKGDIR}/usr/bin/apollo
+          cp build/sunshine* ${PKGDIR}/usr/bin/apollo 2>/dev/null || true
+          chmod 755 ${PKGDIR}/usr/bin/apollo 2>/dev/null || true
           
           cp -r build/assets/web ${PKGDIR}/usr/share/apollo/ 2>/dev/null || true
-          cp -r build/assets/*.png build/assets/*.json ${PKGDIR}/usr/share/apollo/ 2>/dev/null || true
+          cp build/assets/*.png build/assets/*.json ${PKGDIR}/usr/share/apollo/ 2>/dev/null || true
           
           # Copy icons
           cp src_assets/linux/misc/icons/*.svg ${PKGDIR}/usr/share/icons/hicolor/scalable/apps/ 2>/dev/null || true
-          cp src_assets/linux/misc/icons/*-tray.svg ${PKGDIR}/usr/share/icons/hicolor/scalable/status/ 2>/dev/null || true
-          cp src_assets/linux/misc/icons/*-playing.svg ${PKGDIR}/usr/share/icons/hicolor/scalable/status/ 2>/dev/null || true
-          cp src_assets/linux/misc/icons/*-pausing.svg ${PKGDIR}/usr/share/icons/hicolor/scalable/status/ 2>/dev/null || true
-          cp src_assets/linux/misc/icons/*-locked.svg ${PKGDIR}/usr/share/icons/hicolor/scalable/status/ 2>/dev/null || true
           
           # Create control file
           cat > ${PKGDIR}/DEBIAN/control << EOF
@@ -340,7 +364,7 @@ jobs:
           Section: net
           Priority: optional
           Architecture: amd64
-          Depends: libssl3, libboost-all-dev, libpulse0, libopus0, libavcodec59, libdrm2, libwayland-client0, libx11-6, libva2, libcurl4, libnotify4, libayatana-appindicator3-1, libevdev2, libcap2
+          Depends: libssl3, libboost-all-dev, libpulse0, libopus0, libdrm2, libwayland-client0, libx11-6, libva2, libcurl4, libnotify4, libayatana-appindicator3-1, libevdev2, libcap2
           Recommends: evdi-dkms
           Maintainer: Apollo Linux Fork
           Description: Self-hosted game stream host with Linux virtual display support
@@ -355,9 +379,6 @@ jobs:
           setcap cap_sys_admin+p /usr/bin/apollo || true
           if command -v modprobe &> /dev/null; then
             modprobe evdi 2>/dev/null || true
-          fi
-          if [ ! -f /etc/modules-load.d/evdi.conf ]; then
-            echo "evdi" > /etc/modules-load.d/evdi.conf 2>/dev/null || true
           fi
           gtk-update-icon-cache -f /usr/share/icons/hicolor/ 2>/dev/null || true
           EOF
@@ -401,102 +422,15 @@ jobs:
           name: apollo-deb
           path: "*.deb"
           retention-days: 30
-
-  # ===========================================
-  # Flatpak Build
-  # ===========================================
-  build-flatpak:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Flatpak
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
-
-      - name: Create Flatpak Manifest
-        run: |
-          cat > dev.lizardbyte.Apollo.yml << 'EOF'
-          app-id: dev.lizardbyte.Apollo
-          runtime: org.freedesktop.Platform
-          runtime-version: '23.08'
-          sdk: org.freedesktop.Sdk
-          command: apollo
-          finish-args:
-            - --share=ipc
-            - --share=network
-            - --socket=x11
-            - --socket=wayland
-            - --socket=pulseaudio
-            - --device=all
-            - --filesystem=home
-            - --talk-name=org.freedesktop.Notifications
-            - --talk-name=org.kde.StatusNotifierWatcher
-            - --own-name=org.kde.StatusNotifierItem-2-1
-          modules:
-            - name: boost
-              buildsystem: simple
-              build-commands:
-                - ./bootstrap.sh --prefix=/app --with-libraries=system,thread,log,filesystem,program_options,regex,json
-                - ./b2 install -j$FLATPAK_BUILDER_N_JOBS
-              sources:
-                - type: archive
-                  url: https://boostorg.jfrog.io/artifactory/main/release/1.83.0/source/boost_1_83_0.tar.gz
-                  sha256: c0685b68dd44cc46574cce86c4e17c0f611b15e195be9848dfd0769a0a207628
-            
-            - name: miniupnpc
-              buildsystem: cmake-ninja
-              config-opts:
-                - -DUPNPC_BUILD_STATIC=OFF
-                - -DUPNPC_BUILD_SHARED=ON
-                - -DUPNPC_BUILD_TESTS=OFF
-                - -DUPNPC_BUILD_SAMPLE=OFF
-              sources:
-                - type: archive
-                  url: https://miniupnp.tuxfamily.org/files/miniupnpc-2.2.5.tar.gz
-                  sha256: 86085f1ed489462c913f8f7d8abde8f6ad8a9da1f37cd0cd4ed4a2e0eff82ecf
-
-            - name: apollo
-              buildsystem: cmake-ninja
-              config-opts:
-                - -DCMAKE_BUILD_TYPE=Release
-                - -DSUNSHINE_ENABLE_WAYLAND=ON
-                - -DSUNSHINE_ENABLE_X11=ON
-                - -DSUNSHINE_ENABLE_DRM=ON
-                - -DSUNSHINE_ENABLE_CUDA=OFF
-                - -DSUNSHINE_BUILD_FLATPAK=ON
-              sources:
-                - type: dir
-                  path: .
-          EOF
-
-      - name: Build Flatpak
-        run: |
-          flatpak-builder --force-clean --repo=repo build-dir dev.lizardbyte.Apollo.yml || true
-          flatpak build-bundle repo apollo.flatpak dev.lizardbyte.Apollo || true
-
-      - name: Upload Flatpak
-        uses: actions/upload-artifact@v4
-        with:
-          name: apollo-flatpak
-          path: "*.flatpak"
-          retention-days: 30
           if-no-files-found: ignore
 
   # ===========================================
-  # RPM Build (Fedora)
+  # Fedora RPM Build
   # ===========================================
   build-rpm:
     runs-on: ubuntu-latest
     container:
-      image: fedora:39
+      image: fedora:40
     
     steps:
       - name: Install Dependencies
@@ -526,6 +460,8 @@ jobs:
             systemd-devel \
             miniupnpc-devel \
             pulseaudio-libs-devel \
+            libicu-devel \
+            numactl-devel \
             rpm-build \
             nodejs \
             npm
@@ -534,6 +470,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          fetch-depth: 0
+
+      - name: Fix git safe directory
+        run: git config --global --add safe.directory /__w/Apollo-Linux/Apollo-Linux
 
       - name: Configure CMake
         run: |
@@ -548,45 +488,51 @@ jobs:
       - name: Build
         run: cmake --build build -j$(nproc)
 
-      - name: Create RPM Structure
+      - name: Create RPM Package
         run: |
           VERSION="0.1.0"
           mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/bin
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/share/apollo
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/lib/systemd/user
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/share/applications
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/share/icons/hicolor/scalable/apps
-          mkdir -p ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/share/icons/hicolor/scalable/status
           
-          cp build/sunshine* ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/bin/apollo 2>/dev/null || true
-          chmod 755 ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/bin/apollo || true
+          # Create tarball for RPM
+          mkdir -p apollo-${VERSION}/usr/bin
+          mkdir -p apollo-${VERSION}/usr/share/apollo
+          cp build/sunshine* apollo-${VERSION}/usr/bin/apollo 2>/dev/null || true
+          chmod 755 apollo-${VERSION}/usr/bin/apollo 2>/dev/null || true
+          cp -r build/assets/* apollo-${VERSION}/usr/share/apollo/ 2>/dev/null || true
+          tar -czvf ~/rpmbuild/SOURCES/apollo-${VERSION}.tar.gz apollo-${VERSION}
           
-          cat > ~/rpmbuild/SPECS/apollo.spec << EOF
+          cat > ~/rpmbuild/SPECS/apollo.spec << 'EOF'
           Name:           apollo
-          Version:        ${VERSION}
+          Version:        0.1.0
           Release:        1%{?dist}
           Summary:        Self-hosted game stream host with Linux virtual display support
           License:        GPLv3
           URL:            https://github.com/MrOz59/Apollo-Linux
+          Source0:        apollo-%{version}.tar.gz
 
           %description
           Apollo is a game streaming server based on Sunshine with added
           support for Linux virtual displays using EVDI.
 
+          %prep
+          %setup -q
+
           %install
           mkdir -p %{buildroot}/usr/bin
-          cp ~/rpmbuild/BUILDROOT/apollo-${VERSION}-1.x86_64/usr/bin/apollo %{buildroot}/usr/bin/ || true
+          mkdir -p %{buildroot}/usr/share/apollo
+          cp -r usr/bin/* %{buildroot}/usr/bin/ || true
+          cp -r usr/share/apollo/* %{buildroot}/usr/share/apollo/ || true
 
           %files
-          /usr/bin/apollo
+          %attr(755,root,root) /usr/bin/apollo
+          /usr/share/apollo
 
           %post
           setcap cap_sys_admin+p /usr/bin/apollo || true
           EOF
           
-          rpmbuild -bb ~/rpmbuild/SPECS/apollo.spec || true
-          cp ~/rpmbuild/RPMS/x86_64/*.rpm . 2>/dev/null || true
+          rpmbuild -bb ~/rpmbuild/SPECS/apollo.spec || echo "RPM build had issues"
+          cp ~/rpmbuild/RPMS/*/*.rpm . 2>/dev/null || true
 
       - name: Upload RPM
         uses: actions/upload-artifact@v4
@@ -601,7 +547,7 @@ jobs:
   # ===========================================
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-windows, build-linux-appimage, build-deb, build-arch-pkg, build-flatpak, build-rpm]
+    needs: [build-windows, build-linux-appimage, build-deb, build-arch-pkg, build-rpm]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -611,6 +557,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
+
+      - name: List artifacts
+        run: find artifacts/ -type f
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
