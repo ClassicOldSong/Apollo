@@ -227,6 +227,14 @@ namespace platf {
     // Nothing to do
   }
 
+  void client_side_cursor_session_start() {
+    // Not implemented on macOS
+  }
+
+  void client_side_cursor_session_stop() {
+    // Not implemented on macOS
+  }
+
   void restart_on_exit() {
     char executable[2048];
     uint32_t size = sizeof(executable);

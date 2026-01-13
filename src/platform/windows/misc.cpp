@@ -4,6 +4,7 @@
  */
 // standard includes
 #include <csignal>
+#include <cstdlib>
 #include <filesystem>
 #include <iomanip>
 #include <iterator>
@@ -69,6 +70,23 @@
   #define WLAN_API_MAKE_VERSION(_major, _minor) (((DWORD) (_minor)) << 16 | (_major))
 #endif
 
+// OCR_* cursor IDs are missing from MinGW headers
+#ifndef OCR_NORMAL
+  #define OCR_NORMAL      32512
+  #define OCR_IBEAM       32513
+  #define OCR_WAIT        32514
+  #define OCR_CROSS       32515
+  #define OCR_UP          32516
+  #define OCR_SIZENWSE    32642
+  #define OCR_SIZENESW    32643
+  #define OCR_SIZEWE      32644
+  #define OCR_SIZENS      32645
+  #define OCR_SIZEALL     32646
+  #define OCR_NO          32648
+  #define OCR_HAND        32649
+  #define OCR_APPSTARTING 32650
+#endif
+
 #include <winternl.h>
 extern "C" {
   NTSTATUS NTAPI NtSetTimerResolution(ULONG DesiredResolution, BOOLEAN SetResolution, PULONG CurrentResolution);
@@ -111,6 +129,48 @@ namespace platf {
 
   bool enabled_mouse_keys = false;
   MOUSEKEYS previous_mouse_keys_state;
+
+  // Client-side cursor support: transparent cursor state
+  bool client_side_cursor_active = false;
+  std::atomic<int> client_side_cursor_sessions{0};  // Count of sessions requesting client-side cursor
+  bool cursor_crash_handler_registered = false;
+
+  // Store original system cursors to restore later
+  struct saved_cursor_t {
+    HCURSOR cursor;
+    bool saved;
+  };
+  // OCR_* cursor IDs to save/restore
+  constexpr DWORD cursor_ids[] = {
+    OCR_NORMAL, OCR_IBEAM, OCR_WAIT, OCR_CROSS, OCR_UP,
+    OCR_SIZENWSE, OCR_SIZENESW, OCR_SIZEWE, OCR_SIZENS, OCR_SIZEALL,
+    OCR_NO, OCR_HAND, OCR_APPSTARTING
+  };
+  saved_cursor_t saved_cursors[sizeof(cursor_ids) / sizeof(cursor_ids[0])];
+  HCURSOR transparent_cursor = nullptr;
+
+  /**
+   * @brief Emergency cursor restoration - resets all cursors to system defaults.
+   * This is called on crash/unexpected termination to ensure user doesn't lose their cursor.
+   */
+  void emergency_restore_cursors() {
+    if (client_side_cursor_active) {
+      // Reset all cursors to system defaults - this is the nuclear option but guaranteed to work
+      SystemParametersInfoW(SPI_SETCURSORS, 0, nullptr, 0);
+      client_side_cursor_active = false;
+    }
+  }
+
+  // Crash handler for cursor restoration
+  static LONG WINAPI cursor_crash_handler(EXCEPTION_POINTERS* exceptionInfo) {
+    emergency_restore_cursors();
+    return EXCEPTION_CONTINUE_SEARCH;  // Let other handlers process the exception
+  }
+
+  // atexit handler for cursor restoration
+  static void cursor_atexit_handler() {
+    emergency_restore_cursors();
+  }
 
   HANDLE qos_handle = nullptr;
 
@@ -1102,6 +1162,122 @@ namespace platf {
     if (!SetThreadPriority(GetCurrentThread(), win32_priority)) {
       auto winerr = GetLastError();
       BOOST_LOG(warning) << "Unable to set thread priority to "sv << win32_priority << ": "sv << winerr;
+    }
+  }
+
+  /**
+   * @brief Creates a fully transparent cursor.
+   * @return Handle to the transparent cursor, or nullptr on failure.
+   */
+  HCURSOR create_transparent_cursor() {
+    // Create a 1x1 transparent cursor
+    constexpr int width = 1;
+    constexpr int height = 1;
+
+    // AND mask: all 1s (transparent where AND with screen)
+    BYTE andMask[1] = {0xFF};
+    // XOR mask: all 0s (don't invert)
+    BYTE xorMask[1] = {0x00};
+
+    return CreateCursor(GetModuleHandle(nullptr), 0, 0, width, height, andMask, xorMask);
+  }
+
+  /**
+   * @brief Saves all current system cursors and replaces them with transparent ones.
+   * @return true on success.
+   */
+  bool enable_transparent_cursors() {
+    if (client_side_cursor_active) {
+      return true;  // Already active
+    }
+
+    // Create the transparent cursor if we haven't yet
+    if (!transparent_cursor) {
+      transparent_cursor = create_transparent_cursor();
+      if (!transparent_cursor) {
+        BOOST_LOG(error) << "Failed to create transparent cursor: "sv << GetLastError();
+        return false;
+      }
+    }
+
+    // Save and replace each system cursor
+    for (size_t i = 0; i < sizeof(cursor_ids) / sizeof(cursor_ids[0]); i++) {
+      // Copy the system cursor to save it
+      HCURSOR original = CopyCursor(LoadCursorW(nullptr, MAKEINTRESOURCEW(cursor_ids[i])));
+      if (original) {
+        saved_cursors[i].cursor = original;
+        saved_cursors[i].saved = true;
+
+        // Replace with transparent cursor (need to copy it for each SetSystemCursor call)
+        HCURSOR transparent_copy = CopyCursor(transparent_cursor);
+        if (transparent_copy) {
+          if (!SetSystemCursor(transparent_copy, cursor_ids[i])) {
+            BOOST_LOG(warning) << "Failed to set transparent cursor for ID "sv << cursor_ids[i] << ": "sv << GetLastError();
+          }
+        }
+      } else {
+        saved_cursors[i].saved = false;
+        BOOST_LOG(warning) << "Failed to copy cursor for ID "sv << cursor_ids[i] << ": "sv << GetLastError();
+      }
+    }
+
+    // Register crash handlers to ensure cursor restoration on unexpected termination
+    if (!cursor_crash_handler_registered) {
+      SetUnhandledExceptionFilter(cursor_crash_handler);
+      std::atexit(cursor_atexit_handler);
+      cursor_crash_handler_registered = true;
+      BOOST_LOG(debug) << "Registered cursor crash recovery handlers"sv;
+    }
+
+    client_side_cursor_active = true;
+    BOOST_LOG(info) << "Client-side cursor mode enabled: system cursors are now transparent"sv;
+    return true;
+  }
+
+  /**
+   * @brief Restores all original system cursors.
+   */
+  void disable_transparent_cursors() {
+    if (!client_side_cursor_active) {
+      return;  // Not active
+    }
+
+    // Restore each saved cursor
+    for (size_t i = 0; i < sizeof(cursor_ids) / sizeof(cursor_ids[0]); i++) {
+      if (saved_cursors[i].saved) {
+        // SetSystemCursor takes ownership, so no need to destroy after
+        if (!SetSystemCursor(saved_cursors[i].cursor, cursor_ids[i])) {
+          BOOST_LOG(warning) << "Failed to restore cursor for ID "sv << cursor_ids[i] << ": "sv << GetLastError();
+          // Destroy the cursor since SetSystemCursor failed
+          DestroyCursor(saved_cursors[i].cursor);
+        }
+        saved_cursors[i].saved = false;
+        saved_cursors[i].cursor = nullptr;
+      }
+    }
+
+    // Alternatively, reset all cursors to system defaults
+    // SystemParametersInfoW(SPI_SETCURSORS, 0, nullptr, SPIF_SENDCHANGE);
+
+    client_side_cursor_active = false;
+    BOOST_LOG(info) << "Client-side cursor mode disabled: system cursors restored"sv;
+  }
+
+  /**
+   * @brief Called when a session starts with client-side cursor enabled.
+   */
+  void client_side_cursor_session_start() {
+    if (++client_side_cursor_sessions == 1) {
+      enable_transparent_cursors();
+    }
+  }
+
+  /**
+   * @brief Called when a session ends that had client-side cursor enabled.
+   */
+  void client_side_cursor_session_stop() {
+    if (--client_side_cursor_sessions == 0) {
+      disable_transparent_cursors();
     }
   }
 

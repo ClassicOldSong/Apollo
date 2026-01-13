@@ -371,6 +371,14 @@ std::string get_local_ip_for_gateway() {
     // Nothing to do
   }
 
+  void client_side_cursor_session_start() {
+    // Not implemented on Linux - cursor hiding would need X11/Wayland specific code
+  }
+
+  void client_side_cursor_session_stop() {
+    // Not implemented on Linux
+  }
+
   void restart_on_exit() {
     char executable[PATH_MAX];
     ssize_t len = readlink("/proc/self/exe", executable, PATH_MAX - 1);

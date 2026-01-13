@@ -618,6 +618,10 @@ namespace platf {
   void streaming_will_start();
   void streaming_will_stop();
 
+  // Client-side cursor support (Windows only, no-op on other platforms)
+  void client_side_cursor_session_start();
+  void client_side_cursor_session_stop();
+
   void restart();
 
   /**

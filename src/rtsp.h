@@ -58,6 +58,8 @@ namespace rtsp_stream {
     std::list<crypto::command_entry_t> client_do_cmds;
     std::list<crypto::command_entry_t> client_undo_cmds;
 
+    bool clientSideCursor;  ///< If true, host should hide cursor (make transparent) for client-side rendering
+
   #ifdef _WIN32
     GUID display_guid{};
   #endif

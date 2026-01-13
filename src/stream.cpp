@@ -419,6 +419,8 @@ namespace stream {
     std::list<crypto::command_entry_t> do_cmds;
     std::list<crypto::command_entry_t> undo_cmds;
 
+    bool clientSideCursor;  ///< If true, host cursor is transparent for client-side rendering
+
     safe::mail_raw_t::event_t<bool> shutdown_event;
     safe::signal_t controlEnd;
 
@@ -2047,6 +2049,11 @@ namespace stream {
       BOOST_LOG(debug) << "Resetting Input..."sv;
       input::reset(session.input);
 
+      // Disable client-side cursor mode if it was enabled for this session
+      if (session.clientSideCursor) {
+        platf::client_side_cursor_session_stop();
+      }
+
       if (!session.undo_cmds.empty()) {
         auto exec_thread = std::thread([cmd_list = session.undo_cmds]{
           for (auto &cmd : cmd_list) {
@@ -2123,6 +2130,11 @@ namespace stream {
         proc::proc.resume();
       }
 
+      // Enable client-side cursor mode if requested
+      if (session.clientSideCursor) {
+        platf::client_side_cursor_session_start();
+      }
+
       if (!session.do_cmds.empty()) {
         auto exec_thread = std::thread([cmd_list = session.do_cmds]{
           for (auto &cmd : cmd_list) {
@@ -2158,6 +2170,7 @@ namespace stream {
 
       session->do_cmds = std::move(launch_session.client_do_cmds);
       session->undo_cmds = std::move(launch_session.client_undo_cmds);
+      session->clientSideCursor = launch_session.clientSideCursor;
 
       session->config = config;
 
