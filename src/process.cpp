@@ -325,6 +325,29 @@ namespace proc {
           // empty name when probing graphics cards.
 
           config::video.output_name = display_device::map_display_name(this->display_name);
+
+          // In headless mode, ensure virtual display becomes primary
+          // We need to temporarily override configuration_option to ensure_primary
+          if (config::video.headless_mode) {
+            BOOST_LOG(info) << "Headless mode: Configuring virtual display as primary";
+            
+            // Save original configuration option
+            auto original_config_option = config::video.dd.configuration_option;
+            
+            // Temporarily set to ensure_primary to make virtual display the primary one
+            config::video.dd.configuration_option = config::video_t::dd_t::config_option_e::ensure_primary;
+            
+            // Give Windows time to register the new display
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            
+            // Apply the configuration which will make it primary
+            display_device::configure_display(config::video, *launch_session);
+            
+            // Restore original configuration option
+            config::video.dd.configuration_option = original_config_option;
+            
+            BOOST_LOG(info) << "Headless mode: Virtual display configured as primary";
+          }
         } else {
           BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
         }
