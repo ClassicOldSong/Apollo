@@ -411,6 +411,8 @@ namespace stream {
       safe::mail_raw_t::event_t<video::hdr_info_t> hdr_queue;
     } control;
 
+    seat::seat_ptr seat;
+
     std::uint32_t launch_session_id;
     std::string device_name;
     std::string device_uuid;
@@ -1917,7 +1919,12 @@ namespace stream {
     session->video.qos = platf::enable_socket_qos(ref->video_sock.native_handle(), address, session->video.peer.port(), platf::qos_data_type_e::video, session->config.videoQosType != 0);
 
     BOOST_LOG(debug) << "Start capturing Video"sv;
-    video::capture(session->mail, session->config.monitor, session);
+    video::capture(
+      session->mail,
+      session->config.monitor,
+      session,
+      session->seat ? session->seat->display_name : ""
+    );
   }
 
   void audioThread(session_t *session) {
@@ -2083,6 +2090,11 @@ namespace stream {
         platf::streaming_will_stop();
       }
 
+      // Release the seat back to the seat manager
+      if (session.seat) {
+        seat::manager.release(session.seat);
+      }
+
       BOOST_LOG(debug) << "Session ended"sv;
     }
 
@@ -2145,8 +2157,11 @@ namespace stream {
       return 0;
     }
 
-    std::shared_ptr<session_t> alloc(config_t &config, rtsp_stream::launch_session_t &launch_session) {
+    std::shared_ptr<session_t> alloc(config_t &config, rtsp_stream::launch_session_t &launch_session, const seat::seat_ptr &seat) {
       auto session = std::make_shared<session_t>();
+
+      // Assign the seat to this session (may be nullptr in single-seat mode without explicit acquisition)
+      session->seat = seat;
 
       auto mail = std::make_shared<safe::mail_raw_t>();
 

@@ -1156,12 +1156,21 @@ namespace rtsp_stream {
       return;
     }
 
-    auto stream_session = stream::session::alloc(config, session);
+    // Acquire a seat for this session
+    auto session_seat = seat::manager.acquire();
+    if (!session_seat) {
+      BOOST_LOG(error) << "No available seat for new session"sv;
+      respond(sock, session, &option, 503, "Service Unavailable", req->sequenceNumber, {});
+      return;
+    }
+
+    auto stream_session = stream::session::alloc(config, session, session_seat);
     server->insert(stream_session);
 
     if (stream::session::start(*stream_session, sock.remote_endpoint().address().to_string())) {
       BOOST_LOG(error) << "Failed to start a streaming session"sv;
 
+      seat::manager.release(session_seat);
       server->remove(stream_session);
       respond(sock, session, &option, 500, "Internal Server Error", req->sequenceNumber, {});
       return;
