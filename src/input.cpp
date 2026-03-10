@@ -25,6 +25,7 @@ extern "C" {
 #include "input.h"
 #include "logging.h"
 #include "platform/common.h"
+#include "seat.h"
 #include "thread_pool.h"
 #include "utility.h"
 
@@ -162,13 +163,15 @@ namespace input {
 
     input_t(
       safe::mail_raw_t::event_t<input::touch_port_t> touch_port_event,
-      platf::feedback_queue_t feedback_queue
+      platf::feedback_queue_t feedback_queue,
+      const seat::seat_ptr &seat
     ):
         shortcutFlags {},
         gamepads(MAX_GAMEPADS),
-        client_context {platf::allocate_client_input_context(platf_input)},
+        client_context {platf::allocate_client_input_context(platf_input, seat)},
         touch_port_event {std::move(touch_port_event)},
         feedback_queue {std::move(feedback_queue)},
+        seat {seat},
         mouse_left_button_timeout {},
         touch_port {{0, 0, 0, 0}, 0, 0, 1.0f},
         accumulated_vscroll_delta {},
@@ -183,6 +186,8 @@ namespace input {
 
     safe::mail_raw_t::event_t<input::touch_port_t> touch_port_event;
     platf::feedback_queue_t feedback_queue;
+
+    seat::seat_ptr seat;  ///< The seat this input is bound to (may be nullptr)
 
     std::list<std::vector<uint8_t>> input_queue;
     std::mutex input_queue_lock;
@@ -1691,10 +1696,11 @@ namespace input {
     return true;
   }
 
-  std::shared_ptr<input_t> alloc(safe::mail_t mail) {
+  std::shared_ptr<input_t> alloc(safe::mail_t mail, const seat::seat_ptr &seat) {
     auto input = std::make_shared<input_t>(
       mail->event<input::touch_port_t>(mail::touch_port),
-      mail->queue<platf::gamepad_feedback_msg_t>(mail::gamepad_feedback)
+      mail->queue<platf::gamepad_feedback_msg_t>(mail::gamepad_feedback),
+      seat
     );
 
     // Workaround to ensure new frames will be captured when a client connects

@@ -757,7 +757,9 @@ namespace proc {
     }
 
     bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && _launch_session->virtual_display;
-    if (used_virtual_display) {
+    if (used_virtual_display && !_launch_session->seat_owns_vdisplay) {
+      // Only remove the virtual display if the seat hasn't adopted ownership.
+      // When seat_owns_vdisplay is true, the seat will clean up on release.
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
         BOOST_LOG(info) << "Virtual Display removed successfully";
       } else if (this->virtual_display) {
@@ -765,6 +767,8 @@ namespace proc {
       } else {
         BOOST_LOG(warning) << "Virtual Display remove failed, but it seems it was not created correctly either.";
       }
+    } else if (used_virtual_display && _launch_session->seat_owns_vdisplay) {
+      BOOST_LOG(info) << "Virtual Display cleanup deferred to seat";
     }
 
     // Only show the Stopped notification if we actually have an app to stop

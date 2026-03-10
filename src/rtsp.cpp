@@ -27,6 +27,7 @@ extern "C" {
 #include "input.h"
 #include "logging.h"
 #include "network.h"
+#include "process.h"
 #include "rtsp.h"
 #include "stream.h"
 #include "sync.h"
@@ -1163,6 +1164,17 @@ namespace rtsp_stream {
       respond(sock, session, &option, 503, "Service Unavailable", req->sequenceNumber, {});
       return;
     }
+
+#ifdef _WIN32
+    // In multi-seat mode, transfer virtual display ownership to the seat.
+    // Each seat manages its own display lifecycle independently from the app.
+    // In single-seat mode, proc::terminate() handles cleanup as before,
+    // because the app may outlive the streaming session (paused state).
+    if (session.virtual_display && !session.seat_owns_vdisplay && seat::manager.multi_seat_enabled()) {
+      session_seat->adopt_virtual_display(session.display_guid, proc::proc.display_name);
+      session.seat_owns_vdisplay = true;
+    }
+#endif
 
     auto stream_session = stream::session::alloc(config, session, session_seat);
     server->insert(stream_session);

@@ -90,7 +90,11 @@ namespace platf {
     }
   };
 
-  std::unique_ptr<audio_control_t> audio_control() {
+  std::unique_ptr<audio_control_t> audio_control(const std::string &endpoint_id) {
+    if (!endpoint_id.empty()) {
+      BOOST_LOG(info) << "Per-seat audio endpoint requested ["sv << endpoint_id
+                      << "], but macOS per-endpoint targeting is not supported. Using default."sv;
+    }
     return std::make_unique<macos_audio_control_t>();
   }
 }  // namespace platf

@@ -25,7 +25,9 @@ namespace platf {
     return {new input_raw_t()};
   }
 
-  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input) {
+  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input,
+    const seat::seat_ptr &seat) {
+    // TODO (Phase 4 Linux): Use seat input_target for display-specific input routing
     return std::make_unique<client_input_raw_t>(input);
   }
 

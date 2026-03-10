@@ -467,9 +467,11 @@ const KeyCodeMap kKeyCodesMap[] = {
   /**
    * @brief Allocates a context to store per-client input data.
    * @param input The global input context.
+   * @param seat The seat this input is bound to (unused on macOS).
    * @return A unique pointer to a per-client input data context.
    */
-  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input) {
+  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input,
+    const seat::seat_ptr &seat) {
     // Unused
     return nullptr;
   }

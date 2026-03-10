@@ -46,6 +46,46 @@ namespace seat {
 
 #ifdef _WIN32
     std::optional<GUID> vdisplay_guid; ///< Virtual display GUID (Windows)
+
+    /**
+     * @brief Create a virtual display for this seat using SudoVDA.
+     * @param client_uid Client unique ID for display identity.
+     * @param client_name Client display name.
+     * @param width Display width in pixels.
+     * @param height Display height in pixels.
+     * @param fps Display refresh rate (in mHz, e.g., 60000 = 60Hz).
+     * @param guid The GUID to assign to the virtual display.
+     * @return true if the virtual display was created successfully.
+     *
+     * Sets display_name, vdisplay_guid, and input_target on success.
+     * No-op if the seat already owns a virtual display.
+     */
+    bool setup_virtual_display(
+      const std::string &client_uid,
+      const std::string &client_name,
+      uint32_t width,
+      uint32_t height,
+      uint32_t fps,
+      const GUID &guid
+    );
+
+    /**
+     * @brief Adopt an existing virtual display created elsewhere (e.g., by proc).
+     * @param guid The virtual display GUID.
+     * @param name The display device name (UTF-8).
+     *
+     * Transfers ownership of the virtual display to this seat so it will be
+     * cleaned up when the seat is released.
+     */
+    void adopt_virtual_display(const GUID &guid, const std::string &name);
+
+    /**
+     * @brief Tear down the virtual display owned by this seat.
+     *
+     * Removes the virtual display via SudoVDA and clears vdisplay_guid.
+     * Safe to call even if no virtual display is owned.
+     */
+    void teardown_virtual_display();
 #endif
 
     state_e state = state_e::AVAILABLE;

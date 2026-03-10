@@ -1945,7 +1945,12 @@ namespace stream {
     session->audio.qos = platf::enable_socket_qos(ref->audio_sock.native_handle(), address, session->audio.peer.port(), platf::qos_data_type_e::audio, session->config.audioQosType != 0);
 
     BOOST_LOG(debug) << "Start capturing Audio"sv;
-    audio::capture(session->mail, session->config.audio, session);
+    audio::capture(
+      session->mail,
+      session->config.audio,
+      session,
+      session->seat ? session->seat->audio_sink_id : ""
+    );
   }
 
   namespace session {
@@ -2099,7 +2104,7 @@ namespace stream {
     }
 
     int start(session_t &session, const std::string &addr_string) {
-      session.input = input::alloc(session.mail);
+      session.input = input::alloc(session.mail, session.seat);
 
       session.broadcast_ref = broadcast.ref();
       if (!session.broadcast_ref) {

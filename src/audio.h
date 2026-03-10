@@ -77,19 +77,30 @@ namespace audio {
   using packet_t = std::pair<void *, buffer_t>;
   using audio_ctx_ref_t = safe::shared_t<audio_ctx_t>::ptr_t;
 
-  void capture(safe::mail_t mail, config_t config, void *channel_data);
+  /**
+   * @brief Capture audio from a specific endpoint.
+   * @param mail Mailbox for shutdown signaling.
+   * @param config Audio configuration.
+   * @param channel_data Session context for encoding.
+   * @param audio_sink_id Target audio endpoint (empty = system default for backward compat).
+   */
+  void capture(safe::mail_t mail, config_t config, void *channel_data,
+    const std::string &audio_sink_id = "");
 
   /**
-   * @brief Get the reference to the audio context.
+   * @brief Get the reference to the audio context for a specific endpoint.
+   * @param endpoint_id Target audio endpoint (empty = system default).
    * @returns A shared pointer reference to audio context.
    * @note Aside from the configuration purposes, it can be used to extend the
    *       audio sink lifetime to capture sink earlier and restore it later.
+   *       In multi-seat mode, each endpoint gets its own isolated context.
    *
    * @examples
    * audio_ctx_ref_t audio = get_audio_ctx_ref()
+   * audio_ctx_ref_t audio = get_audio_ctx_ref("endpoint-123")
    * @examples_end
    */
-  audio_ctx_ref_t get_audio_ctx_ref();
+  audio_ctx_ref_t get_audio_ctx_ref(const std::string &endpoint_id = "");
 
   /**
    * @brief Check if the audio sink held by audio context is available.

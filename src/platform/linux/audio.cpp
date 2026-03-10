@@ -513,7 +513,13 @@ namespace platf {
     };
   }  // namespace pa
 
-  std::unique_ptr<audio_control_t> audio_control() {
+  std::unique_ptr<audio_control_t> audio_control(const std::string &endpoint_id) {
+    if (!endpoint_id.empty()) {
+      BOOST_LOG(info) << "Per-seat audio endpoint requested ["sv << endpoint_id
+                      << "], but Linux PulseAudio per-endpoint targeting is not yet implemented. Using default."sv;
+      // TODO (Phase 3 Linux): Use PulseAudio/PipeWire API to target a specific sink monitor
+    }
+
     auto audio = std::make_unique<pa::server_t>();
 
     if (audio->init()) {

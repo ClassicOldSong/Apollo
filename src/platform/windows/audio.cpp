@@ -335,6 +335,27 @@ namespace platf::audio {
     return audio_client;
   }
 
+  /**
+   * @brief Get an audio device by its endpoint ID string.
+   * @param device_enum The device enumerator.
+   * @param endpoint_id The endpoint ID string (e.g., from IMMDevice::GetId()).
+   * @return The device, or nullptr on failure.
+   */
+  device_t device_by_id(device_enum_t &device_enum, const std::string &endpoint_id) {
+    device_t device;
+
+    auto wide_id = from_utf8(endpoint_id);
+    HRESULT status = device_enum->GetDevice(wide_id.c_str(), &device);
+
+    if (FAILED(status)) {
+      BOOST_LOG(error) << "Couldn't get audio device for endpoint ["sv << endpoint_id
+                       << "] [0x"sv << util::hex(status).to_string_view() << ']';
+      return nullptr;
+    }
+
+    return device;
+  }
+
   device_t default_device(device_enum_t &device_enum) {
     device_t device;
     HRESULT status;
@@ -478,10 +499,22 @@ namespace platf::audio {
         return -1;
       }
 
-      auto device = default_device(device_enum);
-      if (!device) {
+      // Get the target device: specific endpoint if provided, otherwise system default
+      device_t target_device;
+      if (!endpoint_id.empty()) {
+        target_device = device_by_id(device_enum, endpoint_id);
+        if (!target_device) {
+          BOOST_LOG(error) << "Couldn't get audio device for endpoint ["sv << endpoint_id << "], falling back to default"sv;
+          target_device = default_device(device_enum);
+        }
+      }
+      else {
+        target_device = default_device(device_enum);
+      }
+      if (!target_device) {
         return -1;
       }
+      auto device = std::move(target_device);
 
       for (const auto &format : formats) {
         if (format.channel_count != channels_out) {
@@ -680,10 +713,14 @@ namespace platf::audio {
     int channels;
 
     HANDLE mmcss_task_handle = nullptr;
+
+    std::string endpoint_id;  ///< Target audio endpoint (empty = system default)
   };
 
   class audio_control_t: public ::platf::audio_control_t {
   public:
+    std::string endpoint_id;  ///< Target audio endpoint (empty = system default)
+
     std::optional<sink_t> sink_info() override {
       sink_t sink;
 
@@ -763,6 +800,7 @@ namespace platf::audio {
 
     std::unique_ptr<mic_t> microphone(const std::uint8_t *mapping, int channels, std::uint32_t sample_rate, std::uint32_t frame_size) override {
       auto mic = std::make_unique<mic_wasapi_t>();
+      mic->endpoint_id = endpoint_id;  // Pass per-seat endpoint target to mic
 
       if (mic->init(sample_rate, frame_size, channels)) {
         return nullptr;
@@ -1159,8 +1197,9 @@ namespace platf {
     int init();
   }
 
-  std::unique_ptr<audio_control_t> audio_control() {
+  std::unique_ptr<audio_control_t> audio_control(const std::string &endpoint_id) {
     auto control = std::make_unique<audio::audio_control_t>();
+    control->endpoint_id = endpoint_id;
 
     if (control->init()) {
       return nullptr;

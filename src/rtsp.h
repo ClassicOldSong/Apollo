@@ -60,6 +60,7 @@ namespace rtsp_stream {
 
   #ifdef _WIN32
     GUID display_guid{};
+    bool seat_owns_vdisplay = false;  ///< If true, the seat will handle virtual display cleanup
   #endif
   };
 

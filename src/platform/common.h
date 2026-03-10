@@ -27,6 +27,12 @@
 #include "src/utility.h"
 #include "src/video_colorspace.h"
 
+// Forward declarations for multi-seat support
+namespace seat {
+  struct seat_t;
+  using seat_ptr = std::shared_ptr<seat_t>;
+}
+
 extern "C" {
 #include <moonlight-common-c/src/Limelight.h>
 }
@@ -583,7 +589,12 @@ namespace platf {
   std::string from_sockaddr(const sockaddr *const);
   std::pair<std::uint16_t, std::string> from_sockaddr_ex(const sockaddr *const);
 
-  std::unique_ptr<audio_control_t> audio_control();
+  /**
+   * @brief Create an audio control instance targeting a specific endpoint.
+   * @param endpoint_id Target audio endpoint (empty = system default for backward compat).
+   * @return Audio control instance, or nullptr on failure.
+   */
+  std::unique_ptr<audio_control_t> audio_control(const std::string &endpoint_id = "");
 
   /**
    * @brief Get the display_t instance for the given hwdevice_type.
@@ -769,9 +780,12 @@ namespace platf {
   /**
    * @brief Allocate a context to store per-client input data.
    * @param input The global input context.
+   * @param seat The seat this input is bound to (nullptr = default/legacy behavior).
+   *             Used to target input to the correct display/desktop in multi-seat mode.
    * @return A unique pointer to a per-client input data context.
    */
-  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input);
+  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input,
+    const seat::seat_ptr &seat = nullptr);
 
   /**
    * @brief Send a touch event to the OS.

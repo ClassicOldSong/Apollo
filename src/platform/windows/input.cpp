@@ -21,6 +21,7 @@
 #include "src/globals.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/seat.h"
 
 #ifdef __MINGW32__
 // DECLARE_HANDLE(HSYNTHETICPOINTERDEVICE);
@@ -661,8 +662,16 @@ namespace platf {
   }
 
   struct client_input_raw_t: public client_input_t {
-    client_input_raw_t(input_t &input) {
+    client_input_raw_t(input_t &input, const seat::seat_ptr &seat) {
       global = (input_raw_t *) input.get();
+
+      // Store the seat's input target display name for coordinate remapping.
+      // In single-seat mode (seat == nullptr or empty display_name), input goes
+      // to the default desktop. In multi-seat mode, input targets the seat's
+      // specific virtual display coordinates.
+      if (seat) {
+        input_target_display = seat->input_target.display_name;
+      }
     }
 
     ~client_input_raw_t() override {
@@ -683,6 +692,12 @@ namespace platf {
 
     input_raw_t *global;
 
+    /// Target display name for input routing in multi-seat mode.
+    /// Empty means use the default desktop (single-seat behavior).
+    /// In Phase 5+, this will be used to remap coordinates to the virtual display's
+    /// position in the Windows virtual desktop space.
+    std::string input_target_display;
+
     // Device state and handles for pen and touch input must be stored in the per-client
     // input context, because each connected client may be sending their own independent
     // pen/touch events. To maintain separation, we expose separate pen and touch devices
@@ -701,10 +716,12 @@ namespace platf {
   /**
    * @brief Allocates a context to store per-client input data.
    * @param input The global input context.
+   * @param seat The seat this input is bound to (nullptr = default/legacy behavior).
    * @return A unique pointer to a per-client input data context.
    */
-  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input) {
-    return std::make_unique<client_input_raw_t>(input);
+  std::unique_ptr<client_input_t> allocate_client_input_context(input_t &input,
+    const seat::seat_ptr &seat) {
+    return std::make_unique<client_input_raw_t>(input, seat);
   }
 
   /**

@@ -9,6 +9,7 @@
 
 // local includes
 #include "platform/common.h"
+#include "seat.h"
 #include "thread_safe.h"
 #include "crypto.h"
 
@@ -23,7 +24,13 @@ namespace input {
 
   bool probe_gamepads();
 
-  std::shared_ptr<input_t> alloc(safe::mail_t mail);
+  /**
+   * @brief Allocate an input context for a session.
+   * @param mail Mailbox for event signaling.
+   * @param seat The seat this input is bound to (nullptr = default/legacy behavior).
+   * @return A shared pointer to the input context.
+   */
+  std::shared_ptr<input_t> alloc(safe::mail_t mail, const seat::seat_ptr &seat = nullptr);
 
   struct touch_port_t: public platf::touch_port_t {
     int env_width, env_height;

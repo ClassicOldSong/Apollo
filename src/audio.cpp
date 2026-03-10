@@ -17,12 +17,15 @@
 #include "thread_safe.h"
 #include "utility.h"
 
+#include <mutex>
+#include <unordered_map>
+
 namespace audio {
   using namespace std::literals;
   using opus_t = util::safe_ptr<OpusMSEncoder, opus_multistream_encoder_destroy>;
   using sample_queue_t = std::shared_ptr<safe::queue_t<std::vector<float>>>;
 
-  static int start_audio_control(audio_ctx_t &ctx);
+  static int start_audio_control(audio_ctx_t &ctx, const std::string &endpoint_id = "");
   static void stop_audio_control(audio_ctx_t &);
   static void apply_surround_params(opus_stream_config_t &stream, const stream_params_t &params);
 
@@ -127,7 +130,8 @@ namespace audio {
     }
   }
 
-  void capture(safe::mail_t mail, config_t config, void *channel_data) {
+  void capture(safe::mail_t mail, config_t config, void *channel_data,
+    const std::string &audio_sink_id) {
     auto shutdown_event = mail->event<bool>(mail::shutdown);
     if (!config::audio.stream || config.input_only) {
       shutdown_event->view();
@@ -138,7 +142,7 @@ namespace audio {
       apply_surround_params(stream, config.customStreamParams);
     }
 
-    auto ref = get_audio_ctx_ref();
+    auto ref = get_audio_ctx_ref(audio_sink_id);
     if (!ref) {
       return;
     }
@@ -250,9 +254,40 @@ namespace audio {
     }
   }
 
-  audio_ctx_ref_t get_audio_ctx_ref() {
-    static auto control_shared {safe::make_shared<audio_ctx_t>(start_audio_control, stop_audio_control)};
-    return control_shared.ref();
+  // Per-endpoint audio context pool.
+  // Each unique audio endpoint gets its own audio context, keyed by endpoint ID.
+  // The existing safe::shared_t lifecycle pattern is preserved: the context
+  // starts when the first session references it and stops when the last drops.
+  static std::mutex audio_contexts_mutex;
+  static std::unordered_map<std::string,
+    std::unique_ptr<safe::shared_t<audio_ctx_t>>> audio_contexts;
+
+  audio_ctx_ref_t get_audio_ctx_ref(const std::string &endpoint_id) {
+    std::lock_guard lock(audio_contexts_mutex);
+
+    auto key = endpoint_id.empty() ? std::string("__default__") : endpoint_id;
+    auto it = audio_contexts.find(key);
+    if (it != audio_contexts.end()) {
+      return it->second->ref();
+    }
+
+    // Create a new audio context for this endpoint.
+    // The start callback captures the endpoint_id so the platform audio_control
+    // can target the specific endpoint.
+    auto eid = endpoint_id;  // copy for lambda capture
+    auto ptr = std::make_unique<safe::shared_t<audio_ctx_t>>(
+      [eid](audio_ctx_t &ctx) -> int {
+        return start_audio_control(ctx, eid);
+      },
+      stop_audio_control
+    );
+
+    auto ref = ptr->ref();
+    audio_contexts.emplace(key, std::move(ptr));
+
+    BOOST_LOG(info) << "Audio context created for endpoint: "sv
+                    << (eid.empty() ? "(system default)"sv : std::string_view(eid));
+    return ref;
   }
 
   bool is_audio_ctx_sink_available(const audio_ctx_t &ctx) {
@@ -281,7 +316,7 @@ namespace audio {
     return STEREO;
   }
 
-  int start_audio_control(audio_ctx_t &ctx) {
+  int start_audio_control(audio_ctx_t &ctx, const std::string &endpoint_id) {
     auto fg = util::fail_guard([]() {
       BOOST_LOG(warning) << "There will be no audio"sv;
     });
@@ -291,7 +326,7 @@ namespace audio {
     // The default sink has not been replaced yet.
     ctx.restore_sink = false;
 
-    if (!(ctx.control = platf::audio_control())) {
+    if (!(ctx.control = platf::audio_control(endpoint_id))) {
       return 0;
     }
 
