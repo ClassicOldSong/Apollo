@@ -7,6 +7,7 @@
 #include <bitset>
 #include <list>
 #include <thread>
+#include <unordered_map>
 
 // lib includes
 #include <boost/pointer_cast.hpp>
@@ -468,6 +469,8 @@ namespace video {
     safe::signal_t reinit_event;
     const encoder_t *encoder_p;
     sync_util::sync_t<std::weak_ptr<platf::display_t>> display_wp;
+
+    std::string display_name;  ///< Per-seat display target (empty = use config default)
   };
 
   struct capture_thread_sync_ctx_t {
@@ -479,8 +482,47 @@ namespace video {
   int start_capture_async(capture_thread_async_ctx_t &ctx);
   void end_capture_async(capture_thread_async_ctx_t &ctx);
 
-  // Keep a reference counter to ensure the capture thread only runs when other threads have a reference to the capture thread
-  auto capture_thread_async = safe::make_shared<capture_thread_async_ctx_t>(start_capture_async, end_capture_async);
+  // Per-display async capture thread pool.
+  // Each unique display target gets its own capture thread, keyed by display name.
+  // The existing safe::shared_t lifecycle pattern is preserved: the capture thread
+  // starts when the first session references it and stops when the last session drops.
+  static std::mutex capture_threads_mutex;
+  static std::unordered_map<std::string, std::unique_ptr<safe::shared_t<capture_thread_async_ctx_t>>> capture_threads;
+
+  /**
+   * @brief Get or create an async capture thread for the given display target.
+   * @param display_name The display to capture from (empty = config default).
+   * @return Reference to the shared_t managing the capture thread lifecycle.
+   */
+  static safe::shared_t<capture_thread_async_ctx_t> &
+  get_capture_thread_for_display(const std::string &display_name) {
+    std::lock_guard lock(capture_threads_mutex);
+
+    auto key = display_name.empty() ? std::string("__default__") : display_name;
+    auto it = capture_threads.find(key);
+    if (it != capture_threads.end()) {
+      return *it->second;
+    }
+
+    // Create a new capture thread container for this display.
+    // The lambda captures the display_name and stores it in the context
+    // before starting the capture thread.
+    auto dn = display_name;  // copy for lambda capture
+    auto ptr = std::unique_ptr<safe::shared_t<capture_thread_async_ctx_t>>(
+      new safe::shared_t<capture_thread_async_ctx_t>(
+        [dn](capture_thread_async_ctx_t &ctx) -> int {
+          ctx.display_name = dn;
+          return start_capture_async(ctx);
+        },
+        end_capture_async
+      )
+    );
+
+    auto [inserted_it, _] = capture_threads.emplace(key, std::move(ptr));
+    return *inserted_it->second;
+  }
+
+  // Keep a reference counter to ensure the sync capture thread only runs when other threads have a reference
   auto capture_thread_sync = safe::make_shared<capture_thread_sync_ctx_t>(start_capture_sync, end_capture_sync);
 
 #ifdef _WIN32
@@ -1081,10 +1123,16 @@ namespace video {
    * @param dev_type The encoder device type used for display lookup.
    * @param display_names The list of display names to repopulate.
    * @param current_display_index The current display index or -1 if not yet known.
+   * @param preferred_display_name Name of a previously active display to try to stay on.
+   * @param output_name_override Per-seat display target override. When non-empty, replaces
+   *   config::video.output_name as the fallback display for this capture thread.
    */
-  void refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index, std::string &preferred_display_name) {
-    // It is possible that the output name may be empty even if it wasn't before (device disconnected) or vice-versa
-    const auto output_name { display_device::map_output_name(config::video.output_name) };
+  void refresh_displays(platf::mem_type_e dev_type, std::vector<std::string> &display_names, int &current_display_index,
+    std::string &preferred_display_name, const std::string &output_name_override = "") {
+    // Use the per-seat display target if provided, otherwise fall back to the global config
+    const auto output_name { display_device::map_output_name(
+      output_name_override.empty() ? config::video.output_name : output_name_override
+    ) };
     std::string current_display_name = preferred_display_name;
 
     // If we have a current display index, let's start with that
@@ -1109,7 +1157,9 @@ namespace video {
     current_display_index = 0;
 
     if (current_display_name.empty()) {
-      current_display_name = display_device::map_output_name(config::video.output_name);
+      current_display_name = display_device::map_output_name(
+        output_name_override.empty() ? config::video.output_name : output_name_override
+      );
     }
 
     // If we had a name previously, let's try to find it in the new list
@@ -1142,7 +1192,8 @@ namespace video {
     std::shared_ptr<safe::queue_t<capture_ctx_t>> capture_ctx_queue,
     sync_util::sync_t<std::weak_ptr<platf::display_t>> &display_wp,
     safe::signal_t &reinit_event,
-    const encoder_t &encoder
+    const encoder_t &encoder,
+    const std::string &seat_display_name  ///< Per-seat display target (empty = use config default)
   ) {
     std::vector<capture_ctx_t> capture_ctxs;
 
@@ -1167,19 +1218,27 @@ namespace video {
     }
     capture_ctxs.emplace_back(std::move(*initial_capture_ctx));
 
+    // Use per-seat display target if provided, otherwise fall back to proc display name
+    const auto &initial_display = seat_display_name.empty() ? proc::proc.display_name : seat_display_name;
+    // Tracks the preferred display for this capture thread across reinits
+    std::string preferred_display;
+
     std::vector<std::string> display_names;
     int display_p = -1;
     std::shared_ptr<platf::display_t> disp;
-    if (!proc::proc.display_name.empty()) {
-      disp = platf::display(encoder.platform_formats->dev_type, proc::proc.display_name, capture_ctxs.front().config);
+    if (!initial_display.empty()) {
+      disp = platf::display(encoder.platform_formats->dev_type, initial_display, capture_ctxs.front().config);
     }
     if (!disp) {
       // Get all the monitor names now, rather than at boot, to
       // get the most up-to-date list available monitors
-      refresh_displays(encoder.platform_formats->dev_type, display_names, display_p);
+      refresh_displays(encoder.platform_formats->dev_type, display_names, display_p, preferred_display, seat_display_name);
       disp = platf::display(encoder.platform_formats->dev_type, display_names[display_p], capture_ctxs.front().config);
       if (disp) {
-        proc::proc.display_name = display_names[display_p];
+        // Only update the global proc display name in single-seat mode (empty seat_display_name)
+        if (seat_display_name.empty()) {
+          proc::proc.display_name = display_names[display_p];
+        }
       } else {
         return;
       }
@@ -1368,8 +1427,11 @@ namespace video {
               // only support a single display session per device/application.
               disp.reset();
 
+              // Use per-seat display as preferred, falling back to proc display name in single-seat mode
+              auto &reinit_preferred = seat_display_name.empty() ? proc::proc.display_name : preferred_display;
+
               // Refresh display names since a display removal might have caused the reinitialization
-              refresh_displays(encoder.platform_formats->dev_type, display_names, display_p, proc::proc.display_name);
+              refresh_displays(encoder.platform_formats->dev_type, display_names, display_p, reinit_preferred, seat_display_name);
 
               // Process any pending display switch with the new list of displays
               if (switch_display_event->peek()) {
@@ -1379,7 +1441,11 @@ namespace video {
               // reset_display() will sleep between retries
               reset_display(disp, encoder.platform_formats->dev_type, display_names[display_p], capture_ctxs.front().config);
               if (disp) {
-                proc::proc.display_name = display_names[display_p];
+                // Only update the global proc display name in single-seat mode
+                if (seat_display_name.empty()) {
+                  proc::proc.display_name = display_names[display_p];
+                }
+                preferred_display = display_names[display_p];
                 break;
               }
             }
@@ -2354,7 +2420,8 @@ namespace video {
   void capture_async(
     safe::mail_t mail,
     config_t &config,
-    void *channel_data
+    void *channel_data,
+    const std::string &display_name = ""
   ) {
     auto shutdown_event = mail->event<bool>(mail::shutdown);
 
@@ -2364,7 +2431,7 @@ namespace video {
       shutdown_event->raise(true);
     });
 
-    auto ref = capture_thread_async.ref();
+    auto ref = get_capture_thread_for_display(display_name).ref();
     if (!ref) {
       return;
     }
@@ -2438,13 +2505,14 @@ namespace video {
   void capture(
     safe::mail_t mail,
     config_t config,
-    void *channel_data
+    void *channel_data,
+    const std::string &display_name
   ) {
     auto idr_events = mail->event<bool>(mail::idr);
 
     idr_events->raise(true);
     if (chosen_encoder->flags & PARALLEL_ENCODING) {
-      capture_async(std::move(mail), config, channel_data);
+      capture_async(std::move(mail), config, channel_data, display_name);
     } else {
       safe::signal_t join_event;
       auto ref = capture_thread_sync.ref();
@@ -2990,7 +3058,8 @@ namespace video {
       capture_thread_ctx.capture_ctx_queue,
       std::ref(capture_thread_ctx.display_wp),
       std::ref(capture_thread_ctx.reinit_event),
-      std::ref(*capture_thread_ctx.encoder_p)
+      std::ref(*capture_thread_ctx.encoder_p),
+      capture_thread_ctx.display_name  // Per-seat display target
     };
 
     return 0;
