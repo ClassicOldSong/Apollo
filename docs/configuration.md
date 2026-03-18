@@ -825,6 +825,62 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### mic_backend
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Select how Apollo exposes redirected client microphone audio on Windows.
+            In this fork, Windows microphone redirection is standardized on the `vb_cable` backend.
+            Apollo renders decoded client microphone audio into the VB-CABLE playback endpoint, and host applications
+            should select the paired `CABLE Output` recording device.
+            @note{This option is currently only used on Windows hosts.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            vb_cable
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            mic_backend = vb_cable
+            @endcode</td>
+    </tr>
+</table>
+
+### mic_device
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            The host-side device used for redirected client microphone audio.
+            On Windows, Apollo currently auto-detects the VB-CABLE render endpoint and this value is typically left unset.
+            On Linux and macOS this should point at the virtual device Apollo writes into.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">Unset.</td>
+    </tr>
+    <tr>
+        <td>Example (Windows)</td>
+        <td colspan="2">@code{}
+            mic_device = CABLE Input (VB-Audio Virtual Cable)
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example (Linux)</td>
+        <td colspan="2">@code{}
+            mic_device = sunshine-mic
+            @endcode</td>
+    </tr>
+</table>
+
 ### stream_audio
 
 <table>
@@ -844,6 +900,29 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Example</td>
         <td colspan="2">@code{}
             stream_audio = disabled
+            @endcode</td>
+    </tr>
+</table>
+
+### stream_mic
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Whether Apollo should accept redirected client microphone audio and inject it into a host-side microphone backend.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            stream_mic = enabled
             @endcode</td>
     </tr>
 </table>

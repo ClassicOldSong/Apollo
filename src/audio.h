@@ -9,7 +9,11 @@
 #include "thread_safe.h"
 #include "utility.h"
 
+#include <cstddef>
 #include <bitset>
+#include <cstdint>
+#include <string>
+#include <vector>
 
 namespace audio {
   enum stream_config_e : int {
@@ -77,6 +81,38 @@ namespace audio {
   using packet_t = std::pair<void *, buffer_t>;
   using audio_ctx_ref_t = safe::shared_t<audio_ctx_t>::ptr_t;
 
+  struct mic_debug_snapshot_t {
+    bool session_active {};
+    bool mic_requested {};
+    bool encryption_enabled {};
+    bool backend_initialized {};
+    bool first_packet_received {};
+    bool decode_active {};
+    bool render_active {};
+    bool signal_detected {};
+    std::uint64_t packets_received {};
+    std::uint64_t packets_decoded {};
+    std::uint64_t packets_rendered {};
+    std::uint64_t packets_dropped {};
+    std::uint64_t decrypt_errors {};
+    std::uint64_t decode_errors {};
+    std::uint64_t render_errors {};
+    std::uint64_t silent_packets {};
+    std::uint16_t last_sequence_number {};
+    std::size_t last_payload_size {};
+    double last_input_level {};
+    double last_render_level {};
+    std::int64_t last_packet_age_ms {-1};
+    std::int64_t last_decode_age_ms {-1};
+    std::int64_t last_render_age_ms {-1};
+    std::string client_name;
+    std::string backend_name;
+    std::string target_device_name;
+    std::string state;
+    std::string last_error;
+    std::vector<std::string> recent_events;
+  };
+
   void capture(safe::mail_t mail, config_t config, void *channel_data);
 
   /**
@@ -106,4 +142,20 @@ namespace audio {
    * @examples_end
    */
   bool is_audio_ctx_sink_available(const audio_ctx_t &ctx);
+  int init_mic_redirect_device();
+  void release_mic_redirect_device();
+  int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number);
+  mic_debug_snapshot_t get_mic_debug_snapshot();
+  void mic_debug_on_session_start(const std::string &client_name, bool encryption_enabled);
+  void mic_debug_on_session_stop(const std::string &reason = {});
+  void mic_debug_on_backend_initialized(const std::string &backend_name);
+  void mic_debug_on_backend_target(const std::string &target_device_name, int channels, std::uint32_t sample_rate);
+  void mic_debug_on_backend_error(const std::string &message);
+  void mic_debug_on_packet_received(std::uint16_t sequence_number, std::size_t payload_len);
+  void mic_debug_on_packet_decrypt_error(std::uint16_t sequence_number, const std::string &message);
+  void mic_debug_on_packet_dropped(std::uint16_t sequence_number, const std::string &message);
+  void mic_debug_on_packet_decoded(std::uint16_t sequence_number, double normalized_level, bool silent);
+  void mic_debug_on_packet_rendered(std::uint16_t sequence_number, double normalized_level, bool silent);
+  void mic_debug_on_decode_error(std::uint16_t sequence_number, const std::string &message);
+  void mic_debug_on_render_error(std::uint16_t sequence_number, const std::string &message);
 }  // namespace audio

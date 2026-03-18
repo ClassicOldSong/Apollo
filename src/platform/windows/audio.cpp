@@ -6,6 +6,7 @@
 
 // standard includes
 #include <format>
+#include <vector>
 
 // platform includes
 #include <Audioclient.h>
@@ -16,6 +17,8 @@
 #include <synchapi.h>
 
 // local includes
+#include "apollo_vmic.h"
+#include "mic_write.h"
 #include "misc.h"
 #include "src/config.h"
 #include "src/logging.h"
@@ -196,6 +199,22 @@ namespace {
     }
 
     return result;
+  }
+
+  std::string normalize_mic_backend_name(const std::string &backend_name) {
+    if (backend_name.empty() || backend_name == "vb_cable") {
+      return "vb_cable";
+    }
+
+    if (backend_name == "auto" || backend_name == "legacy_device" || backend_name == "apollo_virtual_mic" || backend_name == "steam_streaming_microphone") {
+      BOOST_LOG(warning) << "Windows microphone backend ["sv << backend_name
+                         << "] is no longer supported in Apollo Mic. Using VB-CABLE instead.";
+      return "vb_cable";
+    }
+
+    BOOST_LOG(warning) << "Unknown microphone backend ["sv << backend_name
+                       << "], using VB-CABLE";
+    return "vb_cable";
   }
 
 }  // namespace
@@ -782,6 +801,43 @@ namespace platf::audio {
       return mic;
     }
 
+    int init_mic_redirect_device() override {
+      if (mic_redirect_device) {
+        return 0;
+      }
+
+      config::audio.mic_backend = normalize_mic_backend_name(config::audio.mic_backend);
+
+      auto device = std::make_unique<apollo_vmic_t>();
+      if (device->init() == 0) {
+        active_mic_backend = std::string {device->backend_id()};
+        BOOST_LOG(info) << "Client microphone redirection backend: " << active_mic_backend;
+        mic_redirect_device = std::move(device);
+        return 0;
+      }
+
+      BOOST_LOG(warning) << "Client microphone redirection is unavailable because VB-CABLE is not installed or not accessible. "
+                         << "Re-run the Apollo installer to let it install VB-CABLE automatically, or install it from www.vb-cable.com, "
+                         << "then use \"CABLE Output\" as the host microphone in your applications.";
+      active_mic_backend.clear();
+      return -1;
+    }
+
+    void release_mic_redirect_device() override {
+      mic_redirect_device.reset();
+      active_mic_backend.clear();
+    }
+
+    int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number) override {
+      if (!mic_redirect_device) {
+        BOOST_LOG(warning) << "Client microphone packet rejected before decode because no Windows microphone redirect device is active"
+                           << " [seq=" << sequence_number << ", len=" << len << ']';
+        return -1;
+      }
+
+      return mic_redirect_device->write_data(data, len, sequence_number);
+    }
+
     /**
      * If the requested sink is a virtual sink, meaning no speakers attached to
      * the host, then we can seamlessly set the format to stereo and surround sound.
@@ -1041,11 +1097,7 @@ namespace platf::audio {
       BOOST_LOG(info) << "Successfully reset default audio device"sv;
     }
 
-    /**
-     * @brief Installs the Steam Streaming Speakers driver, if present.
-     * @return `true` if installation was successful.
-     */
-    bool install_steam_audio_drivers() {
+    bool install_driver_from_local_steam_inf(const wchar_t *driver_path_template, std::wstring_view driver_name, bool restore_default_output_device) {
 #ifdef STEAM_DRIVER_SUBDIR
       // MinGW's libnewdev.a is missing DiInstallDriverW() even though the headers have it,
       // so we have to load it at runtime. It's Vista or later, so it will always be available.
@@ -1064,22 +1116,23 @@ namespace platf::audio {
         return false;
       }
 
-      // Get the current default audio device (if present)
-      auto old_default_dev = default_device(device_enum);
+      audio::device_t old_default_dev;
+      if (restore_default_output_device) {
+        old_default_dev = default_device(device_enum);
+      }
 
-      // Install the Steam Streaming Speakers driver
       WCHAR driver_path[MAX_PATH] = {};
-      ExpandEnvironmentStringsW(STEAM_AUDIO_DRIVER_PATH, driver_path, ARRAYSIZE(driver_path));
+      ExpandEnvironmentStringsW(driver_path_template, driver_path, ARRAYSIZE(driver_path));
       if (fn_DiInstallDriverW(nullptr, driver_path, 0, nullptr)) {
-        BOOST_LOG(info) << "Successfully installed Steam Streaming Speakers"sv;
+        BOOST_LOG(info) << "Successfully installed "sv << driver_name;
 
         // Wait for 5 seconds to allow the audio subsystem to reconfigure things before
         // modifying the default audio device or enumerating devices again.
         Sleep(5000);
 
-        // If there was a previous default device, restore that original device as the
-        // default output device just in case installing the new one changed it.
-        if (old_default_dev) {
+        if (restore_default_output_device && old_default_dev) {
+          // If there was a previous default device, restore that original device as the
+          // default output device just in case installing the new one changed it.
           audio::wstring_t old_default_id;
           old_default_dev->GetId(&old_default_id);
 
@@ -1093,23 +1146,31 @@ namespace platf::audio {
         auto err = GetLastError();
         switch (err) {
           case ERROR_ACCESS_DENIED:
-            BOOST_LOG(warning) << "Administrator privileges are required to install Steam Streaming Speakers"sv;
+            BOOST_LOG(warning) << "Administrator privileges are required to install "sv << driver_name;
             break;
           case ERROR_FILE_NOT_FOUND:
           case ERROR_PATH_NOT_FOUND:
-            BOOST_LOG(info) << "Steam audio drivers not found. This is expected if you don't have Steam installed."sv;
+            BOOST_LOG(info) << "Steam audio drivers not found locally. Install Steam on the host to use "sv << driver_name << '.';
             break;
           default:
-            BOOST_LOG(warning) << "Failed to install Steam audio drivers: "sv << err;
+            BOOST_LOG(warning) << "Failed to install "sv << driver_name << ": "sv << err;
             break;
         }
 
         return false;
       }
 #else
-      BOOST_LOG(warning) << "Unable to install Steam Streaming Speakers on unknown architecture"sv;
+      BOOST_LOG(warning) << "Unable to install "sv << driver_name << " on unknown architecture"sv;
       return false;
 #endif
+    }
+
+    /**
+     * @brief Installs the Steam Streaming Speakers driver, if present.
+     * @return `true` if installation was successful.
+     */
+    bool install_steam_audio_drivers() {
+      return install_driver_from_local_steam_inf(STEAM_AUDIO_DRIVER_PATH, L"Steam Streaming Speakers", true);
     }
 
     int init() {
@@ -1149,6 +1210,8 @@ namespace platf::audio {
     policy_t policy;
     audio::device_enum_t device_enum;
     std::string assigned_sink;
+    std::string active_mic_backend;
+    std::unique_ptr<mic_redirect_backend_t> mic_redirect_device;
   };
 }  // namespace platf::audio
 

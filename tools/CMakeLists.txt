@@ -21,6 +21,20 @@ target_link_libraries(audio-info
         ${PLATFORM_LIBRARIES})
 target_compile_options(audio-info PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
 
+add_executable(apollovmicctl apollovmicctl.cpp)
+set_target_properties(apollovmicctl PROPERTIES CXX_STANDARD 23)
+target_link_libraries(apollovmicctl
+        ${CMAKE_THREAD_LIBS_INIT}
+        cfgmgr32
+        newdev
+        setupapi
+        ${PLATFORM_LIBRARIES})
+target_compile_options(apollovmicctl PRIVATE ${SUNSHINE_COMPILE_OPTIONS})
+if(MINGW)
+    target_compile_options(apollovmicctl PRIVATE -municode)
+    target_link_options(apollovmicctl PRIVATE -municode)
+endif()
+
 add_executable(sunshinesvc sunshinesvc.cpp)
 set_target_properties(sunshinesvc PROPERTIES CXX_STANDARD 23)
 target_link_libraries(sunshinesvc

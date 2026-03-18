@@ -7,6 +7,7 @@ Major features:
 - [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
 - [x] Permission management for clients
 - [x] Clipboard sync
+- [x] Windows remote microphone redirection through VB-CABLE with host-side debug visibility
 - [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
 - [x] Input only mode
 
@@ -34,6 +35,14 @@ Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Permission-Sy
 Apollo uses SudoVDA for virtual display. It features auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you do not see a new virtual display added or removed when the stream starts or stops, there may be a driver misconfiguration, or another persistent virtual display might still be active.**
 
 The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
+
+## About Remote Microphone Redirection
+
+This fork adds a working Windows remote microphone path for compatible Moonlight/Artemis clients.
+
+Apollo accepts the client's Opus microphone packets, decodes them on the host, and renders the audio into the VB-CABLE playback endpoint `CABLE Input`. Host applications should then select `CABLE Output` as their microphone source.
+
+Setup and implementation notes are documented in [docs/remote_microphone.md](docs/remote_microphone.md).
 
 ## Configuration for dual GPU laptops
 

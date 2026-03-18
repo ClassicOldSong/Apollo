@@ -3,7 +3,8 @@
 #
 include_guard(GLOBAL)
 
-set(BOOST_VERSION "1.89.0")
+set(BOOST_MIN_VERSION "1.89.0")
+set(BOOST_FETCH_VERSION "1.89.0")
 set(BOOST_COMPONENTS
         filesystem
         locale
@@ -30,9 +31,9 @@ endif()
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     cmake_policy(SET CMP0167 NEW)  # Get BoostConfig.cmake from upstream
 endif()
-find_package(Boost CONFIG ${BOOST_VERSION} EXACT COMPONENTS ${BOOST_COMPONENTS})
+find_package(Boost CONFIG ${BOOST_MIN_VERSION} COMPONENTS ${BOOST_COMPONENTS})
 if(NOT Boost_FOUND)
-    message(STATUS "Boost v${BOOST_VERSION} package not found in the system. Falling back to FetchContent.")
+    message(STATUS "Boost v${BOOST_MIN_VERSION}+ package not found in the system. Falling back to FetchContent.")
     include(FetchContent)
 
     if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
@@ -54,8 +55,8 @@ if(NOT Boost_FOUND)
 
     # Limit boost to the required libraries only
     set(BOOST_INCLUDE_LIBRARIES ${BOOST_COMPONENTS})
-    set(BOOST_URL "https://github.com/boostorg/boost/releases/download/boost-${BOOST_VERSION}/boost-${BOOST_VERSION}-cmake.tar.xz")  # cmake-lint: disable=C0301
-    set(BOOST_HASH "SHA256=f48b48390380cfb94a629872346e3a81370dc498896f16019ade727ab72eb1ec")
+    set(BOOST_URL "https://github.com/boostorg/boost/releases/download/boost-${BOOST_FETCH_VERSION}/boost-${BOOST_FETCH_VERSION}-cmake.tar.xz")  # cmake-lint: disable=C0301
+    set(BOOST_HASH "SHA256=67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74")
 
     if(CMAKE_VERSION VERSION_LESS "3.24.0")
         FetchContent_Declare(

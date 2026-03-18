@@ -14,6 +14,9 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         nsExec::ExecToLog 'icacls \\\"$INSTDIR\\\" /reset'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\update-path.bat\\\" add'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\install.bat\\\"'
+        IfSilent +3 0
+        MessageBox MB_OK|MB_ICONINFORMATION \\\"Apollo uses VB-CABLE for Windows microphone passthrough. Origin: www.vb-cable.com. VB-CABLE is a donationware, all participations are welcome.\\\"
+        nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\vbcable\\\\install.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\migrate-config.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\add-firewall-rule.bat\\\"'
         nsExec::ExecToLog \
@@ -43,6 +46,11 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
             /SD IDNO IDNO NoSudoVDA
             nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\sudovda\\\\uninstall.bat\\\"'; skipped if no
         NoSudoVDA:
+        MessageBox MB_YESNO|MB_ICONQUESTION \
+            'Do you want to remove VB-CABLE used for Apollo microphone passthrough?' \
+            /SD IDNO IDNO NoVBCable
+            nsExec::ExecToLog '\\\"$INSTDIR\\\\drivers\\\\vbcable\\\\uninstall.bat\\\"'; skipped if no
+        NoVBCable:
         MessageBox MB_YESNO|MB_ICONQUESTION \
             'Do you want to remove $INSTDIR (this includes the configuration, cover images, and settings)?' \
             /SD IDNO IDNO NoDelete
