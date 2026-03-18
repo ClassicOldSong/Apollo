@@ -27,7 +27,7 @@ namespace platf::audio {
 
   class mic_write_wasapi_t: public mic_redirect_backend_t {
   public:
-    mic_write_wasapi_t(std::string backend_name = "vb_cable",
+    mic_write_wasapi_t(std::string backend_name = "steam_streaming_microphone",
                        std::vector<std::wstring> autodetect_patterns = {},
                        std::string requested_device_name = {});
     ~mic_write_wasapi_t();
@@ -39,12 +39,13 @@ namespace platf::audio {
 
   private:
     bool initialize_device();
-    bool find_target_device(std::wstring &device_id, std::string &device_name);
+    bool find_target_device(EDataFlow flow, std::wstring &device_id, std::string &device_name);
 
     util::safe_ptr<IMMDeviceEnumerator, release_com<IMMDeviceEnumerator>> device_enum;
     util::safe_ptr<IAudioClient, release_com<IAudioClient>> audio_client;
     IAudioRenderClient *audio_render = nullptr;
     OpusDecoder *opus_decoder = nullptr;
+    std::vector<BYTE> active_format_storage;
     WAVEFORMATEX active_format {};
     UINT32 buffer_frame_count = 0;
     std::string backend_name;

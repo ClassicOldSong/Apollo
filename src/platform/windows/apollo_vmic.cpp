@@ -1,6 +1,6 @@
 /**
  * @file src/platform/windows/apollo_vmic.cpp
- * @brief VB-CABLE backend for Windows host-side mic injection.
+ * @brief Steam Streaming Microphone backend for Windows host-side mic injection.
  */
 #include "apollo_vmic.h"
 
@@ -11,7 +11,7 @@ namespace platf::audio {
   apollo_vmic_t::~apollo_vmic_t() = default;
 
   std::string_view apollo_vmic_t::backend_id() const {
-    return "vb_cable";
+    return "steam_streaming_microphone";
   }
 
   bool apollo_vmic_t::log_missing_driver_once() {
@@ -21,19 +21,19 @@ namespace platf::audio {
 
     missing_driver_logged = true;
     BOOST_LOG(warning)
-      << "VB-CABLE microphone backend is unavailable. Install VB-CABLE and ensure the "
-      << "\"CABLE Input\" playback endpoint is present. Host applications should capture from "
-      << "\"CABLE Output\".";
+      << "Steam Streaming Microphone is unavailable. Install the local Steam audio drivers and ensure the "
+      << "\"Speakers (Steam Streaming Microphone)\" playback endpoint is present. Host applications should capture from "
+      << "\"Microphone (Steam Streaming Microphone)\".";
     return true;
   }
 
   int apollo_vmic_t::init() {
     if (!speaker_backend) {
       speaker_backend = std::make_unique<mic_write_wasapi_t>(
-        "vb_cable",
+        "steam_streaming_microphone",
         std::vector<std::wstring> {
-          L"CABLE Input",
-          L"VB-Audio Virtual Cable",
+          L"Steam Streaming Microphone",
+          L"Speakers (Steam Streaming Microphone)",
         }
       );
     }
@@ -49,7 +49,7 @@ namespace platf::audio {
 
   int apollo_vmic_t::write_data(const char *data, std::size_t len, std::uint16_t sequence_number) {
     if (!speaker_backend) {
-      BOOST_LOG(warning) << "Client microphone packet rejected before decode because the VB-CABLE speaker backend is missing"
+      BOOST_LOG(warning) << "Client microphone packet rejected before decode because the Steam Streaming Microphone backend is missing"
                          << " [seq=" << sequence_number << ", len=" << len << ']';
       log_missing_driver_once();
       return -1;

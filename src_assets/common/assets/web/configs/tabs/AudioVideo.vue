@@ -93,17 +93,17 @@ const micStages = computed(() => {
   }
 
   let renderState = 'idle'
-  let renderDetail = 'VB-Cable rendering has not started.'
+  let renderDetail = 'Steam Streaming Microphone rendering has not started.'
   if (debug.sessionActive) {
     if (debug.renderErrors > 0 && !debug.renderActive) {
       renderState = 'danger'
-      renderDetail = 'Apollo decoded microphone audio, but writing it into VB-Cable failed.'
+      renderDetail = 'Apollo decoded microphone audio, but writing it into Steam Streaming Microphone failed.'
     } else if (debug.renderActive && isFreshAge(debug.lastRenderAgeMs)) {
       renderState = 'success'
-      renderDetail = `Apollo is rendering microphone audio into ${debug.targetDeviceName || 'VB-Cable'} (${debug.lastRenderAgeMs} ms ago).`
+      renderDetail = `Apollo is rendering microphone audio into ${debug.targetDeviceName || 'Steam Streaming Microphone'} (${debug.lastRenderAgeMs} ms ago).`
     } else if (debug.decodeActive) {
       renderState = 'warning'
-      renderDetail = 'Apollo decoded microphone audio, but the VB-Cable render stage has not completed yet.'
+      renderDetail = 'Apollo decoded microphone audio, but the Steam Streaming Microphone render stage has not completed yet.'
     }
   }
 
@@ -126,7 +126,7 @@ const micStages = computed(() => {
     { key: 'capture', label: 'Moonlight capture/send', state: captureState, detail: captureDetail },
     { key: 'packets', label: 'Packets arriving', state: packetState, detail: packetDetail },
     { key: 'decode', label: 'Decoded on host', state: decodeState, detail: decodeDetail },
-    { key: 'render', label: 'Rendered into VB-Cable', state: renderState, detail: renderDetail },
+    { key: 'render', label: 'Rendered into Steam Streaming Microphone', state: renderState, detail: renderDetail },
     { key: 'signal', label: 'Live signal detected', state: signalState, detail: signalDetail },
   ]
 })
@@ -394,6 +394,27 @@ onBeforeUnmount(() => {
             <div class="small text-muted mt-3 mb-1">Target device</div>
             <div>{{ micDebug.targetDeviceName || 'Unavailable' }}</div>
 
+            <div class="small text-muted mt-3 mb-1">Endpoint mix format</div>
+            <div>{{ micDebug.endpointMixFormat || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Render device format</div>
+            <div>{{ micDebug.renderDeviceFormat || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Initialized render format</div>
+            <div>{{ micDebug.renderFormat || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Capture device</div>
+            <div>{{ micDebug.captureDeviceName || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Capture endpoint mix format</div>
+            <div>{{ micDebug.captureEndpointMixFormat || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Capture device format</div>
+            <div>{{ micDebug.captureDeviceFormat || 'Unavailable' }}</div>
+
+            <div class="small text-muted mt-3 mb-1">Channel mapping</div>
+            <div>{{ micDebug.channelMapping || 'Unavailable' }}</div>
+
             <div class="small text-muted mt-3 mb-1">Packet flow</div>
             <div>Received: {{ micDebug.packetsReceived }}</div>
             <div>Decoded: {{ micDebug.packetsDecoded }}</div>
@@ -421,6 +442,9 @@ onBeforeUnmount(() => {
             <div>Encryption: {{ micDebug.encryptionEnabled ? 'Enabled' : 'Disabled' }}</div>
             <div>First packet received: {{ micDebug.firstPacketReceived ? 'Yes' : 'No' }}</div>
             <div>Decode active: {{ micDebug.decodeActive ? 'Yes' : 'No' }}</div>
+            <div>Resampling active: {{ micDebug.resamplingActive ? 'Yes' : 'No' }}</div>
+            <div>Recommended format active: {{ micDebug.recommendedFormatActive ? 'Yes' : 'No' }}</div>
+            <div>Recommended format enforced: {{ micDebug.recommendedFormatEnforced ? 'Yes' : 'No' }}</div>
             <div>Last packet age: {{ micDebug.lastPacketAgeMs >= 0 ? `${micDebug.lastPacketAgeMs} ms` : 'N/A' }}</div>
             <div>Last decode age: {{ micDebug.lastDecodeAgeMs >= 0 ? `${micDebug.lastDecodeAgeMs} ms` : 'N/A' }}</div>
             <div>Last render age: {{ micDebug.lastRenderAgeMs >= 0 ? `${micDebug.lastRenderAgeMs} ms` : 'N/A' }}</div>

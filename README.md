@@ -7,7 +7,7 @@ Major features:
 - [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
 - [x] Permission management for clients
 - [x] Clipboard sync
-- [x] Windows remote microphone redirection through VB-CABLE with host-side debug visibility
+- [x] Windows remote microphone redirection through Steam Streaming Microphone with host-side debug visibility
 - [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
 - [x] Input only mode
 
@@ -40,7 +40,7 @@ The virtual display works just like any physically attached monitors with SudoVD
 
 This fork adds a working Windows remote microphone path for compatible Moonlight/Artemis clients.
 
-Apollo accepts the client's Opus microphone packets, decodes them on the host, and renders the audio into the VB-CABLE playback endpoint `CABLE Input`. Host applications should then select `CABLE Output` as their microphone source.
+Apollo accepts the client's Opus microphone packets, decodes them on the host, and renders the audio into the Steam playback endpoint `Speakers (Steam Streaming Microphone)`. Host applications should then select `Microphone (Steam Streaming Microphone)` as their microphone source.
 
 Setup and implementation notes are documented in [docs/remote_microphone.md](docs/remote_microphone.md).
 

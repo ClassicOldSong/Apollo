@@ -108,8 +108,18 @@ namespace audio {
     std::string client_name;
     std::string backend_name;
     std::string target_device_name;
+    std::string endpoint_mix_format;
+    std::string render_device_format;
+    std::string render_format;
+    std::string capture_device_name;
+    std::string capture_endpoint_mix_format;
+    std::string capture_device_format;
+    std::string channel_mapping;
     std::string state;
     std::string last_error;
+    bool resampling_active {};
+    bool recommended_format_enforced {};
+    bool recommended_format_active {};
     std::vector<std::string> recent_events;
   };
 
@@ -150,6 +160,13 @@ namespace audio {
   void mic_debug_on_session_stop(const std::string &reason = {});
   void mic_debug_on_backend_initialized(const std::string &backend_name);
   void mic_debug_on_backend_target(const std::string &target_device_name, int channels, std::uint32_t sample_rate);
+  void mic_debug_on_backend_format(const std::string &endpoint_mix_format, const std::string &render_format, bool resampling_active, const std::string &channel_mapping);
+  void mic_debug_on_backend_endpoint_formats(const std::string &render_device_format,
+                                             const std::string &capture_device_name,
+                                             const std::string &capture_endpoint_mix_format,
+                                             const std::string &capture_device_format,
+                                             bool recommended_format_enforced,
+                                             bool recommended_format_active);
   void mic_debug_on_backend_error(const std::string &message);
   void mic_debug_on_packet_received(std::uint16_t sequence_number, std::size_t payload_len);
   void mic_debug_on_packet_decrypt_error(std::uint16_t sequence_number, const std::string &message);

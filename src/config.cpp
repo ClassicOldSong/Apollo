@@ -521,7 +521,7 @@ namespace config {
   audio_t audio {
     {},  // audio_sink
     {},  // virtual_sink
-    "vb_cable",  // mic_backend
+    "steam_streaming_microphone",  // mic_backend
     {},  // mic_device
     true,  // stream audio
     false,  // stream microphone

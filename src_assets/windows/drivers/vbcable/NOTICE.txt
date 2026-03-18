@@ -1,9 +1,0 @@
-VB-CABLE is provided by VB-Audio Software.
-Origin: https://www.vb-cable.com/
-Licensing: https://vb-audio.com/Services/licensing.htm
-
-VB-CABLE is a donationware, all participations are welcome.
-
-Apollo downloads the official VB-CABLE package from VB-Audio during installation
-to enable Windows microphone passthrough. Apollo does not modify the VB-CABLE
-package.

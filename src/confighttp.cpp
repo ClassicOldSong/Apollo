@@ -1073,6 +1073,16 @@ namespace confighttp {
     output_tree["clientName"] = snapshot.client_name;
     output_tree["backendName"] = snapshot.backend_name;
     output_tree["targetDeviceName"] = snapshot.target_device_name;
+    output_tree["endpointMixFormat"] = snapshot.endpoint_mix_format;
+    output_tree["renderDeviceFormat"] = snapshot.render_device_format;
+    output_tree["renderFormat"] = snapshot.render_format;
+    output_tree["captureDeviceName"] = snapshot.capture_device_name;
+    output_tree["captureEndpointMixFormat"] = snapshot.capture_endpoint_mix_format;
+    output_tree["captureDeviceFormat"] = snapshot.capture_device_format;
+    output_tree["resamplingActive"] = snapshot.resampling_active;
+    output_tree["recommendedFormatEnforced"] = snapshot.recommended_format_enforced;
+    output_tree["recommendedFormatActive"] = snapshot.recommended_format_active;
+    output_tree["channelMapping"] = snapshot.channel_mapping;
     output_tree["state"] = snapshot.state;
     output_tree["lastError"] = snapshot.last_error;
     output_tree["recentEvents"] = snapshot.recent_events;

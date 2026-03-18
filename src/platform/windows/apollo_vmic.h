@@ -1,6 +1,6 @@
 /**
  * @file src/platform/windows/apollo_vmic.h
- * @brief VB-CABLE microphone backend definitions.
+ * @brief Steam Streaming Microphone backend definitions.
  */
 #pragma once
 

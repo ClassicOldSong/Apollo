@@ -20,6 +20,7 @@
 #include "apollo_vmic.h"
 #include "mic_write.h"
 #include "misc.h"
+#include "src/audio.h"
 #include "src/config.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
@@ -42,7 +43,8 @@ DEFINE_PROPERTYKEY(PKEY_DeviceInterface_FriendlyName, 0x026e516e, 0xb814, 0x414b
 namespace {
 
   constexpr auto SAMPLE_RATE = 48000;
-  constexpr auto STEAM_AUDIO_DRIVER_PATH = L"%CommonProgramFiles(x86)%\\Steam\\drivers\\Windows10\\" STEAM_DRIVER_SUBDIR L"\\SteamStreamingSpeakers.inf";
+  constexpr auto STEAM_SPEAKERS_DRIVER_PATH = L"%CommonProgramFiles(x86)%\\Steam\\drivers\\Windows10\\" STEAM_DRIVER_SUBDIR L"\\SteamStreamingSpeakers.inf";
+  constexpr auto STEAM_MICROPHONE_DRIVER_PATH = L"%CommonProgramFiles(x86)%\\Steam\\drivers\\Windows10\\" STEAM_DRIVER_SUBDIR L"\\SteamStreamingMicrophone.inf";
 
   constexpr auto waveformat_mask_stereo = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
@@ -201,20 +203,14 @@ namespace {
     return result;
   }
 
-  std::string normalize_mic_backend_name(const std::string &backend_name) {
-    if (backend_name.empty() || backend_name == "vb_cable") {
-      return "vb_cable";
+  std::optional<std::string> normalize_mic_backend_name(const std::string &backend_name) {
+    if (backend_name.empty() || backend_name == "steam_streaming_microphone") {
+      return "steam_streaming_microphone";
     }
 
-    if (backend_name == "auto" || backend_name == "legacy_device" || backend_name == "apollo_virtual_mic" || backend_name == "steam_streaming_microphone") {
-      BOOST_LOG(warning) << "Windows microphone backend ["sv << backend_name
-                         << "] is no longer supported in Apollo Mic. Using VB-CABLE instead.";
-      return "vb_cable";
-    }
-
-    BOOST_LOG(warning) << "Unknown microphone backend ["sv << backend_name
-                       << "], using VB-CABLE";
-    return "vb_cable";
+    BOOST_LOG(error) << "Windows microphone backend ["sv << backend_name
+                     << "] is not supported in Apollo Mic. Use [steam_streaming_microphone].";
+    return std::nullopt;
   }
 
 }  // namespace
@@ -806,19 +802,41 @@ namespace platf::audio {
         return 0;
       }
 
-      config::audio.mic_backend = normalize_mic_backend_name(config::audio.mic_backend);
+      auto normalized_backend = normalize_mic_backend_name(config::audio.mic_backend);
+      if (!normalized_backend) {
+        ::audio::mic_debug_on_backend_error("Unsupported Windows microphone backend [" + config::audio.mic_backend + "]. Use steam_streaming_microphone.");
+        active_mic_backend.clear();
+        return -1;
+      }
 
-      auto device = std::make_unique<apollo_vmic_t>();
-      if (device->init() == 0) {
+      config::audio.mic_backend = *normalized_backend;
+
+      auto try_create_device = [this]() {
+        auto device = std::make_unique<apollo_vmic_t>();
+        if (device->init() != 0) {
+          return false;
+        }
+
         active_mic_backend = std::string {device->backend_id()};
         BOOST_LOG(info) << "Client microphone redirection backend: " << active_mic_backend;
         mic_redirect_device = std::move(device);
+        return true;
+      };
+
+      if (try_create_device()) {
         return 0;
       }
 
-      BOOST_LOG(warning) << "Client microphone redirection is unavailable because VB-CABLE is not installed or not accessible. "
-                         << "Re-run the Apollo installer to let it install VB-CABLE automatically, or install it from www.vb-cable.com, "
-                         << "then use \"CABLE Output\" as the host microphone in your applications.";
+      if (config::audio.install_steam_drivers) {
+        BOOST_LOG(info) << "Attempting to install missing Steam audio drivers for microphone redirection"sv;
+        install_steam_audio_drivers();
+        if (try_create_device()) {
+          return 0;
+        }
+      }
+
+      BOOST_LOG(warning) << "Client microphone redirection is unavailable because Steam Streaming Microphone is not installed or not accessible. "
+                         << "Install the local Steam audio drivers and use \"Microphone (Steam Streaming Microphone)\" as the host microphone in your applications.";
       active_mic_backend.clear();
       return -1;
     }
@@ -949,6 +967,14 @@ namespace platf::audio {
     audio_control_t::match_fields_list_t match_steam_speakers() {
       return {
         {match_field_e::adapter_friendly_name, L"Steam Streaming Speakers"}
+      };
+    }
+
+    audio_control_t::match_fields_list_t match_steam_microphone() {
+      return {
+        {match_field_e::device_friendly_name, L"Speakers (Steam Streaming Microphone)"},
+        {match_field_e::adapter_friendly_name, L"Steam Streaming Microphone"},
+        {match_field_e::device_description, L"Steam Streaming Microphone"},
       };
     }
 
@@ -1165,12 +1191,18 @@ namespace platf::audio {
 #endif
     }
 
-    /**
-     * @brief Installs the Steam Streaming Speakers driver, if present.
-     * @return `true` if installation was successful.
-     */
     bool install_steam_audio_drivers() {
-      return install_driver_from_local_steam_inf(STEAM_AUDIO_DRIVER_PATH, L"Steam Streaming Speakers", true);
+      bool ok = true;
+
+      if (!find_device_id(match_steam_speakers())) {
+        ok = install_driver_from_local_steam_inf(STEAM_SPEAKERS_DRIVER_PATH, L"Steam Streaming Speakers", true) && ok;
+      }
+
+      if (!find_device_id(match_steam_microphone())) {
+        ok = install_driver_from_local_steam_inf(STEAM_MICROPHONE_DRIVER_PATH, L"Steam Streaming Microphone", false) && ok;
+      }
+
+      return ok;
     }
 
     int init() {
@@ -1229,9 +1261,11 @@ namespace platf {
       return nullptr;
     }
 
-    // Install Steam Streaming Speakers if needed. We do this during audio_control() to ensure
-    // the sink information returned includes the new Steam Streaming Speakers device.
-    if (config::audio.install_steam_drivers && !control->find_device_id(control->match_steam_speakers())) {
+    // Install Steam Streaming audio drivers if needed. We do this during audio_control() to ensure
+    // the sink information returned includes the new Steam endpoints before any later enumeration.
+    if (config::audio.install_steam_drivers &&
+        (!control->find_device_id(control->match_steam_speakers()) ||
+         !control->find_device_id(control->match_steam_microphone()))) {
       // This is best effort. Don't fail if it doesn't work.
       control->install_steam_audio_drivers();
     }
