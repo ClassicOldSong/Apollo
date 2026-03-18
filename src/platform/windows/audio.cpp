@@ -846,14 +846,14 @@ namespace platf::audio {
       active_mic_backend.clear();
     }
 
-    int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number) override {
+    int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) override {
       if (!mic_redirect_device) {
         BOOST_LOG(warning) << "Client microphone packet rejected before decode because no Windows microphone redirect device is active"
-                           << " [seq=" << sequence_number << ", len=" << len << ']';
+                          << " [seq=" << sequence_number << ", ts=" << timestamp << ", len=" << len << ']';
         return -1;
       }
 
-      return mic_redirect_device->write_data(data, len, sequence_number);
+      return mic_redirect_device->write_data(data, len, sequence_number, timestamp);
     }
 
     /**

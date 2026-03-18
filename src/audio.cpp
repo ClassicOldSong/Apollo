@@ -344,17 +344,17 @@ namespace audio {
     ref = {};
   }
 
-  int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number) {
+  int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) {
     auto &held_ref = mic_redirect_audio_ctx();
     auto ref = held_ref ? held_ref : get_audio_ctx_ref();
     if (!ref || !ref->control) {
       BOOST_LOG(warning) << "Client microphone packet rejected before decode because audio control is unavailable"
-                         << " [seq=" << sequence_number << ", len=" << len << ']';
+                         << " [seq=" << sequence_number << ", ts=" << timestamp << ", len=" << len << ']';
       mic_debug_on_packet_dropped(sequence_number, "Audio control is unavailable while writing microphone data");
       return -1;
     }
 
-    return ref->control->write_mic_data(data, len, sequence_number);
+    return ref->control->write_mic_data(data, len, sequence_number, timestamp);
   }
 
   mic_debug_snapshot_t get_mic_debug_snapshot() {

@@ -47,14 +47,14 @@ namespace platf::audio {
     return -1;
   }
 
-  int apollo_vmic_t::write_data(const char *data, std::size_t len, std::uint16_t sequence_number) {
+  int apollo_vmic_t::write_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) {
     if (!speaker_backend) {
       BOOST_LOG(warning) << "Client microphone packet rejected before decode because the Steam Streaming Microphone backend is missing"
-                         << " [seq=" << sequence_number << ", len=" << len << ']';
+                         << " [seq=" << sequence_number << ", ts=" << timestamp << ", len=" << len << ']';
       log_missing_driver_once();
       return -1;
     }
 
-    return speaker_backend->write_data(data, len, sequence_number);
+    return speaker_backend->write_data(data, len, sequence_number, timestamp);
   }
 }  // namespace platf::audio

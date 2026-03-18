@@ -1395,6 +1395,7 @@ namespace stream {
       }
 
       const auto sequence_number = static_cast<std::uint16_t>(header->sequenceNumber);
+      const auto timestamp = static_cast<std::uint32_t>(header->timestamp);
       const auto payload_len = bytes - sizeof(mic_packet_header_t);
       const auto *payload = reinterpret_cast<const std::uint8_t *>(buf.data() + sizeof(mic_packet_header_t));
       audio::mic_debug_on_packet_received(sequence_number, payload_len);
@@ -1422,7 +1423,7 @@ namespace stream {
       }
 
       const auto decoded_payload_len = decrypted_payload.empty() ? payload_len : decrypted_payload.size();
-      if (audio::write_mic_data(reinterpret_cast<const char *>(payload), decoded_payload_len, sequence_number) < 0) {
+      if (audio::write_mic_data(reinterpret_cast<const char *>(payload), decoded_payload_len, sequence_number, timestamp) < 0) {
         BOOST_LOG(debug) << "Dropping microphone packet for ["sv << session->device_name << ']';
         audio::mic_debug_on_packet_dropped(sequence_number, "Host microphone render path rejected the packet");
       }

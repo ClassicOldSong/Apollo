@@ -16,6 +16,7 @@
 #include <ksmedia.h>
 #include <mmdeviceapi.h>
 #include <opus/opus.h>
+#include <synchapi.h>
 
 #include "PolicyConfig.h"
 #include "misc.h"
@@ -40,6 +41,12 @@ namespace platf::audio {
 
     constexpr std::uint32_t decoded_sample_rate = 48000;
     constexpr REFERENCE_TIME buffer_duration_100ns = 1000000;
+    constexpr std::uint32_t default_packet_duration_samples = 960;
+    constexpr std::uint32_t max_packet_duration_samples = 5760;
+    constexpr std::size_t max_queued_frames = decoded_sample_rate;
+    constexpr std::size_t max_queued_packets = 64;
+    constexpr std::size_t target_prebuffer_packets = 4;
+    constexpr std::size_t target_prebuffer_frames = default_packet_duration_samples * target_prebuffer_packets;
 
     template<typename T>
     void co_task_free(T *ptr) {
@@ -157,6 +164,14 @@ namespace platf::audio {
       return status == AUDCLNT_E_DEVICE_INVALIDATED ||
              status == AUDCLNT_E_RESOURCES_INVALIDATED ||
              status == AUDCLNT_E_SERVICE_NOT_RUNNING;
+    }
+
+    std::uint16_t sequence_distance(std::uint16_t newer, std::uint16_t older) {
+      return static_cast<std::uint16_t>(newer - older);
+    }
+
+    std::uint32_t timestamp_distance(std::uint32_t newer, std::uint32_t older) {
+      return static_cast<std::uint32_t>(newer - older);
     }
 
     bool recover_device(mic_write_wasapi_t &writer, HRESULT status, const char *operation) {
@@ -457,7 +472,7 @@ namespace platf::audio {
     active_format_storage = make_required_steam_mic_render_waveformat();
     auto *required_render_format = reinterpret_cast<WAVEFORMATEX *>(active_format_storage.data());
 
-    const auto init_status = initialize_shared_audio_client(audio_client.get(), required_render_format, 0);
+    const auto init_status = initialize_shared_audio_client(audio_client.get(), required_render_format, AUDCLNT_STREAMFLAGS_EVENTCALLBACK);
     if (FAILED(init_status)) {
       BOOST_LOG(error) << "Couldn't initialize microphone playback client [" << target_device_name
                        << "] with required format [float32, 32-bit, 48000 Hz, 2ch]: 0x"
@@ -480,6 +495,20 @@ namespace platf::audio {
     if (FAILED(status) || !audio_render) {
       BOOST_LOG(error) << "Couldn't acquire microphone playback render client: 0x" << util::hex(status).to_string_view();
       ::audio::mic_debug_on_backend_error("Could not acquire the microphone playback render client");
+      return false;
+    }
+
+    render_event.reset(CreateEvent(nullptr, FALSE, FALSE, nullptr));
+    if (!render_event) {
+      BOOST_LOG(error) << "Couldn't create microphone playback event handle: 0x" << util::hex(GetLastError()).to_string_view();
+      ::audio::mic_debug_on_backend_error("Could not create the microphone playback event handle");
+      return false;
+    }
+
+    status = audio_client->SetEventHandle(render_event.get());
+    if (FAILED(status)) {
+      BOOST_LOG(error) << "Couldn't set microphone playback event handle: 0x" << util::hex(status).to_string_view();
+      ::audio::mic_debug_on_backend_error("Could not set the microphone playback event handle");
       return false;
     }
 
@@ -520,6 +549,9 @@ namespace platf::audio {
       return false;
     }
 
+    stop_render_thread = false;
+    render_thread = std::thread {[this]() { render_loop(); }};
+
     return true;
   }
 
@@ -548,133 +580,356 @@ namespace platf::audio {
     return 0;
   }
 
-  int mic_write_wasapi_t::write_data(const char *data, std::size_t len, std::uint16_t sequence_number) {
-    if (!audio_client || audio_render == nullptr || opus_decoder == nullptr || data == nullptr || len == 0) {
+  int mic_write_wasapi_t::write_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) {
+    if (!audio_client || audio_render == nullptr || opus_decoder == nullptr || data == nullptr || len == 0 || !render_event) {
       BOOST_LOG(warning) << "Client microphone packet rejected before decode because the WASAPI write path is not ready"
                          << " [seq=" << sequence_number
+                         << ", ts=" << timestamp
                          << ", len=" << len
                          << ", audio_client=" << static_cast<bool>(audio_client)
                          << ", audio_render=" << static_cast<bool>(audio_render != nullptr)
                          << ", opus_decoder=" << static_cast<bool>(opus_decoder != nullptr)
+                         << ", render_event=" << static_cast<bool>(render_event)
                          << ", data=" << static_cast<bool>(data != nullptr) << ']';
       return -1;
     }
-
-    std::vector<float> decoded_pcm(5760);
-    const auto decoded_frames = opus_decode_float(
-      opus_decoder,
-      reinterpret_cast<const unsigned char *>(data),
-      static_cast<opus_int32>(len),
-      decoded_pcm.data(),
-      static_cast<int>(decoded_pcm.size()),
-      0
-    );
-    if (decoded_frames <= 0) {
-      BOOST_LOG(debug) << "Couldn't decode microphone Opus frame";
-      ::audio::mic_debug_on_decode_error(sequence_number, "The host could not decode the incoming Opus microphone frame");
-      return -1;
-    }
-
-    float peak = 0.0f;
-    for (int i = 0; i < decoded_frames; ++i) {
-      const float sample = std::fabs(decoded_pcm[i]);
-      peak = std::max(peak, sample);
-    }
-    const double normalized_level = std::clamp(static_cast<double>(peak), 0.0, 1.0);
-    const bool silent = peak < 0.015625f;
-    ::audio::mic_debug_on_packet_decoded(sequence_number, normalized_level, silent);
 
     if (active_format.nChannels != 2 || active_format.nSamplesPerSec != decoded_sample_rate || active_format.wBitsPerSample != 32) {
       ::audio::mic_debug_on_render_error(sequence_number, "Steam Streaming Microphone is not running at the required 2ch, 32-bit float, 48000 Hz format");
       return -1;
     }
 
-    UINT32 frames_written = 0;
-    int empty_buffer_waits = 0;
-    while (frames_written < static_cast<UINT32>(decoded_frames)) {
+    bool stale_packet = false;
+    bool duplicate_packet = false;
+    bool trimmed_packet_queue = false;
+    {
+      std::lock_guard lock(queue_mutex);
+
+      if (has_playout_cursor) {
+        const auto behind = sequence_distance(expected_sequence_number, sequence_number);
+        if (behind != 0 && behind < 0x8000) {
+          stale_packet = true;
+        }
+      }
+
+      if (!stale_packet) {
+        auto [_, inserted] = pending_packets.emplace(sequence_number, queued_mic_packet_t {
+          std::vector<std::uint8_t> {reinterpret_cast<const std::uint8_t *>(data), reinterpret_cast<const std::uint8_t *>(data) + len},
+          sequence_number,
+          timestamp,
+          std::chrono::steady_clock::now()
+        });
+
+        duplicate_packet = !inserted;
+        if (inserted && pending_packets.size() > max_queued_packets) {
+          pending_packets.erase(pending_packets.begin());
+          trimmed_packet_queue = true;
+        }
+      }
+    }
+
+    if (stale_packet) {
+      ::audio::mic_debug_on_packet_dropped(sequence_number, "Dropped a stale microphone packet that arrived after its playout deadline");
+      return 0;
+    }
+
+    if (duplicate_packet) {
+      ::audio::mic_debug_on_packet_dropped(sequence_number, "Dropped a duplicate microphone packet");
+      return 0;
+    }
+
+    if (trimmed_packet_queue) {
+      BOOST_LOG(debug) << "Trimmed queued microphone packets for [" << target_device_name << "] to keep jitter-buffer latency bounded";
+      ::audio::mic_debug_on_render_error(sequence_number, "Queued microphone packets grew too large, so older packets were dropped to keep latency bounded");
+    }
+
+    SetEvent(render_event.get());
+    return static_cast<int>(len);
+  }
+
+  std::uint32_t mic_write_wasapi_t::infer_packet_duration_samples(std::uint32_t current_timestamp, std::uint32_t next_timestamp) const {
+    const auto delta = timestamp_distance(next_timestamp, current_timestamp);
+    if (delta >= 120 && delta <= max_packet_duration_samples) {
+      return delta;
+    }
+    return default_packet_duration_samples;
+  }
+
+  bool mic_write_wasapi_t::should_conceal_missing_packet_locked() const {
+    if (pending_packets.empty()) {
+      return false;
+    }
+
+    if (pending_packets.find(static_cast<std::uint16_t>(expected_sequence_number + 1)) != pending_packets.end()) {
+      return true;
+    }
+
+    const auto delta = sequence_distance(pending_packets.begin()->first, expected_sequence_number);
+    return delta != 0 && delta < 0x8000;
+  }
+
+  void mic_write_wasapi_t::append_decoded_frames(const float *samples, int decoded_frames, std::uint16_t sequence_number) {
+    if (samples == nullptr || decoded_frames <= 0) {
+      return;
+    }
+
+    float peak = 0.0f;
+    {
+      std::lock_guard lock(queue_mutex);
+      for (int frame = 0; frame < decoded_frames; ++frame) {
+        const float sample = std::clamp(samples[frame], -1.0f, 1.0f);
+        peak = std::max(peak, std::fabs(sample));
+        pending_frames.push_back(sample);
+      }
+
+      if (pending_frames.size() > max_queued_frames) {
+        const auto frames_to_trim = pending_frames.size() - max_queued_frames;
+        pending_frames.erase(pending_frames.begin(), pending_frames.begin() + static_cast<std::ptrdiff_t>(frames_to_trim));
+      }
+    }
+
+    const double normalized_level = std::clamp(static_cast<double>(peak), 0.0, 1.0);
+    const bool silent = peak < 0.015625f;
+    ::audio::mic_debug_on_packet_decoded(sequence_number, normalized_level, silent);
+    ::audio::mic_debug_on_packet_rendered(sequence_number, normalized_level, silent);
+  }
+
+  bool mic_write_wasapi_t::decode_next_packet() {
+    queued_mic_packet_t packet;
+    std::uint16_t packet_sequence = 0;
+    std::uint32_t frame_duration_samples = default_packet_duration_samples;
+    bool decode_fec = false;
+    bool decode_plc = false;
+
+    {
+      std::lock_guard lock(queue_mutex);
+
+      if (!has_playout_cursor) {
+        if (pending_packets.size() < target_prebuffer_packets) {
+          return false;
+        }
+
+        expected_sequence_number = pending_packets.begin()->first;
+        expected_timestamp = pending_packets.begin()->second.timestamp;
+        has_playout_cursor = true;
+      }
+
+      packet_sequence = expected_sequence_number;
+
+      if (auto current = pending_packets.find(expected_sequence_number); current != pending_packets.end()) {
+        if (auto next = std::next(current); next != pending_packets.end()) {
+          frame_duration_samples = infer_packet_duration_samples(current->second.timestamp, next->second.timestamp);
+        }
+
+        packet = std::move(current->second);
+        pending_packets.erase(current);
+      } else if (auto next = pending_packets.find(static_cast<std::uint16_t>(expected_sequence_number + 1)); next != pending_packets.end()) {
+        frame_duration_samples = infer_packet_duration_samples(expected_timestamp, next->second.timestamp);
+        packet = next->second;
+        decode_fec = true;
+      } else if (should_conceal_missing_packet_locked()) {
+        decode_plc = true;
+      } else {
+        return false;
+      }
+    }
+
+    std::vector<float> decoded_pcm(max_packet_duration_samples);
+    int decoded_frames = 0;
+    if (decode_plc) {
+      decoded_frames = opus_decode_float(opus_decoder, nullptr, 0, decoded_pcm.data(), static_cast<int>(frame_duration_samples), 0);
+      BOOST_LOG(debug) << "Applying Opus PLC for missing microphone packet on [" << target_device_name << "] sequence " << packet_sequence;
+    } else if (decode_fec) {
+      decoded_frames = opus_decode_float(
+        opus_decoder,
+        packet.payload.data(),
+        static_cast<opus_int32>(packet.payload.size()),
+        decoded_pcm.data(),
+        static_cast<int>(frame_duration_samples),
+        1
+      );
+      BOOST_LOG(debug) << "Applying Opus FEC for missing microphone packet on [" << target_device_name << "] sequence " << packet_sequence;
+    } else {
+      decoded_frames = opus_decode_float(
+        opus_decoder,
+        packet.payload.data(),
+        static_cast<opus_int32>(packet.payload.size()),
+        decoded_pcm.data(),
+        static_cast<int>(decoded_pcm.size()),
+        0
+      );
+    }
+
+    if (decoded_frames <= 0) {
+      ::audio::mic_debug_on_decode_error(packet_sequence, "The host could not decode a microphone frame from the jitter buffer");
+      std::vector<float> silent_pcm(frame_duration_samples, 0.0f);
+      append_decoded_frames(silent_pcm.data(), static_cast<int>(silent_pcm.size()), packet_sequence);
+      decoded_frames = static_cast<int>(silent_pcm.size());
+    } else {
+      append_decoded_frames(decoded_pcm.data(), decoded_frames, packet_sequence);
+
+      if (!first_packet_written_logged) {
+        first_packet_written_logged = true;
+        BOOST_LOG(info) << "Client microphone audio is being rendered into [" << target_device_name << ']';
+      }
+    }
+
+    {
+      std::lock_guard lock(queue_mutex);
+      expected_sequence_number = static_cast<std::uint16_t>(expected_sequence_number + 1);
+      expected_timestamp += static_cast<std::uint32_t>(decoded_frames);
+    }
+
+    return decoded_frames > 0;
+  }
+
+  void mic_write_wasapi_t::render_loop() {
+    CoInitializeEx(nullptr, COINIT_MULTITHREADED | COINIT_SPEED_OVER_MEMORY);
+    platf::adjust_thread_priority(platf::thread_priority_e::high);
+
+    while (!stop_render_thread) {
+      if (!audio_client || audio_render == nullptr || !render_event) {
+        break;
+      }
+
+      const auto wait_result = WaitForSingleObject(render_event.get(), 20);
+      if (stop_render_thread) {
+        break;
+      }
+      if (wait_result != WAIT_OBJECT_0 && wait_result != WAIT_TIMEOUT) {
+        BOOST_LOG(debug) << "Microphone render wait failed for [" << target_device_name << "]: 0x"
+                         << util::hex(GetLastError()).to_string_view();
+        continue;
+      }
+
       UINT32 padding = 0;
       auto status = audio_client->GetCurrentPadding(&padding);
       if (FAILED(status)) {
-        if (recover_device(*this, status, "querying microphone playback padding")) {
-          return 0;
+        BOOST_LOG(debug) << "Couldn't query microphone playback padding for [" << target_device_name << "]: 0x"
+                         << util::hex(status).to_string_view();
+        if (is_recoverable_device_error(status)) {
+          ::audio::mic_debug_on_backend_error("Steam microphone playback device was invalidated during rendering. Restart the stream.");
+          break;
         }
-        ::audio::mic_debug_on_render_error(sequence_number, "Could not query microphone playback padding");
-        return -1;
+        continue;
       }
 
       if (padding > buffer_frame_count) {
         padding = 0;
       }
 
-      auto frames_available = buffer_frame_count - padding;
+      const auto frames_available = buffer_frame_count - padding;
       if (frames_available == 0) {
-        if (++empty_buffer_waits > 8) {
-          break;
-        }
-        Sleep(5);
         continue;
       }
 
-      const auto frames_to_write = std::min<UINT32>(frames_available, static_cast<UINT32>(decoded_frames) - frames_written);
-      if (frames_to_write == 0) {
-        break;
+      while (true) {
+        std::size_t queued_frames = 0;
+        std::size_t queued_packets = 0;
+        {
+          std::lock_guard lock(queue_mutex);
+          queued_frames = pending_frames.size();
+          queued_packets = pending_packets.size();
+        }
+
+        if (queued_frames >= target_prebuffer_frames || queued_packets == 0) {
+          break;
+        }
+
+        if (!decode_next_packet()) {
+          break;
+        }
+      }
+
+      UINT32 queued_frames = 0;
+      std::size_t queued_packets = 0;
+      {
+        std::lock_guard lock(queue_mutex);
+        queued_frames = std::min<UINT32>(frames_available, static_cast<UINT32>(pending_frames.size()));
+        queued_packets = pending_packets.size();
+      }
+
+      const auto buffered_frames_total = padding + queued_frames;
+
+      if (!playout_started) {
+        if (buffered_frames_total < target_prebuffer_frames) {
+          if (!playout_wait_logged) {
+            playout_wait_logged = true;
+            BOOST_LOG(debug) << "Waiting for microphone playout prebuffer on [" << target_device_name << "], queued "
+                             << queued_frames << " frames, " << queued_packets << " buffered packets, padding " << padding << ", total buffered "
+                             << buffered_frames_total << " of " << target_prebuffer_frames << " target frames";
+          }
+          continue;
+        }
+
+        playout_started = true;
+        playout_wait_logged = false;
+        BOOST_LOG(debug) << "Microphone playout prebuffer ready on [" << target_device_name << "] with "
+                         << queued_frames << " queued frames, " << queued_packets << " buffered packets, padding " << padding
+                         << ", total buffered " << buffered_frames_total << " frames";
+      }
+
+      if (queued_frames == 0) {
+        while (decode_next_packet()) {
+          std::lock_guard lock(queue_mutex);
+          queued_frames = std::min<UINT32>(frames_available, static_cast<UINT32>(pending_frames.size()));
+          if (queued_frames != 0) {
+            break;
+          }
+        }
+      }
+
+      if (queued_frames == 0) {
+        continue;
       }
 
       BYTE *buffer = nullptr;
-      status = audio_render->GetBuffer(frames_to_write, &buffer);
+      status = audio_render->GetBuffer(queued_frames, &buffer);
       if (FAILED(status) || buffer == nullptr) {
-        if (FAILED(status) && recover_device(*this, status, "acquiring a microphone playback buffer")) {
-          return 0;
-        }
         BOOST_LOG(debug) << "Couldn't acquire microphone playback buffer for [" << target_device_name << "]: 0x"
                          << util::hex(status).to_string_view();
-        ::audio::mic_debug_on_render_error(sequence_number, "Could not acquire a microphone playback buffer from Windows");
-        return -1;
+        if (FAILED(status) && is_recoverable_device_error(status)) {
+          ::audio::mic_debug_on_backend_error("Steam microphone playback device was invalidated while acquiring a render buffer. Restart the stream.");
+          break;
+        }
+        continue;
       }
 
       auto *dst = reinterpret_cast<float *>(buffer);
-      for (UINT32 frame = 0; frame < frames_to_write; ++frame) {
-        const float sample = std::clamp(decoded_pcm[frames_written + frame], -1.0f, 1.0f);
-        dst[static_cast<std::size_t>(frame) * 2] = sample;
-        dst[static_cast<std::size_t>(frame) * 2 + 1] = sample;
+      {
+        std::lock_guard lock(queue_mutex);
+        for (UINT32 frame = 0; frame < queued_frames; ++frame) {
+          const float sample = pending_frames.front();
+          pending_frames.pop_front();
+          dst[static_cast<std::size_t>(frame) * 2] = sample;
+          dst[static_cast<std::size_t>(frame) * 2 + 1] = sample;
+        }
       }
 
-      status = audio_render->ReleaseBuffer(frames_to_write, 0);
+      status = audio_render->ReleaseBuffer(queued_frames, 0);
       if (FAILED(status)) {
-        if (recover_device(*this, status, "releasing a microphone playback buffer")) {
-          return 0;
-        }
         BOOST_LOG(debug) << "Couldn't release microphone playback buffer for [" << target_device_name << "]: 0x"
                          << util::hex(status).to_string_view();
-        ::audio::mic_debug_on_render_error(sequence_number, "Could not release a microphone playback buffer to Windows");
-        return -1;
+        if (is_recoverable_device_error(status)) {
+          ::audio::mic_debug_on_backend_error("Steam microphone playback device was invalidated while releasing a render buffer. Restart the stream.");
+          break;
+        }
       }
-
-      frames_written += frames_to_write;
-      empty_buffer_waits = 0;
     }
 
-    if (frames_written == 0) {
-      ::audio::mic_debug_on_render_error(sequence_number, "The microphone playback buffer stayed full long enough that this packet was skipped");
-      return 0;
-    }
-
-    if (frames_written < static_cast<UINT32>(decoded_frames)) {
-      BOOST_LOG(debug) << "Microphone playback buffer filled before the whole packet could be rendered for ["
-                       << target_device_name << "], wrote " << frames_written << " of " << decoded_frames << " frames";
-    }
-
-    if (!first_packet_written_logged) {
-      first_packet_written_logged = true;
-      BOOST_LOG(info) << "Client microphone audio is being rendered into [" << target_device_name << ']';
-    }
-
-    ::audio::mic_debug_on_packet_rendered(sequence_number, normalized_level, silent);
-
-    return decoded_frames;
+    CoUninitialize();
   }
 
   void mic_write_wasapi_t::cleanup() {
+    stop_render_thread = true;
+    if (render_event) {
+      SetEvent(render_event.get());
+    }
+
+    if (render_thread.joinable()) {
+      render_thread.join();
+    }
+
     if (audio_client) {
       audio_client->Stop();
     }
@@ -697,5 +952,16 @@ namespace platf::audio {
     active_format = {};
     target_device_name.clear();
     first_packet_written_logged = false;
+    render_event.reset();
+    {
+      std::lock_guard lock(queue_mutex);
+      pending_packets.clear();
+      pending_frames.clear();
+    }
+    expected_sequence_number = 0;
+    expected_timestamp = 0;
+    has_playout_cursor = false;
+    playout_started = false;
+    playout_wait_logged = false;
   }
 }  // namespace platf::audio

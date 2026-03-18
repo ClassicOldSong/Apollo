@@ -18,7 +18,7 @@ namespace platf::audio {
 
     virtual std::string_view backend_id() const = 0;
     virtual int init() = 0;
-    virtual int write_data(const char *data, std::size_t len, std::uint16_t sequence_number) = 0;
+    virtual int write_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) = 0;
   };
 
   class apollo_vmic_t final: public mic_redirect_backend_t {
@@ -27,7 +27,7 @@ namespace platf::audio {
 
     std::string_view backend_id() const override;
     int init() override;
-    int write_data(const char *data, std::size_t len, std::uint16_t sequence_number) override;
+    int write_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) override;
 
   private:
     bool log_missing_driver_once();
