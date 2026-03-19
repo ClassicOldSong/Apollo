@@ -113,6 +113,36 @@
         </div>
       </div>
     </div>
+    <!-- Remote Microphone -->
+    <div class="card p-2 my-4" v-if="platform === 'windows'">
+      <div class="card-body">
+        <h2 id="remote_mic">Remote Microphone</h2>
+        <br>
+        <p>Use Moonlight's microphone preview first, then follow the host-side validation stages below.</p>
+        <div class="alert" :class="micStatusClass">
+          {{ micDebug && micDebug.state ? micDebug.state : 'No active remote microphone session' }}
+        </div>
+        <div class="list-group">
+          <div
+            v-for="stage in micStages"
+            :key="stage.key"
+            class="list-group-item border"
+            :class="micStageClass(stage.state)"
+          >
+            <div class="d-flex justify-content-between align-items-center gap-3">
+              <div class="fw-semibold">{{ stage.label }}</div>
+              <span class="badge" :class="micStageBadgeClass(stage.state)">
+                {{ micStageStateLabel(stage.state) }}
+              </span>
+            </div>
+            <div class="small mt-1">{{ stage.detail }}</div>
+          </div>
+          <div class="list-group-item text-muted" v-if="micStages.length === 0">
+            Loading microphone status...
+          </div>
+        </div>
+      </div>
+    </div>
     <!-- Logs -->
     <div class="card p-2 my-4">
       <div class="card-body">
@@ -151,6 +181,8 @@
           logs: 'Loading...',
           logFilter: null,
           logInterval: null,
+          micDebug: null,
+          micDebugInterval: null,
           serverRestarting: false,
           serverQuitting: false,
           serverQuit: false,
@@ -158,18 +190,132 @@
         };
       },
       computed: {
+        combinedLogs() {
+          const sections = [];
+
+          if (this.platform === 'windows' && this.micDebug && this.micDebug.recentEvents && this.micDebug.recentEvents.length > 0) {
+            sections.push(`=== Recent Microphone Events ===\n${this.micDebug.recentEvents.join("\n")}`);
+          }
+
+          sections.push(this.logs);
+          return sections.join("\n\n");
+        },
         actualLogs() {
-          if (!this.logFilter) return this.logs;
-          let lines = this.logs.split("\n");
+          if (!this.logFilter) return this.combinedLogs;
+          let lines = this.combinedLogs.split("\n");
           lines = lines.filter(x => x.indexOf(this.logFilter) !== -1);
           return lines.join("\n");
-        }
+        },
+        micStages() {
+          if (!this.micDebug) {
+            return [];
+          }
+
+          const debug = this.micDebug;
+          const isFreshAge = (ageMs) => ageMs >= 0 && ageMs < 3000;
+
+          const captureState = !debug.sessionActive ? 'idle' : (debug.firstPacketReceived ? 'success' : 'warning');
+          const captureDetail = !debug.sessionActive
+            ? 'Start a remote session with microphone passthrough enabled.'
+            : (debug.firstPacketReceived
+              ? 'Moonlight is sending microphone audio to Apollo. Confirm the local source with the Moonlight preview.'
+              : 'Apollo negotiated microphone passthrough, but Moonlight has not sent microphone audio yet.');
+
+          let packetState = 'idle';
+          let packetDetail = 'No active microphone session.';
+          if (debug.sessionActive) {
+            if (!debug.firstPacketReceived) {
+              packetState = 'warning';
+              packetDetail = 'Waiting for the first microphone packet from Moonlight.';
+            } else if (isFreshAge(debug.lastPacketAgeMs)) {
+              packetState = 'success';
+              packetDetail = `Packets are arriving from Moonlight (${debug.lastPacketAgeMs} ms ago).`;
+            } else {
+              packetState = 'warning';
+              packetDetail = 'Packets arrived earlier, but Apollo has not seen a fresh microphone packet recently.';
+            }
+          }
+
+          let decodeState = 'idle';
+          let decodeDetail = 'No decoded microphone audio on the host yet.';
+          if (debug.sessionActive) {
+            if (debug.decodeErrors > 0 && !debug.decodeActive) {
+              decodeState = 'danger';
+              decodeDetail = 'Apollo received microphone packets but could not decode them.';
+            } else if (debug.decodeActive && isFreshAge(debug.lastDecodeAgeMs)) {
+              decodeState = 'success';
+              decodeDetail = `Apollo decoded microphone audio successfully (${debug.lastDecodeAgeMs} ms ago).`;
+            } else if (debug.packetsReceived > 0) {
+              decodeState = 'warning';
+              decodeDetail = 'Apollo is receiving packets, but decoded microphone audio has not been confirmed yet.';
+            }
+          }
+
+          let renderState = 'idle';
+          let renderDetail = 'Steam Streaming Microphone rendering has not started.';
+          if (debug.sessionActive) {
+            if (debug.renderErrors > 0 && !debug.renderActive) {
+              renderState = 'danger';
+              renderDetail = 'Apollo decoded microphone audio, but writing it into Steam Streaming Microphone failed.';
+            } else if (debug.renderActive && isFreshAge(debug.lastRenderAgeMs)) {
+              renderState = 'success';
+              renderDetail = `Apollo is rendering microphone audio into ${debug.targetDeviceName || 'Steam Streaming Microphone'} (${debug.lastRenderAgeMs} ms ago).`;
+            } else if (debug.decodeActive) {
+              renderState = 'warning';
+              renderDetail = 'Apollo decoded microphone audio, but the Steam Streaming Microphone render stage has not completed yet.';
+            }
+          }
+
+          let signalState = 'idle';
+          let signalDetail = 'No decoded microphone signal is available yet.';
+          if (debug.sessionActive) {
+            if (debug.signalDetected) {
+              signalState = 'success';
+              signalDetail = 'Apollo is detecting non-silent microphone audio from Moonlight.';
+            } else if (debug.decodeActive) {
+              signalState = 'warning';
+              signalDetail = 'Decoded microphone audio is currently silent or below the signal threshold.';
+            } else if (debug.firstPacketReceived) {
+              signalState = 'warning';
+              signalDetail = 'Packets are arriving, but Apollo has not decoded usable microphone audio yet.';
+            }
+          }
+
+          return [
+            { key: 'capture', label: 'Moonlight capture/send', state: captureState, detail: captureDetail },
+            { key: 'packets', label: 'Packets arriving', state: packetState, detail: packetDetail },
+            { key: 'decode', label: 'Decoded on host', state: decodeState, detail: decodeDetail },
+            { key: 'render', label: 'Rendered into Steam Streaming Microphone', state: renderState, detail: renderDetail },
+            { key: 'signal', label: 'Live signal detected', state: signalState, detail: signalDetail },
+          ];
+        },
+        micStatusClass() {
+          if (!this.micDebug) {
+            return 'alert-secondary';
+          }
+
+          if (this.micDebug.renderActive) {
+            return 'alert-success';
+          }
+
+          if (this.micDebug.sessionActive) {
+            return 'alert-warning';
+          }
+
+          return 'alert-secondary';
+        },
       },
       created() {
         fetch("/api/config")
           .then((r) => r.json())
           .then((r) => {
             this.platform = r.platform;
+            if (this.platform === 'windows') {
+              this.refreshMicDebug();
+              this.micDebugInterval = setInterval(() => {
+                this.refreshMicDebug();
+              }, 1000);
+            }
           });
 
         this.logInterval = setInterval(() => {
@@ -177,10 +323,35 @@
         }, 5000);
         this.refreshLogs();
       },
-      beforeDestroy() {
+      beforeUnmount() {
         clearInterval(this.logInterval);
+        clearInterval(this.micDebugInterval);
       },
       methods: {
+        micStageClass(state) {
+          return {
+            success: 'bg-success-subtle border-success-subtle text-success-emphasis',
+            warning: 'bg-warning-subtle border-warning-subtle text-warning-emphasis',
+            danger: 'bg-danger-subtle border-danger-subtle text-danger-emphasis',
+            idle: 'bg-secondary-subtle border-secondary-subtle text-secondary-emphasis',
+          }[state] || 'bg-secondary-subtle border-secondary-subtle text-secondary-emphasis';
+        },
+        micStageBadgeClass(state) {
+          return {
+            success: 'text-bg-success',
+            warning: 'text-bg-warning',
+            danger: 'text-bg-danger',
+            idle: 'text-bg-secondary',
+          }[state] || 'text-bg-secondary';
+        },
+        micStageStateLabel(state) {
+          return {
+            success: 'OK',
+            warning: 'Waiting',
+            danger: 'Error',
+            idle: 'Idle',
+          }[state] || 'Idle';
+        },
         refreshLogs() {
           fetch("./api/logs", {
             credentials: 'include'
@@ -202,6 +373,28 @@
               this.logs = text;
             })
             .catch(error => console.error("Error fetching logs:", error));
+        },
+        refreshMicDebug() {
+          if (this.platform !== 'windows') {
+            return;
+          }
+
+          fetch('./api/audio-debug', {
+            credentials: 'include',
+          })
+            .then((response) => {
+              if (!response.ok) {
+                return null;
+              }
+
+              return response.json();
+            })
+            .then((data) => {
+              if (data) {
+                this.micDebug = data;
+              }
+            })
+            .catch((error) => console.error('Error fetching microphone debug status:', error));
         },
         closeApp() {
           this.closeAppPressed = true;
