@@ -1977,6 +1977,7 @@ namespace video {
     }
 
     std::chrono::steady_clock::time_point encode_frame_timestamp;
+    bool missing_frame_timestamp_warning_logged = false;
 
     while (true) {
       // Break out of the encoding loop if any of the following are true:
@@ -2014,6 +2015,10 @@ namespace video {
         if (auto img = images->pop(max_frametime)) {
           frame_timestamp = img->frame_timestamp;
           if (!frame_timestamp) {
+            if (!missing_frame_timestamp_warning_logged) {
+              BOOST_LOG(warning) << "Encoder received image without frame timestamp; substituting steady_clock::now()"sv;
+              missing_frame_timestamp_warning_logged = true;
+            }
             frame_timestamp = std::chrono::steady_clock::now();
           }
 
