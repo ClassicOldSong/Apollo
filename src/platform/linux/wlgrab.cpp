@@ -174,6 +174,7 @@ namespace wl {
       if (status != platf::capture_e::ok) {
         return status;
       }
+      auto frame_timestamp = std::chrono::steady_clock::now();
 
       auto current_frame = dmabuf.current_frame;
 
@@ -197,6 +198,7 @@ namespace wl {
 
       gl::ctx.GetTextureSubImage((*rgb_opt)->tex[0], 0, 0, 0, 0, width, height, 1, GL_BGRA, GL_UNSIGNED_BYTE, img_out->height * img_out->row_pitch, img_out->data);
       gl::ctx.BindTexture(GL_TEXTURE_2D, 0);
+      img_out->frame_timestamp = frame_timestamp;
 
       return platf::capture_e::ok;
     }
@@ -304,6 +306,7 @@ namespace wl {
       if (status != platf::capture_e::ok) {
         return status;
       }
+      auto frame_timestamp = std::chrono::steady_clock::now();
 
       if (!pull_free_image_cb(img_out)) {
         return platf::capture_e::interrupted;
@@ -317,6 +320,7 @@ namespace wl {
       img->sequence = sequence;
 
       img->sd = current_frame->sd;
+      img->frame_timestamp = frame_timestamp;
 
       // Prevent dmabuf from closing the file descriptors.
       std::fill_n(current_frame->sd.fds, 4, -1);
