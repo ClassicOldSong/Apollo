@@ -961,8 +961,7 @@ namespace video {
       {},  // Fallback options
       "h264_vaapi"s,
     },
-    // RC buffer size will be set in platform code if supported
-    LIMITED_GOP_SIZE | PARALLEL_ENCODING | NO_RC_BUF_LIMIT
+    PARALLEL_ENCODING
   };
 #endif
 

@@ -287,7 +287,16 @@ namespace va {
         BOOST_LOG(warning) << "Using CQP rate control"sv;
         av_dict_set_int(options, "qp", config::video.qp, 0);
       } else {
-        BOOST_LOG(info) << "Using default rate control"sv;
+        // For remaining VAAPI encoders (typically AMD H.264/HEVC), explicitly
+        // select a rate control mode. The VBV buffer size is already set by
+        // the common encoder code in video.cpp.
+        if (rc_attr.value & VA_RC_CBR) {
+          BOOST_LOG(info) << "Using CBR rate control"sv;
+          av_dict_set(options, "rc_mode", "CBR", 0);
+        } else if (rc_attr.value & VA_RC_VBR) {
+          BOOST_LOG(info) << "Using VBR rate control"sv;
+          av_dict_set(options, "rc_mode", "VBR", 0);
+        }
       }
     }
 
