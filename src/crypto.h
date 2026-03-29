@@ -226,6 +226,7 @@ namespace crypto {
        * @return The total length of the ciphertext written into cipher. Returns -1 in case of an error.
        */
       int encrypt(const std::string_view &plaintext, std::uint8_t *cipher, aes_t *iv);
+      int decrypt(const std::string_view &cipher, std::vector<std::uint8_t> &plaintext, aes_t *iv);
     };
   }  // namespace cipher
 }  // namespace crypto

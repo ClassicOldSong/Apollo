@@ -3,12 +3,14 @@
  * @brief Definitions for audio control on Linux.
  */
 // standard includes
+#include <array>
 #include <bitset>
 #include <sstream>
 #include <thread>
 
 // lib includes
 #include <boost/regex.hpp>
+#include <opus/opus.h>
 #include <pulse/error.h>
 #include <pulse/pulseaudio.h>
 #include <pulse/simple.h>
@@ -102,6 +104,71 @@ namespace platf {
     return mic;
   }
 
+  struct mic_redirect_t {
+    util::safe_ptr<pa_simple, pa_simple_free> sink;
+    util::safe_ptr<OpusDecoder, opus_decoder_destroy> decoder;
+
+    int init(const std::string &sink_name) {
+      int opus_error = OPUS_OK;
+      decoder.reset(opus_decoder_create(48000, 1, &opus_error));
+      if (!decoder || opus_error != OPUS_OK) {
+        BOOST_LOG(error) << "Couldn't create Opus decoder for microphone redirection: "sv << opus_strerror(opus_error);
+        return -1;
+      }
+
+      pa_sample_spec ss {PA_SAMPLE_S16NE, 48000, 1};
+      pa_buffer_attr attr {
+        .maxlength = uint32_t(-1),
+        .tlength = uint32_t(960 * sizeof(opus_int16) * 6),
+        .prebuf = uint32_t(-1),
+        .minreq = uint32_t(-1),
+        .fragsize = uint32_t(-1),
+      };
+
+      int status = 0;
+      sink.reset(pa_simple_new(nullptr, "sunshine", PA_STREAM_PLAYBACK, sink_name.c_str(), "sunshine-mic", &ss, nullptr, &attr, &status));
+      if (!sink) {
+        BOOST_LOG(error) << "Couldn't open PulseAudio sink for microphone redirection ["sv << sink_name << "]: "sv << pa_strerror(status);
+        decoder.reset();
+        return -1;
+      }
+
+      return 0;
+    }
+
+    int write_data(const char *data, std::size_t len, std::uint16_t sequence_number) {
+      (void) sequence_number;
+
+      if (!sink || !decoder || data == nullptr || len == 0) {
+        return -1;
+      }
+
+      std::array<opus_int16, 960> pcm {};
+      auto decoded = opus_decode(decoder.get(), reinterpret_cast<const unsigned char *>(data), static_cast<opus_int32>(len), pcm.data(), static_cast<int>(pcm.size()), 0);
+      if (decoded <= 0) {
+        return -1;
+      }
+
+      int status = 0;
+      if (pa_simple_write(sink.get(), pcm.data(), decoded * sizeof(opus_int16), &status) < 0) {
+        BOOST_LOG(debug) << "PulseAudio microphone write failed: "sv << pa_strerror(status);
+        return -1;
+      }
+
+      return decoded;
+    }
+
+    void cleanup() {
+      if (sink) {
+        int status = 0;
+        pa_simple_drain(sink.get(), &status);
+      }
+
+      sink.reset();
+      decoder.reset();
+    }
+  };
+
   namespace pa {
     template<bool B, class T>
     struct add_const_helper;
@@ -186,6 +253,7 @@ namespace platf {
       loop_t loop;
       ctx_t ctx;
       std::string requested_sink;
+      std::unique_ptr<mic_redirect_t> mic_redirect_device;
 
       struct {
         std::uint32_t stereo = PA_INVALID_INDEX;
@@ -459,6 +527,43 @@ namespace platf {
         return ::platf::microphone(mapping, channels, sample_rate, frame_size, get_monitor_name(sink_name));
       }
 
+      int init_mic_redirect_device() override {
+        if (mic_redirect_device) {
+          return 0;
+        }
+
+        std::string sink_name = config::audio.mic_device;
+        if (sink_name.empty()) {
+          BOOST_LOG(warning) << "Set config option [stream_mic] with [mic_device] pointing to a virtual PulseAudio/PipeWire sink to enable microphone redirection"sv;
+          return -1;
+        }
+
+        auto device = std::make_unique<mic_redirect_t>();
+        if (device->init(sink_name) != 0) {
+          return -1;
+        }
+
+        BOOST_LOG(info) << "Client microphone redirection target sink: "sv << sink_name;
+        mic_redirect_device = std::move(device);
+        return 0;
+      }
+
+      void release_mic_redirect_device() override {
+        if (mic_redirect_device) {
+          mic_redirect_device->cleanup();
+          mic_redirect_device.reset();
+        }
+      }
+
+      int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) override {
+        (void) timestamp;
+        if (!mic_redirect_device) {
+          return -1;
+        }
+
+        return mic_redirect_device->write_data(data, len, sequence_number);
+      }
+
       bool is_sink_available(const std::string &sink) override {
         BOOST_LOG(warning) << "audio_control_t::is_sink_available() unimplemented: "sv << sink;
         return true;
@@ -495,6 +600,7 @@ namespace platf {
       }
 
       ~server_t() override {
+        release_mic_redirect_device();
         unload_null(index.stereo);
         unload_null(index.surround51);
         unload_null(index.surround71);

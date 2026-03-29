@@ -52,7 +52,18 @@ else()
 endif()
 
 #WebUI build
-find_program(NPM npm REQUIRED)
+if(WIN32)
+    unset(NODE CACHE)
+    unset(NPM_CLI CACHE)
+    find_program(NODE node.exe REQUIRED)
+    find_file(NPM_CLI npm-cli.js
+            PATHS
+            "${CMAKE_PREFIX_PATH}"
+            "C:/msys64/ucrt64/lib/node_modules/npm/bin"
+            REQUIRED)
+else()
+    find_program(NPM npm REQUIRED)
+endif()
 
 if (NPM_OFFLINE)
     set(NPM_INSTALL_FLAGS "--offline")
@@ -63,8 +74,8 @@ endif()
 add_custom_target(web-ui ALL
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
         COMMENT "Installing NPM Dependencies and Building the Web UI"
-        COMMAND "$<$<BOOL:${WIN32}>:cmd;/C>" "${NPM}" install ${NPM_INSTALL_FLAGS}
-        COMMAND "${CMAKE_COMMAND}" -E env "SUNSHINE_BUILD_HOMEBREW=${NPM_BUILD_HOMEBREW}" "SUNSHINE_SOURCE_ASSETS_DIR=${NPM_SOURCE_ASSETS_DIR}" "SUNSHINE_ASSETS_DIR=${NPM_ASSETS_DIR}" "$<$<BOOL:${WIN32}>:cmd;/C>" "${NPM}" run build  # cmake-lint: disable=C0301
+        COMMAND "$<$<BOOL:${WIN32}>:${NODE};${NPM_CLI}>$<$<NOT:$<BOOL:${WIN32}>>:${NPM}>" install ${NPM_INSTALL_FLAGS}
+        COMMAND "${CMAKE_COMMAND}" -E env "SUNSHINE_BUILD_HOMEBREW=${NPM_BUILD_HOMEBREW}" "SUNSHINE_SOURCE_ASSETS_DIR=${NPM_SOURCE_ASSETS_DIR}" "SUNSHINE_ASSETS_DIR=${NPM_ASSETS_DIR}" "$<$<BOOL:${WIN32}>:${NODE};${NPM_CLI}>$<$<NOT:$<BOOL:${WIN32}>>:${NPM}>" run build  # cmake-lint: disable=C0301
         COMMAND_EXPAND_LISTS
         VERBATIM)
 

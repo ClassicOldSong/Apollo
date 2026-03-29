@@ -15,6 +15,9 @@ typedef void (*reed_solomon_release_t)(reed_solomon *rs);
 typedef int (*reed_solomon_encode_t)(reed_solomon *rs, uint8_t **shards, int nr_shards, int bs);
 typedef int (*reed_solomon_decode_t)(reed_solomon *rs, uint8_t **shards, uint8_t *marks, int nr_shards, int bs);
 
+// Preserve the nanors shard limit expected by the streaming code.
+#define DATA_SHARDS_MAX 255
+
 extern reed_solomon_new_t reed_solomon_new_fn;
 extern reed_solomon_release_t reed_solomon_release_fn;
 extern reed_solomon_encode_t reed_solomon_encode_fn;

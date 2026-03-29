@@ -28,7 +28,6 @@ const sudovdaStatus = {
 const currentDriverStatus = computed(() => sudovdaStatus[props.vdisplay])
 
 const config = ref(props.config)
-
 const validateFallbackMode = (event) => {
   const value = event.target.value;
   if (!value.match(/^\d+x\d+x\d+(\.\d+)?$/)) {
@@ -107,6 +106,47 @@ const validateFallbackMode = (event) => {
               v-model="config.stream_audio"
               default="true"
     ></Checkbox>
+
+    <Checkbox class="mb-3"
+              id="stream_mic"
+              locale-prefix="config"
+              v-model="config.stream_mic"
+              default="false"
+    ></Checkbox>
+
+    <div class="mb-3" v-if="platform === 'windows'">
+      <label class="form-label">{{ $t('config.mic_backend') }}</label>
+      <input type="text"
+             class="form-control"
+             :value="$t('config.mic_backend_apollo_virtual_mic')"
+             disabled />
+      <div class="form-text pre-wrap">{{ $t('config.mic_backend_desc_windows') }}</div>
+    </div>
+
+    <div class="mb-3" v-if="platform !== 'windows'">
+      <label for="mic_device" class="form-label">{{ $t('config.mic_device') }}</label>
+      <input type="text"
+             class="form-control"
+             id="mic_device"
+             :placeholder="$tp('config.mic_device_placeholder', 'sunshine-mic')"
+             v-model="config.mic_device" />
+      <div class="form-text pre-wrap">
+        {{ $tp('config.mic_device_desc') }}<br>
+        <PlatformLayout :platform="platform">
+          <template #windows>
+            <pre>tools\audio-info.exe</pre>
+          </template>
+          <template #linux>
+            <pre>pactl list short sinks</pre>
+            <pre>pw-cli ls Node | grep -i sink</pre>
+          </template>
+          <template #macos>
+            <a href="https://github.com/ExistentialAudio/BlackHole" target="_blank">BlackHole</a><br>
+            <a href="https://rogueamoeba.com/loopback/" target="_blank">Loopback</a>
+          </template>
+        </PlatformLayout>
+      </div>
+    </div>
 
     <AdapterNameSelector
         :platform="platform"

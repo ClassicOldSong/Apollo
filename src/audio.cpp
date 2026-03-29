@@ -3,6 +3,10 @@
  * @brief Definitions for audio capture and encoding.
  */
 // standard includes
+#include <chrono>
+#include <ctime>
+#include <deque>
+#include <mutex>
 #include <thread>
 
 // lib includes
@@ -21,6 +25,52 @@ namespace audio {
   using namespace std::literals;
   using opus_t = util::safe_ptr<OpusMSEncoder, opus_multistream_encoder_destroy>;
   using sample_queue_t = std::shared_ptr<safe::queue_t<std::vector<float>>>;
+
+  namespace {
+    struct mic_debug_state_t {
+      std::mutex mutex;
+      mic_debug_snapshot_t snapshot;
+      std::chrono::steady_clock::time_point last_packet_time {};
+      std::chrono::steady_clock::time_point last_decode_time {};
+      std::chrono::steady_clock::time_point last_render_time {};
+      bool has_last_packet_time {false};
+      bool has_last_decode_time {false};
+      bool has_last_render_time {false};
+      std::deque<std::string> recent_events;
+    };
+
+    mic_debug_state_t &mic_debug_state() {
+      static mic_debug_state_t state;
+      return state;
+    }
+
+    void append_mic_event(mic_debug_state_t &state, const std::string &message) {
+      const auto now = std::chrono::system_clock::now();
+      const auto tt = std::chrono::system_clock::to_time_t(now);
+      std::tm tm {};
+#ifdef _WIN32
+      localtime_s(&tm, &tt);
+#else
+      localtime_r(&tt, &tm);
+#endif
+      char timestamp[16] {};
+      std::strftime(timestamp, sizeof(timestamp), "%H:%M:%S", &tm);
+      state.recent_events.push_front(std::string {timestamp} + " " + message);
+      while (state.recent_events.size() > 12) {
+        state.recent_events.pop_back();
+      }
+    }
+
+    void set_mic_state_locked(mic_debug_state_t &state, const std::string &status) {
+      state.snapshot.state = status;
+      append_mic_event(state, status);
+    }
+
+    audio_ctx_ref_t &mic_redirect_audio_ctx() {
+      static audio_ctx_ref_t ref;
+      return ref;
+    }
+  }  // namespace
 
   static int start_audio_control(audio_ctx_t &ctx);
   static void stop_audio_control(audio_ctx_t &);
@@ -266,6 +316,249 @@ namespace audio {
     }
 
     return ctx.control->is_sink_available(sink);
+  }
+
+  int init_mic_redirect_device() {
+    auto &held_ref = mic_redirect_audio_ctx();
+    if (!held_ref) {
+      held_ref = get_audio_ctx_ref();
+    }
+
+    auto &ref = held_ref;
+    if (!ref || !ref->control) {
+      mic_debug_on_backend_error("Audio control is unavailable; microphone redirection could not initialize");
+      return -1;
+    }
+
+    return ref->control->init_mic_redirect_device();
+  }
+
+  void release_mic_redirect_device() {
+    auto &ref = mic_redirect_audio_ctx();
+    if (!ref || !ref->control) {
+      ref = {};
+      return;
+    }
+
+    ref->control->release_mic_redirect_device();
+    ref = {};
+  }
+
+  int write_mic_data(const char *data, std::size_t len, std::uint16_t sequence_number, std::uint32_t timestamp) {
+    auto &held_ref = mic_redirect_audio_ctx();
+    auto ref = held_ref ? held_ref : get_audio_ctx_ref();
+    if (!ref || !ref->control) {
+      BOOST_LOG(warning) << "Client microphone packet rejected before decode because audio control is unavailable"
+                         << " [seq=" << sequence_number << ", ts=" << timestamp << ", len=" << len << ']';
+      mic_debug_on_packet_dropped(sequence_number, "Audio control is unavailable while writing microphone data");
+      return -1;
+    }
+
+    return ref->control->write_mic_data(data, len, sequence_number, timestamp);
+  }
+
+  mic_debug_snapshot_t get_mic_debug_snapshot() {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+
+    auto snapshot = state.snapshot;
+    const auto now = std::chrono::steady_clock::now();
+    if (state.has_last_packet_time) {
+      snapshot.last_packet_age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - state.last_packet_time).count();
+    }
+    if (state.has_last_decode_time) {
+      snapshot.last_decode_age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - state.last_decode_time).count();
+    }
+    if (state.has_last_render_time) {
+      snapshot.last_render_age_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - state.last_render_time).count();
+    }
+    snapshot.recent_events.assign(state.recent_events.begin(), state.recent_events.end());
+    snapshot.signal_detected = snapshot.last_input_level >= 0.02 && snapshot.last_decode_age_ms >= 0 && snapshot.last_decode_age_ms < 3000;
+    return snapshot;
+  }
+
+  void mic_debug_on_session_start(const std::string &client_name, bool encryption_enabled) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot = {};
+    state.snapshot.session_active = true;
+    state.snapshot.mic_requested = true;
+    state.snapshot.encryption_enabled = encryption_enabled;
+    state.snapshot.client_name = client_name;
+    state.snapshot.state = "Microphone redirection negotiated; waiting for client audio";
+    state.snapshot.last_packet_age_ms = -1;
+    state.snapshot.last_decode_age_ms = -1;
+    state.snapshot.last_render_age_ms = -1;
+    state.has_last_packet_time = false;
+    state.has_last_decode_time = false;
+    state.has_last_render_time = false;
+    state.recent_events.clear();
+    append_mic_event(state, "Microphone redirection negotiated for client [" + client_name + "]");
+  }
+
+  void mic_debug_on_session_stop(const std::string &reason) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.session_active = false;
+    state.snapshot.decode_active = false;
+    state.snapshot.render_active = false;
+    state.snapshot.signal_detected = false;
+    state.snapshot.state = reason.empty() ? "No active remote microphone session" : reason;
+    append_mic_event(state, reason.empty() ? "Remote microphone session ended" : reason);
+  }
+
+  void mic_debug_on_backend_initialized(const std::string &backend_name) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.backend_initialized = true;
+    state.snapshot.backend_name = backend_name;
+    state.snapshot.last_error.clear();
+    append_mic_event(state, "Microphone backend ready: " + backend_name);
+  }
+
+  void mic_debug_on_backend_target(const std::string &target_device_name, int channels, std::uint32_t sample_rate) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.target_device_name = target_device_name;
+    state.snapshot.state = "Rendering client microphone into " + target_device_name;
+    append_mic_event(state, "Using host render target [" + target_device_name + "] at " + std::to_string(channels) + "ch/" + std::to_string(sample_rate) + "Hz");
+  }
+
+  void mic_debug_on_backend_format(const std::string &endpoint_mix_format,
+                                   const std::string &render_format,
+                                   bool resampling_active,
+                                   const std::string &channel_mapping) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.endpoint_mix_format = endpoint_mix_format;
+    state.snapshot.render_format = render_format;
+    state.snapshot.resampling_active = resampling_active;
+    state.snapshot.channel_mapping = channel_mapping;
+    append_mic_event(
+      state,
+      "Endpoint mix format [" + endpoint_mix_format + "], render format [" + render_format +
+      "], resampling " + (resampling_active ? "enabled" : "disabled")
+    );
+  }
+
+  void mic_debug_on_backend_endpoint_formats(const std::string &render_device_format,
+                                             const std::string &capture_device_name,
+                                             const std::string &capture_endpoint_mix_format,
+                                             const std::string &capture_device_format,
+                                             bool recommended_format_enforced,
+                                             bool recommended_format_active) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.render_device_format = render_device_format;
+    state.snapshot.capture_device_name = capture_device_name;
+    state.snapshot.capture_endpoint_mix_format = capture_endpoint_mix_format;
+    state.snapshot.capture_device_format = capture_device_format;
+    state.snapshot.recommended_format_enforced = recommended_format_enforced;
+    state.snapshot.recommended_format_active = recommended_format_active;
+    append_mic_event(
+      state,
+      "Render device format [" + render_device_format + "], capture device [" + capture_device_name +
+      "], capture mix [" + capture_endpoint_mix_format + "], recommended format " +
+      (recommended_format_active ? "active" : "inactive") +
+      (recommended_format_enforced ? " (enforced)" : "")
+    );
+  }
+
+  void mic_debug_on_backend_error(const std::string &message) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.last_error = message;
+    state.snapshot.render_active = false;
+    state.snapshot.state = message;
+    append_mic_event(state, message);
+  }
+
+  void mic_debug_on_packet_received(std::uint16_t sequence_number, std::size_t payload_len) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.first_packet_received = true;
+    state.snapshot.packets_received++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_payload_size = payload_len;
+    state.last_packet_time = std::chrono::steady_clock::now();
+    state.has_last_packet_time = true;
+    if (state.snapshot.packets_received == 1) {
+      set_mic_state_locked(state, "Receiving microphone packets from Moonlight");
+    }
+  }
+
+  void mic_debug_on_packet_decrypt_error(std::uint16_t sequence_number, const std::string &message) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.decrypt_errors++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_error = message;
+    state.snapshot.state = message;
+    append_mic_event(state, message);
+  }
+
+  void mic_debug_on_packet_dropped(std::uint16_t sequence_number, const std::string &message) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.packets_dropped++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_error = message;
+    state.snapshot.state = message;
+    append_mic_event(state, message);
+  }
+
+  void mic_debug_on_packet_decoded(std::uint16_t sequence_number, double normalized_level, bool silent) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.decode_active = true;
+    state.snapshot.packets_decoded++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_input_level = normalized_level;
+    state.snapshot.last_error.clear();
+    if (silent) {
+      state.snapshot.silent_packets++;
+    }
+    state.last_decode_time = std::chrono::steady_clock::now();
+    state.has_last_decode_time = true;
+    if (state.snapshot.packets_decoded == 1) {
+      set_mic_state_locked(state, "Apollo decoded microphone audio from Moonlight");
+    }
+  }
+
+  void mic_debug_on_packet_rendered(std::uint16_t sequence_number, double normalized_level, bool silent) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.packets_rendered++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_render_level = normalized_level;
+    state.snapshot.render_active = true;
+    state.snapshot.last_error.clear();
+    state.last_render_time = std::chrono::steady_clock::now();
+    state.has_last_render_time = true;
+    if (state.snapshot.packets_rendered == 1) {
+      set_mic_state_locked(state, "Apollo is rendering microphone audio into Steam Streaming Microphone");
+    }
+  }
+
+  void mic_debug_on_decode_error(std::uint16_t sequence_number, const std::string &message) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.decode_errors++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_error = message;
+    state.snapshot.state = message;
+    append_mic_event(state, message);
+  }
+
+  void mic_debug_on_render_error(std::uint16_t sequence_number, const std::string &message) {
+    auto &state = mic_debug_state();
+    std::lock_guard lock(state.mutex);
+    state.snapshot.render_errors++;
+    state.snapshot.last_sequence_number = sequence_number;
+    state.snapshot.last_error = message;
+    state.snapshot.render_active = false;
+    state.snapshot.state = message;
+    append_mic_event(state, message);
   }
 
   int map_stream(int channels, bool quality) {

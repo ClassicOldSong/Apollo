@@ -25,6 +25,7 @@
 #include <Simple-Web-Server/server_https.hpp>
 
 // local includes
+#include "audio.h"
 #include "config.h"
 #include "confighttp.h"
 #include "crypto.h"
@@ -1032,6 +1033,63 @@ namespace confighttp {
   }
 
   /**
+   * @brief Get the active remote microphone debug status.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   */
+  void getAudioDebug(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) {
+      return;
+    }
+
+    print_req(request);
+
+    const auto snapshot = audio::get_mic_debug_snapshot();
+    nlohmann::json output_tree;
+    output_tree["status"] = true;
+    output_tree["sessionActive"] = snapshot.session_active;
+    output_tree["micRequested"] = snapshot.mic_requested;
+    output_tree["encryptionEnabled"] = snapshot.encryption_enabled;
+    output_tree["backendInitialized"] = snapshot.backend_initialized;
+    output_tree["firstPacketReceived"] = snapshot.first_packet_received;
+    output_tree["decodeActive"] = snapshot.decode_active;
+    output_tree["renderActive"] = snapshot.render_active;
+    output_tree["signalDetected"] = snapshot.signal_detected;
+    output_tree["packetsReceived"] = snapshot.packets_received;
+    output_tree["packetsDecoded"] = snapshot.packets_decoded;
+    output_tree["packetsRendered"] = snapshot.packets_rendered;
+    output_tree["packetsDropped"] = snapshot.packets_dropped;
+    output_tree["decryptErrors"] = snapshot.decrypt_errors;
+    output_tree["decodeErrors"] = snapshot.decode_errors;
+    output_tree["renderErrors"] = snapshot.render_errors;
+    output_tree["silentPackets"] = snapshot.silent_packets;
+    output_tree["lastSequenceNumber"] = snapshot.last_sequence_number;
+    output_tree["lastPayloadSize"] = snapshot.last_payload_size;
+    output_tree["lastInputLevel"] = snapshot.last_input_level;
+    output_tree["lastRenderLevel"] = snapshot.last_render_level;
+    output_tree["lastPacketAgeMs"] = snapshot.last_packet_age_ms;
+    output_tree["lastDecodeAgeMs"] = snapshot.last_decode_age_ms;
+    output_tree["lastRenderAgeMs"] = snapshot.last_render_age_ms;
+    output_tree["clientName"] = snapshot.client_name;
+    output_tree["backendName"] = snapshot.backend_name;
+    output_tree["targetDeviceName"] = snapshot.target_device_name;
+    output_tree["endpointMixFormat"] = snapshot.endpoint_mix_format;
+    output_tree["renderDeviceFormat"] = snapshot.render_device_format;
+    output_tree["renderFormat"] = snapshot.render_format;
+    output_tree["captureDeviceName"] = snapshot.capture_device_name;
+    output_tree["captureEndpointMixFormat"] = snapshot.capture_endpoint_mix_format;
+    output_tree["captureDeviceFormat"] = snapshot.capture_device_format;
+    output_tree["resamplingActive"] = snapshot.resampling_active;
+    output_tree["recommendedFormatEnforced"] = snapshot.recommended_format_enforced;
+    output_tree["recommendedFormatActive"] = snapshot.recommended_format_active;
+    output_tree["channelMapping"] = snapshot.channel_mapping;
+    output_tree["state"] = snapshot.state;
+    output_tree["lastError"] = snapshot.last_error;
+    output_tree["recentEvents"] = snapshot.recent_events;
+    send_response(response, output_tree);
+  }
+
+  /**
    * @brief Save the configuration settings.
    * @param response The HTTP response object.
    * @param request The HTTP request object.
@@ -1542,6 +1600,7 @@ namespace confighttp {
     server.resource["^/api/logs$"]["GET"] = getLogs;
     server.resource["^/api/config$"]["GET"] = getConfig;
     server.resource["^/api/config$"]["POST"] = saveConfig;
+    server.resource["^/api/audio-debug$"]["GET"] = getAudioDebug;
     server.resource["^/api/configLocale$"]["GET"] = getLocale;
     server.resource["^/api/restart$"]["POST"] = restart;
     server.resource["^/api/quit$"]["POST"] = quit;

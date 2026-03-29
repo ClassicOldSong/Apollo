@@ -154,7 +154,10 @@ namespace config {
   struct audio_t {
     std::string sink;
     std::string virtual_sink;
+    std::string mic_backend;
+    std::string mic_device;
     bool stream;
+    bool stream_mic;
     bool install_steam_drivers;
     bool keep_default;
     bool auto_capture;
