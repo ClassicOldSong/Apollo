@@ -83,7 +83,7 @@ Here're some common causes and solutions for stutters: [WiKi](https://github.com
 
 ## Device specific setups
 - Pixel devices might not be able to use native resolution:
-  - Change the device resolution to High: https://github.com/ClassicOldSong/Apollo/issues/700
+  - Change the device resolution to Max: https://github.com/ClassicOldSong/Apollo/issues/700
 
 ## System Requirements
 
