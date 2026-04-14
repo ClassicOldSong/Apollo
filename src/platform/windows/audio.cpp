@@ -56,6 +56,8 @@ namespace {
                                               SPEAKER_BACK_LEFT | SPEAKER_BACK_RIGHT |
                                               SPEAKER_SIDE_LEFT | SPEAKER_SIDE_RIGHT;
 
+  std::map<std::wstring, WAVEFORMATEX> cached_device_formats = {};
+
   enum class sample_format_e {
     f32,
     s32,
@@ -335,7 +337,7 @@ namespace platf::audio {
     return audio_client;
   }
 
-  device_t default_device(device_enum_t &device_enum) {
+  std::optional<device_t> default_device(device_enum_t &device_enum) {
     device_t device;
     HRESULT status;
     status = device_enum->GetDefaultAudioEndpoint(
@@ -345,15 +347,13 @@ namespace platf::audio {
     );
 
     if (FAILED(status)) {
-      BOOST_LOG(error) << "Couldn't get default audio endpoint [0x"sv << util::hex(status).to_string_view() << ']';
-
-      return nullptr;
+      return std::nullopt;
     }
 
     return device;
   }
 
-  class audio_notification_t: public ::IMMNotificationClient {
+  class audio_notification_t: public IMMNotificationClient {
   public:
     audio_notification_t() {
     }
@@ -479,7 +479,7 @@ namespace platf::audio {
       }
 
       auto device = default_device(device_enum);
-      if (!device) {
+      if (!device.has_value()) {
         return -1;
       }
 
@@ -491,7 +491,7 @@ namespace platf::audio {
         }
 
         BOOST_LOG(debug) << "Trying audio format ["sv << format.name << ']';
-        audio_client = make_audio_client(device, format);
+        audio_client = make_audio_client(device.value(), format);
 
         if (audio_client) {
           BOOST_LOG(debug) << "Found audio format ["sv << format.name << ']';
@@ -682,23 +682,21 @@ namespace platf::audio {
     HANDLE mmcss_task_handle = nullptr;
   };
 
-  class audio_control_t: public ::platf::audio_control_t {
+  class audio_control_t: public platf::audio_control_t {
   public:
     std::optional<sink_t> sink_info() override {
       sink_t sink;
 
       // Fill host sink name with the device_id of the current default audio device.
-      {
-        auto device = default_device(device_enum);
-        if (!device) {
-          return std::nullopt;
-        }
-
-        audio::wstring_t id;
-        device->GetId(&id);
-
-        sink.host = to_utf8(id.get());
+      auto device = default_device(device_enum);
+      if (!device.has_value()) {
+        return std::nullopt;
       }
+
+      wstring_t id;
+      device.value()->GetId(&id);
+
+      sink.host = to_utf8(id.get());
 
       // Prepare to search for the device_id of the virtual audio sink device,
       // this device can be either user-configured or
@@ -712,7 +710,7 @@ namespace platf::audio {
 
       // Search for the virtual audio sink device currently present in the system.
       auto matched = find_device_id(match_list);
-      if (matched) {
+      if (matched.has_value()) {
         // Prepare to fill virtual audio sink names with device_id.
         auto device_id = to_utf8(matched->second);
         // Also prepend format name (basically channel layout at the moment)
@@ -797,17 +795,17 @@ namespace platf::audio {
 
       auto virtual_sink_info = extract_virtual_sink_info(sink);
 
-      if (!virtual_sink_info) {
-        // Sink name does not begin with virtual-(format name), hence it's not a virtual sink
+      if (!virtual_sink_info.has_value()) {
+        // Sink name does not begin with virtual-(format name), hence it's not a virtual sink,
         // and we don't want to change playback format of the corresponding device.
         // Also need to perform matching, sink name is not necessarily device_id in this case.
         auto matched = find_device_id(match_all_fields(from_utf8(sink)));
-        if (matched) {
-          return matched->second;
-        } else {
+        if (!matched.has_value()) {
           BOOST_LOG(error) << "Couldn't find audio sink " << sink;
           return std::nullopt;
         }
+
+        return matched->second;
       }
 
       // When switching to a Steam virtual speaker device, try to retain the bit depth of the
@@ -815,33 +813,72 @@ namespace platf::audio {
       // cause glitches for some users.
       int wanted_bits_per_sample = 32;
       auto current_default_dev = default_device(device_enum);
-      if (current_default_dev) {
-        audio::prop_t prop;
+      if (current_default_dev.has_value()) {
+        prop_t prop;
         prop_var_t current_device_format;
 
-        if (SUCCEEDED(current_default_dev->OpenPropertyStore(STGM_READ, &prop)) && SUCCEEDED(prop->GetValue(PKEY_AudioEngine_DeviceFormat, &current_device_format.prop))) {
-          auto *format = (WAVEFORMATEXTENSIBLE *) current_device_format.prop.blob.pBlobData;
+        if (SUCCEEDED(current_default_dev.value()->OpenPropertyStore(STGM_READ, &prop)) && SUCCEEDED(prop->GetValue(PKEY_AudioEngine_DeviceFormat, &current_device_format.prop))) {
+          auto *format = reinterpret_cast<WAVEFORMATEXTENSIBLE *>(current_device_format.prop.blob.pBlobData);
           wanted_bits_per_sample = format->Samples.wValidBitsPerSample;
           BOOST_LOG(info) << "Virtual audio device will use "sv << wanted_bits_per_sample << "-bit to match default device"sv;
         }
       }
 
       auto &device_id = virtual_sink_info->first;
-      auto &waveformats = virtual_sink_info->second.get().virtual_sink_waveformats;
+      auto &requested_format = virtual_sink_info->second.get();
+
+      auto device_id_copy = device_id;
+
+      // Get existing waveformat
+      auto waveformat_existing = new WAVEFORMATEX();
+      if (FAILED(policy->GetDeviceFormat(device_id_copy.c_str(), 0, &waveformat_existing))) {
+        BOOST_LOG(error) << "Could not get virtual sink audio waveformat";
+        return std::nullopt;
+      }
+
+      // Check device format cache
+      if (auto cached = cached_device_formats.find(device_id); cached != cached_device_formats.end()) {
+        BOOST_LOG(debug) << "Found cached waveformat, checking if it changed...";
+        auto a = waveformat_existing;
+        auto b = &cached->second;
+
+        if (requested_format.channel_count == a->nChannels &&
+            a->nChannels == b->nChannels &&
+            a->nSamplesPerSec == b->nSamplesPerSec &&
+            a->wBitsPerSample == b->wBitsPerSample) {
+          BOOST_LOG(info) << "Using existing optimal virtual audio sink waveformat";
+          return device_id;
+        }
+
+        BOOST_LOG(debug) << "Waveformat has changed or is not suitable anymore";
+      }
+
+      // Find optimal waveformat
+      auto waveformats = requested_format.virtual_sink_waveformats;
       for (const auto &waveformat : waveformats) {
         // We're using completely undocumented and unlisted API,
         // better not pass objects without copying them first.
-        auto device_id_copy = device_id;
+        device_id_copy = std::wstring(device_id);
         auto waveformat_copy = waveformat;
-        auto waveformat_copy_pointer = reinterpret_cast<WAVEFORMATEX *>(&waveformat_copy);
 
         if (wanted_bits_per_sample != waveformat.Samples.wValidBitsPerSample) {
           continue;
         }
 
-        WAVEFORMATEXTENSIBLE p {};
-        if (SUCCEEDED(policy->SetDeviceFormat(device_id_copy.c_str(), waveformat_copy_pointer, (WAVEFORMATEX *) &p))) {
+        if (requested_format.channel_count <= waveformat_existing->nChannels &&
+            wanted_bits_per_sample <= waveformat_existing->wBitsPerSample &&
+            waveformat.Format.nSamplesPerSec == waveformat_existing->nSamplesPerSec) {
+          BOOST_LOG(info) << "Existing waveformat is suitable, not changing it";
+
+          cached_device_formats[device_id] = waveformat_copy.Format;
+          return device_id;
+        }
+
+        auto hr = policy->SetDeviceFormat(device_id_copy.c_str(), &waveformat_copy.Format, {});
+        if (SUCCEEDED(hr)) {
           BOOST_LOG(info) << "Changed virtual audio sink format to " << logging::bracket(waveformat_to_pretty_string(waveformat));
+
+          cached_device_formats[device_id] = waveformat_copy.Format;
           return device_id;
         }
       }
@@ -857,14 +894,14 @@ namespace platf::audio {
       }
 
       int failure {};
-      for (int x = 0; x < (int) ERole_enum_count; ++x) {
-        auto status = policy->SetDefaultEndpoint(device_id->c_str(), (ERole) x);
-        if (status) {
+      for (int x = 0; x < ERole_enum_count; ++x) {
+        auto hr = policy->SetDefaultEndpoint(device_id->c_str(), static_cast<ERole>(x));
+        if (FAILED(hr)) {
           // Depending on the format of the string, we could get either of these errors
-          if (status == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || status == E_INVALIDARG) {
+          if (hr == HRESULT_FROM_WIN32(ERROR_NOT_FOUND) || hr == E_INVALIDARG) {
             BOOST_LOG(warning) << "Audio sink not found: "sv << sink;
           } else {
-            BOOST_LOG(warning) << "Couldn't set ["sv << sink << "] to role ["sv << x << "]: 0x"sv << util::hex(status).to_string_view();
+            BOOST_LOG(warning) << "Couldn't set ["sv << sink << "] to role ["sv << x << "]: 0x"sv << util::hex(hr).to_string_view();
           }
 
           ++failure;
@@ -890,13 +927,13 @@ namespace platf::audio {
     using match_fields_list_t = std::vector<std::pair<match_field_e, std::wstring>>;
     using matched_field_t = std::pair<match_field_e, std::wstring>;
 
-    audio_control_t::match_fields_list_t match_steam_speakers() {
+    match_fields_list_t match_steam_speakers() {
       return {
         {match_field_e::adapter_friendly_name, L"Steam Streaming Speakers"}
       };
     }
 
-    audio_control_t::match_fields_list_t match_all_fields(const std::wstring &name) {
+    match_fields_list_t match_all_fields(const std::wstring &name) {
       return {
         {match_field_e::device_id, name},  // {0.0.0.00000000}.{29dd7668-45b2-4846-882d-950f55bf7eb8}
         {match_field_e::device_friendly_name, name},  // Digital Audio (S/PDIF) (High Definition Audio Device)
@@ -925,16 +962,15 @@ namespace platf::audio {
       UINT count = 0;
       collection->GetCount(&count);
 
-      std::vector<std::wstring> matched(match_list.size());
       for (auto x = 0; x < count; ++x) {
-        audio::device_t device;
+        device_t device;
         collection->Item(x, &device);
 
         audio::wstring_t wstring_id;
         device->GetId(&wstring_id);
         std::wstring device_id = wstring_id.get();
 
-        audio::prop_t prop;
+        prop_t prop;
         device->OpenPropertyStore(STGM_READ, &prop);
 
         prop_var_t adapter_friendly_name;
@@ -946,35 +982,27 @@ namespace platf::audio {
         prop->GetValue(PKEY_Device_DeviceDesc, &device_desc.prop);
 
         for (size_t i = 0; i < match_list.size(); i++) {
-          if (matched[i].empty()) {
-            const wchar_t *match_value = nullptr;
-            switch (match_list[i].first) {
-              case match_field_e::device_id:
-                match_value = device_id.c_str();
-                break;
+          const wchar_t *match_value = nullptr;
+          switch (match_list[i].first) {
+            case match_field_e::device_id:
+              match_value = device_id.c_str();
+              break;
 
-              case match_field_e::device_friendly_name:
-                match_value = device_friendly_name.prop.pwszVal;
-                break;
+            case match_field_e::device_friendly_name:
+              match_value = device_friendly_name.prop.pwszVal;
+              break;
 
-              case match_field_e::adapter_friendly_name:
-                match_value = adapter_friendly_name.prop.pwszVal;
-                break;
+            case match_field_e::adapter_friendly_name:
+              match_value = adapter_friendly_name.prop.pwszVal;
+              break;
 
-              case match_field_e::device_description:
-                match_value = device_desc.prop.pwszVal;
-                break;
-            }
-            if (match_value && std::wcscmp(match_value, match_list[i].second.c_str()) == 0) {
-              matched[i] = device_id;
-            }
+            case match_field_e::device_description:
+              match_value = device_desc.prop.pwszVal;
+              break;
           }
-        }
-      }
-
-      for (size_t i = 0; i < match_list.size(); i++) {
-        if (!matched[i].empty()) {
-          return matched_field_t(match_list[i].first, matched[i]);
+          if (match_value && std::wcscmp(match_value, match_list[i].second.c_str()) == 0) {
+            return matched_field_t(match_list[i].first, std::move(device_id));
+          }
         }
       }
 
@@ -986,25 +1014,23 @@ namespace platf::audio {
      */
     void reset_default_device() {
       auto matched_steam = find_device_id(match_steam_speakers());
-      if (!matched_steam) {
+      if (!matched_steam.has_value()) {
         return;
       }
       auto steam_device_id = matched_steam->second;
 
-      {
-        // Get the current default audio device (if present)
-        auto current_default_dev = default_device(device_enum);
-        if (!current_default_dev) {
-          return;
-        }
+      // Get the current default audio device (if present)
+      auto current_default_dev = default_device(device_enum);
+      if (!current_default_dev.has_value()) {
+        return;
+      }
 
-        audio::wstring_t current_default_id;
-        current_default_dev->GetId(&current_default_id);
+      wstring_t current_default_id;
+      current_default_dev->get()->GetId(&current_default_id);
 
-        // If Steam Streaming Speakers are already not default, we're done.
-        if (steam_device_id != current_default_id.get()) {
-          return;
-        }
+      // If Steam Streaming Speakers are already not default, we're done.
+      if (steam_device_id != current_default_id.get()) {
+        return;
       }
 
       // Disable the Steam Streaming Speakers temporarily to allow the OS to pick a new default.
@@ -1026,16 +1052,16 @@ namespace platf::audio {
 
       // If there's now no audio device, the Steam Streaming Speakers were the only device available.
       // There's no other device to set as the default, so just return.
-      if (!new_default_dev) {
+      if (!new_default_dev.has_value()) {
         return;
       }
 
-      audio::wstring_t new_default_id;
-      new_default_dev->GetId(&new_default_id);
+      wstring_t new_default_id;
+      new_default_dev->get()->GetId(&new_default_id);
 
       // Set the new default audio device
       for (int x = 0; x < (int) ERole_enum_count; ++x) {
-        policy->SetDefaultEndpoint(new_default_id.get(), (ERole) x);
+        policy->SetDefaultEndpoint(new_default_id.get(), static_cast<ERole>(x));
       }
 
       BOOST_LOG(info) << "Successfully reset default audio device"sv;
@@ -1080,8 +1106,8 @@ namespace platf::audio {
         // If there was a previous default device, restore that original device as the
         // default output device just in case installing the new one changed it.
         if (old_default_dev) {
-          audio::wstring_t old_default_id;
-          old_default_dev->GetId(&old_default_id);
+          wstring_t old_default_id;
+          old_default_dev->get()->GetId(&old_default_id);
 
           for (int x = 0; x < (int) ERole_enum_count; ++x) {
             policy->SetDefaultEndpoint(old_default_id.get(), (ERole) x);
@@ -1147,7 +1173,7 @@ namespace platf::audio {
     }
 
     policy_t policy;
-    audio::device_enum_t device_enum;
+    device_enum_t device_enum;
     std::string assigned_sink;
   };
 }  // namespace platf::audio
@@ -1168,7 +1194,7 @@ namespace platf {
 
     // Install Steam Streaming Speakers if needed. We do this during audio_control() to ensure
     // the sink information returned includes the new Steam Streaming Speakers device.
-    if (config::audio.install_steam_drivers && !control->find_device_id(control->match_steam_speakers())) {
+    if (config::audio.install_steam_drivers && !control->find_device_id(control->match_steam_speakers()).has_value()) {
       // This is best effort. Don't fail if it doesn't work.
       control->install_steam_audio_drivers();
     }
@@ -1182,7 +1208,7 @@ namespace platf {
     }
 
     // Initialize COM
-    auto co_init = std::make_unique<platf::audio::co_init_t>();
+    auto co_init = std::make_unique<audio::co_init_t>();
 
     // If Steam Streaming Speakers are currently the default audio device,
     // change the default to something else (if another device is available).
