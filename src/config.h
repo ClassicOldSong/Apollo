@@ -158,6 +158,7 @@ namespace config {
     bool install_steam_drivers;
     bool keep_default;
     bool auto_capture;
+    bool release_sink_on_pause;
   };
 
   constexpr int ENCRYPTION_MODE_NEVER = 0;  // Never use video encryption, even if the client supports it
