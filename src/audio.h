@@ -106,4 +106,6 @@ namespace audio {
    * @examples_end
    */
   bool is_audio_ctx_sink_available(const audio_ctx_t &ctx);
+
+  void restore_sink();
 }  // namespace audio
