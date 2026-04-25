@@ -5,7 +5,7 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 #ifndef BOOST_PROCESS_VERSION
- #define BOOST_PROCESS_VERSION 1
+  #define BOOST_PROCESS_VERSION 1
 #endif
 // standard includes
 #include <filesystem>
@@ -28,14 +28,14 @@
 #include "crypto.h"
 #include "display_device.h"
 #include "file_handler.h"
+#include "httpcommon.h"
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
-#include "httpcommon.h"
 #include "system_tray.h"
 #include "utility.h"
-#include "video.h"
 #include "uuid.h"
+#include "video.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -175,7 +175,7 @@ namespace proc {
 #endif
   }
 
-  int proc_t::execute(const ctx_t& app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
+  int proc_t::execute(const ctx_t &app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     if (_app_id == input_only_app_id) {
       terminate(false, false);
       std::this_thread::sleep_for(1s);
@@ -202,8 +202,8 @@ namespace proc {
     }
 
     if (scale_factor != 100) {
-      render_width *= ((float)scale_factor / 100);
-      render_height *= ((float)scale_factor / 100);
+      render_width *= ((float) scale_factor / 100);
+      render_height *= ((float) scale_factor / 100);
 
       // Chop the last bit to ensure the scaled resolution is even numbered
       // Most odd resolutions won't work well
@@ -235,10 +235,10 @@ namespace proc {
 
 #ifdef _WIN32
     if (
-      config::video.headless_mode        // Headless mode
-      || launch_session->virtual_display // User requested virtual display
-      || _app.virtual_display            // App is configured to use virtual display
-      || !video::allow_encoder_probing() // No active display presents
+      config::video.headless_mode  // Headless mode
+      || launch_session->virtual_display  // User requested virtual display
+      || _app.virtual_display  // App is configured to use virtual display
+      || !video::allow_encoder_probing()  // No active display presents
     ) {
       if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
         // Try init driver again
@@ -342,6 +342,31 @@ namespace proc {
       display_device::reset_persistence();
     }
 
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+
+    if (
+      config::video.linux_virtual_display_experimental &&
+      (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display)
+    ) {
+      std::string vdisplay_name;
+      auto status = linux_vdisplay::create(vdisplay_name, render_width, render_height, launch_session->fps, launch_session->unique_id);
+      if (status == linux_vdisplay::status_e::OK) {
+        BOOST_LOG(info) << "[Experimental] Linux virtual display created: "sv << vdisplay_name;
+        this->virtual_display = true;
+
+        auto kms_idx = linux_vdisplay::get_kms_index();
+        if (kms_idx >= 0) {
+          this->original_output_name = config::video.output_name;
+          config::video.output_name = std::to_string(kms_idx);
+          BOOST_LOG(info) << "[Experimental] Capturing virtual display at KMS index "sv << kms_idx;
+        }
+      } else {
+        BOOST_LOG(warning) << "[Experimental] Linux virtual display failed (status "sv << static_cast<int>(status) << ')';
+      }
+    }
+
+    display_device::configure_display(config::video, *launch_session);
+
 #else
 
     display_device::configure_display(config::video, *launch_session);
@@ -362,7 +387,7 @@ namespace proc {
 
     std::string fps_str;
     char fps_buf[8];
-    snprintf(fps_buf, sizeof(fps_buf), "%.3f", (float)launch_session->fps / 1000.0f);
+    snprintf(fps_buf, sizeof(fps_buf), "%.3f", (float) launch_session->fps / 1000.0f);
     fps_str = fps_buf;
 
     // Add Stream-specific environment variables
@@ -371,7 +396,7 @@ namespace proc {
     _env["SUNSHINE_APP_NAME"] = _app.name;
     _env["SUNSHINE_CLIENT_WIDTH"] = std::to_string(render_width);
     _env["SUNSHINE_CLIENT_HEIGHT"] = std::to_string(render_height);
-    _env["SUNSHINE_CLIENT_FPS"] = config::sunshine.envvar_compatibility_mode ? std::to_string(std::round((float)launch_session->fps / 1000.0f)) : fps_str;
+    _env["SUNSHINE_CLIENT_FPS"] = config::sunshine.envvar_compatibility_mode ? std::to_string(std::round((float) launch_session->fps / 1000.0f)) : fps_str;
     _env["SUNSHINE_CLIENT_HDR"] = launch_session->enable_hdr ? "true" : "false";
     _env["SUNSHINE_CLIENT_GCMAP"] = std::to_string(launch_session->gcmap);
     _env["SUNSHINE_CLIENT_HOST_AUDIO"] = launch_session->host_audio ? "true" : "false";
@@ -495,8 +520,8 @@ namespace proc {
 
     _app_launch_time = std::chrono::steady_clock::now();
 
-  #ifdef _WIN32
-    auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr]{
+#ifdef _WIN32
+    auto resetHDRThread = std::thread([this, enable_hdr = launch_session->enable_hdr] {
       // Windows doesn't seem to be able to set HDR correctly when a display is just connected / changed resolution,
       // so we have tooggle HDR for the virtual display manually after a delay.
       auto retryInterval = 200ms;
@@ -549,7 +574,7 @@ namespace proc {
     });
 
     resetHDRThread.detach();
-  #endif
+#endif
 
     fg.disable();
 
@@ -584,11 +609,11 @@ namespace proc {
       BOOST_LOG(info) << "Adjust this behavior in the Applications tab or apps.json if this is not what you want."sv;
       placebo = true;
 
-    #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
       if (_process.native_exit_code() != 0) {
         system_tray::update_tray_launch_error(proc::proc.get_last_run_app_name(), _process.native_exit_code());
       }
-    #endif
+#endif
 
       return _app_id;
     }
@@ -606,7 +631,6 @@ namespace proc {
 
     if (!_app.state_cmds.empty()) {
       auto exec_thread = std::thread([cmd_list = _app.state_cmds, app_working_dir = _app.working_dir, _env = _env]() mutable {
-
         _env["APOLLO_APP_STATUS"] = "RESUMING";
 
         std::error_code ec;
@@ -771,6 +795,21 @@ namespace proc {
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
       if (used_virtual_display) {
+        display_device::reset_persistence();
+      } else {
+        display_device::revert_configuration();
+      }
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+    if (this->virtual_display && linux_vdisplay::is_active()) {
+      linux_vdisplay::remove();
+      BOOST_LOG(info) << "[Experimental] Linux virtual display removed"sv;
+      if (!this->original_output_name.empty()) {
+        config::video.output_name = this->original_output_name;
+        BOOST_LOG(info) << "[Experimental] Restored output_name to "sv << this->original_output_name;
+      }
+    }
+    if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+      if (this->virtual_display) {
         display_device::reset_persistence();
       } else {
         display_device::revert_configuration();
@@ -1060,7 +1099,7 @@ namespace proc {
    * @param fileTree_p Pointer to the JSON object representing the file tree.
    * @param inputTree_p Pointer to the JSON object representing the new app.
    */
-  void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p) {
+  void migrate_apps(nlohmann::json *fileTree_p, nlohmann::json *inputTree_p) {
     std::string new_app_uuid;
 
     if (inputTree_p) {
@@ -1114,14 +1153,14 @@ namespace proc {
     (*fileTree_p)["apps"] = newApps;
   }
 
-  void migration_v2(nlohmann::json& fileTree) {
+  void migration_v2(nlohmann::json &fileTree) {
     static const int this_version = 2;
     // Determine the current migration version (default to 1 if not present).
     int file_version = 1;
     if (fileTree.contains("version")) {
       try {
         file_version = fileTree["version"].get<int>();
-      } catch (const std::exception& e) {
+      } catch (const std::exception &e) {
         BOOST_LOG(info) << "Cannot parse apps.json version, treating as v1: " << e.what();
       }
     }
@@ -1153,7 +1192,7 @@ namespace proc {
       for (auto &app : fileTree["apps"]) {
         for (const auto &key : boolean_keys) {
           if (app.contains(key)) {
-            auto& _key = app[key];
+            auto &_key = app[key];
             if (_key.is_string()) {
               std::string s = _key.get<std::string>();
               std::transform(s.begin(), s.end(), s.begin(), ::tolower);  // Normalize to lowercase for comparison
@@ -1213,7 +1252,7 @@ namespace proc {
     }
   }
 
-  void migrate(nlohmann::json& fileTree, const std::string& fileName) {
+  void migrate(nlohmann::json &fileTree, const std::string &fileName) {
     int last_version = 2;
 
     int file_version = 0;
@@ -1228,7 +1267,6 @@ namespace proc {
   }
 
   std::optional<proc::proc_t> parse(const std::string &file_name) {
-
     // Prepare environment variables.
     auto this_env = boost::this_process::environment();
 
@@ -1243,7 +1281,7 @@ namespace proc {
       try {
         std::string content = file_handler::read_file(file_name.c_str());
         tree = nlohmann::json::parse(content);
-      } catch (const std::exception& e) {
+      } catch (const std::exception &e) {
         BOOST_LOG(warning) << "Couldn't read apps.json properly! Apps will not be loaded."sv;
         break;
       }
@@ -1334,26 +1372,29 @@ namespace proc {
           }
 
           // Process other fields.
-          if (app_node.contains("output"))
+          if (app_node.contains("output")) {
             ctx.output = parse_env_val(this_env, app_node.value("output", ""));
+          }
           std::string name = parse_env_val(this_env, app_node.value("name", ""));
-          if (app_node.contains("cmd"))
+          if (app_node.contains("cmd")) {
             ctx.cmd = parse_env_val(this_env, app_node.value("cmd", ""));
+          }
           if (app_node.contains("working-dir")) {
             ctx.working_dir = parse_env_val(this_env, app_node.value("working-dir", ""));
-    #ifdef _WIN32
+#ifdef _WIN32
             // The working directory, unlike the command itself, should not be quoted.
             boost::erase_all(ctx.working_dir, "\"");
             ctx.working_dir += '\\';
-    #endif
+#endif
           }
-          if (app_node.contains("image-path"))
+          if (app_node.contains("image-path")) {
             ctx.image_path = parse_env_val(this_env, app_node.value("image-path", ""));
+          }
 
           ctx.elevated = app_node.value("elevated", false);
           ctx.auto_detach = app_node.value("auto-detach", true);
           ctx.wait_all = app_node.value("wait-all", true);
-          ctx.exit_timeout = std::chrono::seconds { app_node.value("exit-timeout", 5) };
+          ctx.exit_timeout = std::chrono::seconds {app_node.value("exit-timeout", 5)};
           ctx.virtual_display = app_node.value("virtual-display", false);
           ctx.scale_factor = app_node.value("scale-factor", 100);
           ctx.use_app_identity = app_node.value("use-app-identity", false);
@@ -1418,7 +1459,7 @@ namespace proc {
       BOOST_LOG(warning) << "No applications configured, adding fallback Desktop entry.";
       proc::ctx_t ctx;
       ctx.idx = std::to_string(i);
-      ctx.uuid = FALLBACK_DESKTOP_UUID; // Placeholder UUID
+      ctx.uuid = FALLBACK_DESKTOP_UUID;  // Placeholder UUID
       ctx.name = "Desktop (fallback)";
       ctx.image_path = parse_env_val(this_env, "desktop-alt.png");
       ctx.virtual_display = false;
@@ -1430,7 +1471,7 @@ namespace proc {
 
       ctx.elevated = false;
       ctx.auto_detach = true;
-      ctx.wait_all = false; // Desktop doesn't have a specific command to wait for
+      ctx.wait_all = false;  // Desktop doesn't have a specific command to wait for
       ctx.exit_timeout = 5s;
 
       // Calculate unique ID
@@ -1448,7 +1489,7 @@ namespace proc {
     }
 
     // Virtual Display entry
-  #ifdef _WIN32
+#ifdef _WIN32
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       proc::ctx_t ctx;
       ctx.idx = std::to_string(i);
@@ -1471,8 +1512,7 @@ namespace proc {
       if (ids.count(std::get<0>(possible_ids)) == 0) {
         // Avoid using index to generate id if possible
         ctx.id = std::get<0>(possible_ids);
-      }
-      else {
+      } else {
         // Fallback to include index on collision
         ctx.id = std::get<1>(possible_ids);
       }
@@ -1480,7 +1520,7 @@ namespace proc {
 
       apps.emplace_back(std::move(ctx));
     }
-  #endif
+#endif
 
     if (config::input.enable_input_only_mode) {
       // Input Only entry
@@ -1495,7 +1535,7 @@ namespace proc {
         ctx.use_app_identity = false;
         ctx.per_client_app_identity = false;
         ctx.allow_client_commands = false;
-        ctx.terminate_on_pause = true; // There's no need to keep an active input only session ongoing
+        ctx.terminate_on_pause = true;  // There's no need to keep an active input only session ongoing
 
         ctx.elevated = false;
         ctx.auto_detach = true;
@@ -1506,8 +1546,7 @@ namespace proc {
         if (ids.count(std::get<0>(possible_ids)) == 0) {
           // Avoid using index to generate id if possible
           ctx.id = std::get<0>(possible_ids);
-        }
-        else {
+        } else {
           // Fallback to include index on collision
           ctx.id = std::get<1>(possible_ids);
         }
@@ -1542,8 +1581,7 @@ namespace proc {
         if (ids.count(std::get<0>(possible_ids)) == 0) {
           // Avoid using index to generate id if possible
           ctx.id = std::get<0>(possible_ids);
-        }
-        else {
+        } else {
           // Fallback to include index on collision
           ctx.id = std::get<1>(possible_ids);
         }
@@ -1567,7 +1605,7 @@ namespace proc {
       proc.terminate(false, false);
     }
 
-  #ifdef _WIN32
+#ifdef _WIN32
     size_t fail_count = 0;
     while (fail_count < 5 && vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
       initVDisplayDriver();
@@ -1578,7 +1616,7 @@ namespace proc {
       fail_count += 1;
       std::this_thread::sleep_for(1s);
     }
-  #endif
+#endif
 
     auto proc_opt = proc::parse(file_name);
 

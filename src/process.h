@@ -18,8 +18,8 @@
 
 // lib includes
 #include <boost/process/v1/child.hpp>
-#include <boost/process/v1/group.hpp>
 #include <boost/process/v1/environment.hpp>
+#include <boost/process/v1/group.hpp>
 #include <boost/process/v1/search_path.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <nlohmann/json.hpp>
@@ -32,6 +32,8 @@
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
@@ -96,7 +98,7 @@ namespace proc {
     bool per_client_app_identity;
     bool allow_client_commands;
     bool terminate_on_pause;
-    int  scale_factor;
+    int scale_factor;
     std::chrono::seconds exit_timeout;
   };
 
@@ -109,6 +111,7 @@ namespace proc {
     std::string mode_changed_display;
     bool initial_hdr = false;
     bool virtual_display = false;
+    std::string original_output_name;
     bool allow_client_commands = false;
 
     proc_t(
@@ -121,7 +124,7 @@ namespace proc {
 
     void launch_input_only();
 
-    int execute(const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
+    int execute(const ctx_t &_app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
 
     /**
      * @return `_app_id` if a process is running, otherwise returns `0`
@@ -165,7 +168,7 @@ namespace proc {
   };
 
   boost::filesystem::path
-  find_working_directory(const std::string &cmd, const boost::process::v1::environment &env);
+    find_working_directory(const std::string &cmd, const boost::process::v1::environment &env);
 
   /**
    * @brief Calculate a stable id based on name and image data
@@ -175,7 +178,7 @@ namespace proc {
 
   std::string validate_app_image_path(std::string app_image_path);
   void refresh(const std::string &file_name, bool needs_terminate = true);
-  void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p);
+  void migrate_apps(nlohmann::json *fileTree_p, nlohmann::json *inputTree_p);
   std::optional<proc::proc_t> parse(const std::string &file_name);
 
   /**

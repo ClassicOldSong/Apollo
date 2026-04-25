@@ -8,14 +8,49 @@ modprobe uhid
 if [ ! -x "$(command -v rpm-ostree)" ]; then
   echo "Not in an rpm-ostree environment, proceeding with post install steps."
 
+  # Create sunshine system group if it doesn't exist
+  if ! getent group sunshine >/dev/null 2>&1; then
+    if [ -x "$(command -v groupadd)" ]; then
+      groupadd --system sunshine
+      echo "Created 'sunshine' system group."
+    fi
+  fi
+
+  # Add the installing user to the sunshine group
+  if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    target_user="$SUDO_USER"
+  elif [ -n "$PKEXEC_UID" ]; then
+    target_user=$(id -nu "$PKEXEC_UID" 2>/dev/null)
+  else
+    target_user=""
+  fi
+
+  if [ -n "$target_user" ]; then
+    if ! id -nG "$target_user" 2>/dev/null | grep -qw sunshine; then
+      usermod -aG sunshine "$target_user"
+      echo "Added '$target_user' to 'sunshine' group. Log out and back in for group to take effect."
+    fi
+  fi
+
   # Ensure Sunshine can grab images from KMS
   path_to_setcap=$(which setcap)
   path_to_sunshine=$(readlink -f "$(which sunshine)")
+  path_to_vdisplay_helper=$(readlink -f "$(which sunshine-vdisplay-helper)" 2>/dev/null)
   if [ -x "$path_to_setcap" ] ; then
     echo "Setting CAP_SYS_ADMIN capability on Sunshine binary."
     echo "$path_to_setcap cap_sys_admin+p $path_to_sunshine"
     $path_to_setcap cap_sys_admin+p $path_to_sunshine
     echo "CAP_SYS_ADMIN capability set on Sunshine binary."
+    if [ -n "$path_to_vdisplay_helper" ] ; then
+      if getent group sunshine >/dev/null 2>&1; then
+        chown root:sunshine "$path_to_vdisplay_helper"
+        chmod 0750 "$path_to_vdisplay_helper"
+        echo "Set sunshine-vdisplay-helper ownership to root:sunshine (0750)."
+      fi
+      echo "Setting CAP_DAC_OVERRIDE capability on virtual display helper."
+      $path_to_setcap cap_dac_override+ep $path_to_vdisplay_helper
+      echo "CAP_DAC_OVERRIDE capability set on virtual display helper."
+    fi
   else
     echo "error: setcap not found or not executable."
   fi

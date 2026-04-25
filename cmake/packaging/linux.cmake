@@ -31,6 +31,9 @@ else()
                 DESTINATION "${SYSTEMD_USER_UNIT_INSTALL_DIR}")
         install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc/60-sunshine.conf"
                 DESTINATION "${SYSTEMD_MODULES_LOAD_DIR}")
+        install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc/sunshine-sysusers.conf"
+                DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/sysusers.d"
+                RENAME "sunshine.conf")
     endif()
 endif()
 
@@ -40,7 +43,9 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc
 
 # Apply setcap for RPM
 # https://github.com/coreos/rpm-ostree/discussions/5036#discussioncomment-10291071
-set(CPACK_RPM_USER_FILELIST "%caps(cap_sys_admin+p) ${SUNSHINE_EXECUTABLE_PATH}")
+set(CPACK_RPM_USER_FILELIST
+        "%caps(cap_sys_admin+p) ${SUNSHINE_EXECUTABLE_PATH}"
+        "%attr(0750,root,sunshine) %caps(cap_dac_override+ep) %{_bindir}/sunshine-vdisplay-helper")
 
 # Dependencies
 set(CPACK_DEB_COMPONENT_INSTALL ON)
