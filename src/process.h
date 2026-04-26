@@ -98,7 +98,7 @@ namespace proc {
     bool per_client_app_identity;
     bool allow_client_commands;
     bool terminate_on_pause;
-    int scale_factor;
+    int  scale_factor;
     std::chrono::seconds exit_timeout;
   };
 
@@ -124,7 +124,7 @@ namespace proc {
 
     void launch_input_only();
 
-    int execute(const ctx_t &_app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
+    int execute(const ctx_t& _app, std::shared_ptr<rtsp_stream::launch_session_t> launch_session);
 
     /**
      * @return `_app_id` if a process is running, otherwise returns `0`
@@ -168,7 +168,7 @@ namespace proc {
   };
 
   boost::filesystem::path
-    find_working_directory(const std::string &cmd, const boost::process::v1::environment &env);
+  find_working_directory(const std::string &cmd, const boost::process::v1::environment &env);
 
   /**
    * @brief Calculate a stable id based on name and image data
@@ -178,7 +178,7 @@ namespace proc {
 
   std::string validate_app_image_path(std::string app_image_path);
   void refresh(const std::string &file_name, bool needs_terminate = true);
-  void migrate_apps(nlohmann::json *fileTree_p, nlohmann::json *inputTree_p);
+  void migrate_apps(nlohmann::json* fileTree_p, nlohmann::json* inputTree_p);
   std::optional<proc::proc_t> parse(const std::string &file_name);
 
   /**
