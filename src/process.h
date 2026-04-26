@@ -18,8 +18,8 @@
 
 // lib includes
 #include <boost/process/v1/child.hpp>
-#include <boost/process/v1/group.hpp>
 #include <boost/process/v1/environment.hpp>
+#include <boost/process/v1/group.hpp>
 #include <boost/process/v1/search_path.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <nlohmann/json.hpp>
@@ -32,6 +32,8 @@
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
@@ -109,6 +111,7 @@ namespace proc {
     std::string mode_changed_display;
     bool initial_hdr = false;
     bool virtual_display = false;
+    std::string original_output_name;
     bool allow_client_commands = false;
 
     proc_t(

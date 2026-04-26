@@ -212,7 +212,7 @@ cd %{_builddir}/Sunshine/build
 %make_install
 
 %post
-# Note: this is copied from the postinst script
+# Note: this should be kept in sync with src_assets/linux/misc/postinst
 
 # Load uhid (DS5 emulation)
 echo "Loading uhid kernel module for DS5 emulation."
@@ -221,6 +221,30 @@ modprobe uhid
 # Check if we're in an rpm-ostree environment
 if [ ! -x "$(command -v rpm-ostree)" ]; then
   echo "Not in an rpm-ostree environment, proceeding with post install steps."
+
+  # Create apollo system group if it doesn't exist
+  if ! getent group apollo >/dev/null 2>&1; then
+    if [ -x "$(command -v groupadd)" ]; then
+      groupadd --system apollo
+      echo "Created 'apollo' system group."
+    fi
+  fi
+
+  # Add the installing user to the apollo group
+  if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
+    target_user="$SUDO_USER"
+  elif [ -n "$PKEXEC_UID" ]; then
+    target_user=$(id -nu "$PKEXEC_UID" 2>/dev/null)
+  else
+    target_user=""
+  fi
+
+  if [ -n "$target_user" ]; then
+    if ! id -nG "$target_user" 2>/dev/null | grep -qw apollo; then
+      usermod -aG apollo "$target_user"
+      echo "Added '$target_user' to 'apollo' group. Log out and back in for group to take effect."
+    fi
+  fi
 
   # Trigger udev rule reload for /dev/uinput and /dev/uhid
   path_to_udevadm=$(which udevadm)
@@ -240,7 +264,7 @@ fi
 %files
 # Executables
 %caps(cap_sys_admin+p) %{_bindir}/sunshine
-%caps(cap_sys_admin+p) %{_bindir}/sunshine-*
+%attr(0750,root,apollo) %caps(cap_dac_override+ep) %{_bindir}/apollo-vdisplay-helper
 
 # Systemd unit file for user services
 %{_userunitdir}/sunshine.service
