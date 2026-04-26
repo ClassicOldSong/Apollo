@@ -2,7 +2,7 @@
  * @file src/platform/linux/vdisplay_helper.cpp
  * @brief Privileged helper for virtual display debugfs/sysfs writes.
  *
- * Installed with cap_dac_override+ep so the main sunshine process
+ * Installed with cap_dac_override+ep so the main apollo process
  * does not need CAP_DAC_OVERRIDE in its capability set.
  */
 #include <cstdint>

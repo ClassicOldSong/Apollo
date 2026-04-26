@@ -8,15 +8,15 @@ modprobe uhid
 if [ ! -x "$(command -v rpm-ostree)" ]; then
   echo "Not in an rpm-ostree environment, proceeding with post install steps."
 
-  # Create sunshine system group if it doesn't exist
-  if ! getent group sunshine >/dev/null 2>&1; then
+  # Create apollo system group if it doesn't exist
+  if ! getent group apollo >/dev/null 2>&1; then
     if [ -x "$(command -v groupadd)" ]; then
-      groupadd --system sunshine
-      echo "Created 'sunshine' system group."
+      groupadd --system apollo
+      echo "Created 'apollo' system group."
     fi
   fi
 
-  # Add the installing user to the sunshine group
+  # Add the installing user to the apollo group
   if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     target_user="$SUDO_USER"
   elif [ -n "$PKEXEC_UID" ]; then
@@ -26,26 +26,26 @@ if [ ! -x "$(command -v rpm-ostree)" ]; then
   fi
 
   if [ -n "$target_user" ]; then
-    if ! id -nG "$target_user" 2>/dev/null | grep -qw sunshine; then
-      usermod -aG sunshine "$target_user"
-      echo "Added '$target_user' to 'sunshine' group. Log out and back in for group to take effect."
+    if ! id -nG "$target_user" 2>/dev/null | grep -qw apollo; then
+      usermod -aG apollo "$target_user"
+      echo "Added '$target_user' to 'apollo' group. Log out and back in for group to take effect."
     fi
   fi
 
   # Ensure Sunshine can grab images from KMS
   path_to_setcap=$(which setcap)
   path_to_sunshine=$(readlink -f "$(which sunshine)")
-  path_to_vdisplay_helper=$(readlink -f "$(which sunshine-vdisplay-helper)" 2>/dev/null)
+  path_to_vdisplay_helper=$(readlink -f "$(which apollo-vdisplay-helper)" 2>/dev/null)
   if [ -x "$path_to_setcap" ] ; then
     echo "Setting CAP_SYS_ADMIN capability on Sunshine binary."
     echo "$path_to_setcap cap_sys_admin+p $path_to_sunshine"
     $path_to_setcap cap_sys_admin+p $path_to_sunshine
     echo "CAP_SYS_ADMIN capability set on Sunshine binary."
     if [ -n "$path_to_vdisplay_helper" ] ; then
-      if getent group sunshine >/dev/null 2>&1; then
-        chown root:sunshine "$path_to_vdisplay_helper"
+      if getent group apollo >/dev/null 2>&1; then
+        chown root:apollo "$path_to_vdisplay_helper"
         chmod 0750 "$path_to_vdisplay_helper"
-        echo "Set sunshine-vdisplay-helper ownership to root:sunshine (0750)."
+        echo "Set apollo-vdisplay-helper ownership to root:apollo (0750)."
       fi
       echo "Setting CAP_DAC_OVERRIDE capability on virtual display helper."
       $path_to_setcap cap_dac_override+ep $path_to_vdisplay_helper

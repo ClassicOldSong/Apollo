@@ -3,10 +3,10 @@ do_setcap() {
 }
 
 do_vdisplay_helper() {
-  local helper=$(readlink -f usr/bin/sunshine-vdisplay-helper 2>/dev/null)
+  local helper=$(readlink -f usr/bin/apollo-vdisplay-helper 2>/dev/null)
   if [ -x "$helper" ]; then
-    if getent group sunshine >/dev/null 2>&1; then
-      chown root:sunshine "$helper"
+    if getent group apollo >/dev/null 2>&1; then
+      chown root:apollo "$helper"
       chmod 0750 "$helper"
     fi
     setcap cap_dac_override+ep "$helper"

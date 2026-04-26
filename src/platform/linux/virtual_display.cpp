@@ -563,12 +563,12 @@ namespace linux_vdisplay {
     std::error_code ec;
     auto self = fs::read_symlink("/proc/self/exe", ec);
     if (!ec) {
-      auto sibling = self.parent_path() / "sunshine-vdisplay-helper";
+      auto sibling = self.parent_path() / "apollo-vdisplay-helper";
       if (fs::exists(sibling, ec)) {
         return boost::filesystem::path(sibling.string());
       }
     }
-    return bp::search_path("sunshine-vdisplay-helper");
+    return bp::search_path("apollo-vdisplay-helper");
   }
 
   // Instead of doing debugfs edits here which would require cap_dac_override caps
@@ -579,7 +579,7 @@ namespace linux_vdisplay {
     run_helper(const std::vector<std::string> &args, const uint8_t *stdin_data = nullptr, size_t stdin_len = 0) {
     auto helper = find_helper();
     if (helper.empty()) {
-      BOOST_LOG(error) << "[Experimental] sunshine-vdisplay-helper not found"sv;
+      BOOST_LOG(error) << "[Experimental] apollo-vdisplay-helper not found"sv;
       return false;
     }
 

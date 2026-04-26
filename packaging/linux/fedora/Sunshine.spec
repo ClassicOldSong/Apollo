@@ -222,15 +222,15 @@ modprobe uhid
 if [ ! -x "$(command -v rpm-ostree)" ]; then
   echo "Not in an rpm-ostree environment, proceeding with post install steps."
 
-  # Create sunshine system group if it doesn't exist
-  if ! getent group sunshine >/dev/null 2>&1; then
+  # Create apollo system group if it doesn't exist
+  if ! getent group apollo >/dev/null 2>&1; then
     if [ -x "$(command -v groupadd)" ]; then
-      groupadd --system sunshine
-      echo "Created 'sunshine' system group."
+      groupadd --system apollo
+      echo "Created 'apollo' system group."
     fi
   fi
 
-  # Add the installing user to the sunshine group
+  # Add the installing user to the apollo group
   if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
     target_user="$SUDO_USER"
   elif [ -n "$PKEXEC_UID" ]; then
@@ -240,9 +240,9 @@ if [ ! -x "$(command -v rpm-ostree)" ]; then
   fi
 
   if [ -n "$target_user" ]; then
-    if ! id -nG "$target_user" 2>/dev/null | grep -qw sunshine; then
-      usermod -aG sunshine "$target_user"
-      echo "Added '$target_user' to 'sunshine' group. Log out and back in for group to take effect."
+    if ! id -nG "$target_user" 2>/dev/null | grep -qw apollo; then
+      usermod -aG apollo "$target_user"
+      echo "Added '$target_user' to 'apollo' group. Log out and back in for group to take effect."
     fi
   fi
 
@@ -264,7 +264,7 @@ fi
 %files
 # Executables
 %caps(cap_sys_admin+p) %{_bindir}/sunshine
-%attr(0750,root,sunshine) %caps(cap_dac_override+ep) %{_bindir}/sunshine-vdisplay-helper
+%attr(0750,root,apollo) %caps(cap_dac_override+ep) %{_bindir}/apollo-vdisplay-helper
 
 # Systemd unit file for user services
 %{_userunitdir}/sunshine.service

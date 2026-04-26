@@ -100,10 +100,10 @@ if(LIBDRM_FOUND AND LIBCAP_FOUND)
     list(APPEND SUNSHINE_DEFINITIONS EGL_NO_X11=1)
 
     # Privileged helper for virtual display debugfs writes (cap_dac_override)
-    add_executable(sunshine-vdisplay-helper
+    add_executable(apollo-vdisplay-helper
             "${CMAKE_SOURCE_DIR}/src/platform/linux/vdisplay_helper.cpp")
-    set_target_properties(sunshine-vdisplay-helper PROPERTIES CXX_STANDARD 17)
-    install(TARGETS sunshine-vdisplay-helper RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    set_target_properties(apollo-vdisplay-helper PROPERTIES CXX_STANDARD 17)
+    install(TARGETS apollo-vdisplay-helper RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 
 # evdev
