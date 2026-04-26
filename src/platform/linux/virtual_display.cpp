@@ -10,6 +10,7 @@
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <numeric>
 #include <thread>
@@ -30,6 +31,7 @@
 #include "misc.h"
 #include "src/config.h"
 #include "src/logging.h"
+#include "src/platform/common.h"
 #include "src/utility.h"
 #include "virtual_display.h"
 
@@ -373,6 +375,29 @@ namespace linux_vdisplay {
   };
 
   static std::optional<active_state_t> active_state;
+
+  static fs::path
+    state_file_path() {
+    return platf::appdata() / "vdisplay.state";
+  }
+
+  static void
+    save_state(const connector_info_t &conn) {
+    std::error_code ec;
+    std::ofstream f(state_file_path(), std::ios::trunc);
+    if (f) {
+      f << conn.debugfs_edid_path << '\n'
+        << conn.sysfs_status_path << '\n'
+        << conn.debugfs_hotplug_path << '\n'
+        << conn.sysfs_name << '\n';
+    }
+  }
+
+  static void
+    clear_state() {
+    std::error_code ec;
+    fs::remove(state_file_path(), ec);
+  }
 
   using version_ptr = util::safe_ptr<drmVersion, drmFreeVersion>;
   using res_ptr = util::safe_ptr<drmModeRes, drmModeFreeResources>;
@@ -833,6 +858,38 @@ namespace linux_vdisplay {
     return false;
   }
 
+  void
+    recover_crash_state() {
+    auto path = state_file_path();
+    std::error_code ec;
+    if (!fs::exists(path, ec) || ec) {
+      return;
+    }
+
+    BOOST_LOG(warning) << "[Experimental] Found stale vdisplay state file — recovering from previous crash"sv;
+
+    std::ifstream f(path);
+    std::string edid_path, status_path, hotplug_path, sysfs_name;
+    if (!std::getline(f, edid_path) || !std::getline(f, status_path) || !std::getline(f, hotplug_path) || !std::getline(f, sysfs_name)) {
+      BOOST_LOG(warning) << "[Experimental] Corrupt state file, removing"sv;
+      clear_state();
+      return;
+    }
+
+    connector_info_t conn {};
+    conn.debugfs_edid_path = edid_path;
+    conn.sysfs_status_path = status_path;
+    conn.debugfs_hotplug_path = hotplug_path;
+    conn.sysfs_name = sysfs_name;
+
+    clear_edid(conn);
+    force_status(conn, "detect");
+    trigger_hotplug(conn);
+
+    clear_state();
+    BOOST_LOG(info) << "[Experimental] Crash recovery complete — cleared stale EDID on "sv << sysfs_name;
+  }
+
   static status_e
     create_impl(std::string &out_display_name, int width, int height, int fps_millihertz, const std::string &client_id) {
     if (!is_supported()) {
@@ -905,6 +962,7 @@ namespace linux_vdisplay {
       configure_xrandr(conn);
     }
 
+    save_state(conn);
     out_display_name = conn.sysfs_name;
     return status_e::OK;
   }
@@ -946,6 +1004,7 @@ namespace linux_vdisplay {
     }
 
     active_state.reset();
+    clear_state();
     BOOST_LOG(info) << "[Experimental] Virtual display removed"sv;
     return status_e::OK;
   }

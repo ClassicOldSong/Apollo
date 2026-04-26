@@ -32,6 +32,7 @@ namespace linux_vdisplay {
   };
 
   bool is_supported();
+  void recover_crash_state();
   status_e create(std::string &out_display_name, int width, int height, int fps_millihertz, const std::string &client_id);
   status_e remove();
   bool is_active();
