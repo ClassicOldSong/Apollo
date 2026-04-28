@@ -277,9 +277,15 @@ function add_debian_deps() {
 function add_ubuntu_deps() {
   add_test_ppa
   add_debian_based_deps
-  dependencies+=(
-    "libappindicator3-dev"
-  )
+  if [ "$version" == "26.04" ]; then
+    dependencies+=(
+      "libayatana-appindicator3-dev"
+    )
+  else
+    dependencies+=(
+      "libappindicator3-dev"
+    )
+  fi
 }
 
 function add_fedora_deps() {
@@ -753,6 +759,15 @@ elif grep -q "Ubuntu 25.04" /etc/os-release; then
   cuda_version="12.9.1"
   cuda_build="575.57.08"
   gcc_version="14"
+  nvm_node=0
+elif grep -q "Ubuntu 26.04" /etc/os-release; then
+  distro="ubuntu"
+  version="26.04"
+  package_update_command="${sudo_cmd} apt-get update"
+  package_install_command="${sudo_cmd} apt-get install -y"
+  cuda_version="12.9.1"
+  cuda_build="575.57.08"
+  gcc_version="15"
   nvm_node=0
 else
   echo "Unsupported Distro or Version"
