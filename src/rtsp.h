@@ -12,6 +12,7 @@
 // local includes
 #include "crypto.h"
 #include "thread_safe.h"
+#include "uuid.h"
 
 #ifdef _WIN32
   #include <windows.h>
@@ -58,9 +59,11 @@ namespace rtsp_stream {
     std::list<crypto::command_entry_t> client_do_cmds;
     std::list<crypto::command_entry_t> client_undo_cmds;
 
-  #ifdef _WIN32
+#ifdef _WIN32
     GUID display_guid{};
-  #endif
+#else
+    uuid_util::uuid_t display_guid{};
+#endif
   };
 
   void launch_session_raise(std::shared_ptr<launch_session_t> launch_session);

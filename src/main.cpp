@@ -26,6 +26,8 @@
 #ifdef _WIN32
   #include "platform/windows/misc.h"
   #include "platform/windows/virtual_display.h"
+#else
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define PROBE_DISPLAY_UUID "38F72B96-B00C-4F21-8B6C-E1BFF1602B0E"
@@ -348,6 +350,9 @@ int main(int argc, char *argv[]) {
     BOOST_LOG(error) << "Proc failed to initialize"sv;
   }
 
+  // Initialize virtual display driver early so clients know it's supported
+  proc::initVDisplayDriver();
+
   reed_solomon_init();
   auto input_deinit_guard = input::init();
 
@@ -356,20 +361,24 @@ int main(int argc, char *argv[]) {
   }
 
   if (video::probe_encoders()) {
-#ifdef _WIN32
     bool allow_probing = video::allow_encoder_probing();
     // Create a temporary virtual display for encoder capability probing
     if (proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       std::string probe_uuid_str = PROBE_DISPLAY_UUID;
       auto probe_uuid = uuid_util::uuid_t::parse(probe_uuid_str);
-      auto* probe_guid = (GUID*)(void*)&probe_uuid;
 
       BOOST_LOG(info) << "Creating a temporary virtual display to probe for encoders..."sv;
 
       if (!config::video.adapter_name.empty()) {
+#ifdef _WIN32
         VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
+#else
+        VDISPLAY::setRenderAdapterByName(config::video.adapter_name);
+#endif
       }
 
+#ifdef _WIN32
+      auto* probe_guid = (GUID*)(void*)&probe_uuid;
       VDISPLAY::createVirtualDisplay(
         probe_uuid_str.c_str(),
         "Probe",
@@ -378,6 +387,16 @@ int main(int argc, char *argv[]) {
         60,
         *probe_guid
       );
+#else
+      VDISPLAY::createVirtualDisplay(
+        probe_uuid_str.c_str(),
+        "Probe",
+        800,
+        600,
+        60,
+        probe_uuid
+      );
+#endif
 
       std::this_thread::sleep_for(500ms);
 
@@ -390,13 +409,14 @@ int main(int argc, char *argv[]) {
         }
       }
 
+#ifdef _WIN32
       VDISPLAY::removeVirtualDisplay(*probe_guid);
+#else
+      VDISPLAY::removeVirtualDisplay(probe_uuid);
+#endif
     } else if (!allow_probing) {
       BOOST_LOG(error) << "Video failed to find working encoder: probe failed and virtual display driver isn't initialized"sv;
     }
-#else
-    BOOST_LOG(error) << "Video failed to find working encoder: probing failed."sv;
-#endif
   }
 
   if (http::init()) {

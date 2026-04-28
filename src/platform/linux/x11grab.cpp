@@ -398,8 +398,11 @@ namespace platf {
       refresh();
 
       int streamedMonitor = -1;
-      if (!display_name.empty()) {
+      if (!display_name.empty() && display_name.rfind("VIRTUAL-", 0) != 0) {
+        // Not a virtual display, parse as numeric index
         streamedMonitor = (int) util::from_view(display_name);
+      } else if (display_name.rfind("VIRTUAL-", 0) == 0) {
+        BOOST_LOG(debug) << "Virtual display detected ["sv << display_name << "], using primary monitor for X11 capture"sv;
       }
 
       if (streamedMonitor != -1) {

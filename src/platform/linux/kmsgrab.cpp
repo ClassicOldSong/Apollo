@@ -589,7 +589,15 @@ namespace platf {
       int init(const std::string &display_name, const ::video::config_t &config) {
         delay = std::chrono::nanoseconds {1s} / config.framerate;
 
-        int monitor_index = util::from_view(display_name);
+        // Handle virtual display names (e.g., "VIRTUAL-80EE83C6")
+        // Virtual displays don't have a physical KMS representation, so we fall back to the primary monitor
+        int monitor_index = 0;
+        if (display_name.rfind("VIRTUAL-", 0) != 0) {
+          // Not a virtual display, parse as numeric index
+          monitor_index = util::from_view(display_name);
+        } else {
+          BOOST_LOG(debug) << "Virtual display detected ["sv << display_name << "], using primary monitor for KMS capture"sv;
+        }
         int monitor = 0;
 
         fs::path card_dir {"/dev/dri"sv};

@@ -56,6 +56,7 @@ makedepends=(
 )
 
 optdepends=(
+  'evdi: Virtual display support for streaming to headless clients'
   'libva-mesa-driver: AMD GPU encoding support'
 )
 

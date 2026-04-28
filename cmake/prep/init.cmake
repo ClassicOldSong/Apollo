@@ -9,7 +9,7 @@ elseif (UNIX)
     include(GNUInstallDirs)
 
     if(NOT DEFINED SUNSHINE_EXECUTABLE_PATH)
-        set(SUNSHINE_EXECUTABLE_PATH "sunshine")
+        set(SUNSHINE_EXECUTABLE_PATH "apollo")
     endif()
 
     if(SUNSHINE_BUILD_FLATPAK)

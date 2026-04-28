@@ -41,9 +41,12 @@
   // from_utf8() string conversion function
   #include "platform/windows/misc.h"
   #include "platform/windows/utils.h"
+  #include "platform/windows/virtual_display.h"
 
   // _SH constants for _wfsopen()
   #include <share.h>
+#else
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define DEFAULT_APP_IMAGE_PATH SUNSHINE_ASSETS_DIR "/box.png"
@@ -59,7 +62,6 @@ namespace proc {
   int terminate_app_id = -1;
   std::string terminate_app_id_str;
 
-#ifdef _WIN32
   VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
 
   void onVDisplayWatchdogFailed() {
@@ -76,7 +78,6 @@ namespace proc {
       }
     }
   }
-#endif
 
   class deinit_t: public platf::deinit_t {
   public:
@@ -233,7 +234,6 @@ namespace proc {
       }
     }
 
-#ifdef _WIN32
     if (
       config::video.headless_mode        // Headless mode
       || launch_session->virtual_display // User requested virtual display
@@ -248,7 +248,11 @@ namespace proc {
       if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
         // Try set the render adapter matching the capture adapter if user has specified one
         if (!config::video.adapter_name.empty()) {
+#ifdef _WIN32
           VDISPLAY::setRenderAdapterByName(platf::from_utf8(config::video.adapter_name));
+#else
+          VDISPLAY::setRenderAdapterByName(config::video.adapter_name);
+#endif
         }
 
         std::string device_name;
@@ -276,7 +280,11 @@ namespace proc {
           device_uuid = uuid_util::uuid_t::parse(launch_session->unique_id);
         }
 
+#ifdef _WIN32
         memcpy(&launch_session->display_guid, &device_uuid, sizeof(GUID));
+#else
+        launch_session->display_guid = device_uuid;
+#endif
 
         int target_fps = launch_session->fps ? launch_session->fps : 60000;
 
@@ -288,6 +296,7 @@ namespace proc {
           target_fps *= 2;
         }
 
+#ifdef _WIN32
         std::wstring vdisplayName = VDISPLAY::createVirtualDisplay(
           device_uuid_str.c_str(),
           device_name.c_str(),
@@ -296,6 +305,16 @@ namespace proc {
           target_fps,
           launch_session->display_guid
         );
+#else
+        std::string vdisplayName = VDISPLAY::createVirtualDisplay(
+          device_uuid_str.c_str(),
+          device_name.c_str(),
+          render_width,
+          render_height,
+          target_fps,
+          launch_session->display_guid
+        );
+#endif
 
         // No matter we get the display name or not, the virtual display might still be created.
         // We need to track it properly to remove the display when the session terminates.
@@ -307,18 +326,30 @@ namespace proc {
           // Don't change display settings when no params are given
           if (launch_session->width && launch_session->height && launch_session->fps) {
             // Apply display settings
+#ifdef _WIN32
             VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, target_fps);
+#else
+            VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, target_fps);
+#endif
           }
 
           // Check the ISOLATED DISPLAY configuration setting and rearrange the displays
           if (config::video.isolated_virtual_display_option == true) {
             // Apply the isolated display settings
+#ifdef _WIN32
             VDISPLAY::changeDisplaySettings2(vdisplayName.c_str(), render_width, render_height, target_fps, true);
+#else
+            VDISPLAY::changeDisplaySettings2(vdisplayName.c_str(), render_width, render_height, target_fps, true);
+#endif
           }
 
           // Set virtual_display to true when everything went fine
           this->virtual_display = true;
+#ifdef _WIN32
           this->display_name = platf::to_utf8(vdisplayName);
+#else
+          this->display_name = vdisplayName;
+#endif
 
           // When using virtual display, we don't care which display user configured to use.
           // So we always set output_name to the newly created virtual display as a workaround for
@@ -341,12 +372,6 @@ namespace proc {
     if (this->virtual_display) {
       display_device::reset_persistence();
     }
-
-#else
-
-    display_device::configure_display(config::video, *launch_session);
-
-#endif
 
     // Probe encoders again before streaming to ensure our chosen
     // encoder matches the active GPU (which could have changed
@@ -745,11 +770,14 @@ namespace proc {
 
     bool has_run = _app_id > 0;
 
-#ifdef _WIN32
     // Revert HDR state
     if (has_run && !mode_changed_display.empty()) {
+#ifdef _WIN32
       auto displayNameW = platf::from_utf8(mode_changed_display);
       if (VDISPLAY::setDisplayHDRByName(displayNameW.c_str(), initial_hdr)) {
+#else
+      if (VDISPLAY::setDisplayHDRByName(mode_changed_display.c_str(), initial_hdr)) {
+#endif
         BOOST_LOG(info) << "HDR reverted for display " << mode_changed_display;
       } else {
         BOOST_LOG(info) << "HDR revert failed for display " << mode_changed_display;
@@ -775,10 +803,6 @@ namespace proc {
       } else {
         display_device::revert_configuration();
       }
-#else
-    if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
-      display_device::revert_configuration();
-#endif
 
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
       system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());

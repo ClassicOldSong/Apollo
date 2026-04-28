@@ -52,12 +52,15 @@ namespace wl {
 
       auto monitor = interface.monitors[0].get();
 
-      if (!display_name.empty()) {
+      if (!display_name.empty() && display_name.rfind("VIRTUAL-", 0) != 0) {
+        // Not a virtual display, parse as numeric index
         auto streamedMonitor = util::from_view(display_name);
 
         if (streamedMonitor >= 0 && streamedMonitor < interface.monitors.size()) {
           monitor = interface.monitors[streamedMonitor].get();
         }
+      } else if (display_name.rfind("VIRTUAL-", 0) == 0) {
+        BOOST_LOG(debug) << "Virtual display detected ["sv << display_name << "], using primary monitor for Wayland capture"sv;
       }
 
       monitor->listen(interface.output_manager);

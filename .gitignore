@@ -56,3 +56,9 @@ package-lock.json
 # Python
 *.pyc
 venv/
+
+# Build directories
+cmake-build-*/
+pkg/
+pkg-output/
+*.pkg.tar.zst

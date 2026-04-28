@@ -930,7 +930,7 @@ namespace nvhttp {
 
       tree.put("root.Permission", std::to_string((uint32_t)named_cert_p->perm));
 
-    #ifdef _WIN32
+    #if defined(_WIN32) || defined(__linux__)
       tree.put("root.VirtualDisplayCapable", true);
       if (!!(named_cert_p->perm & PERM::_all_actions)) {
         tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);

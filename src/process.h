@@ -32,6 +32,8 @@
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
+#else
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
@@ -42,9 +44,7 @@
 namespace proc {
   using file_t = util::safe_ptr_v2<FILE, int, fclose>;
 
-#ifdef _WIN32
   extern VDISPLAY::DRIVER_STATUS vDisplayDriverStatus;
-#endif
 
   typedef config::prep_cmd_t cmd_t;
 
@@ -183,6 +183,12 @@ namespace proc {
    * @return Unique pointer to `deinit_t` to manage cleanup
    */
   std::unique_ptr<platf::deinit_t> init();
+
+  /**
+   * @brief Initialize the virtual display driver.
+   * This should be called early in startup to enable virtual display support.
+   */
+  void initVDisplayDriver();
 
   /**
    * @brief Terminates all child processes in a process group.
