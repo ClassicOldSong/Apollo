@@ -2934,7 +2934,8 @@ namespace video {
   util::Either<avcodec_buffer_t, int> cuda_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *encode_device) {
     avcodec_buffer_t hw_device_buf;
 
-    auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_CUDA, nullptr, nullptr, 1 /* AV_CUDA_USE_PRIMARY_CONTEXT */);
+    auto device_name = encode_device->hw_device_name.empty() ? nullptr : encode_device->hw_device_name.c_str();
+    auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_CUDA, device_name, nullptr, 1 /* AV_CUDA_USE_PRIMARY_CONTEXT */);
     if (status < 0) {
       char string[AV_ERROR_MAX_STRING_SIZE];
       BOOST_LOG(error) << "Failed to create a CUDA device: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);

@@ -6,7 +6,10 @@
 #include <bitset>
 #include <fcntl.h>
 #include <filesystem>
+#include <sys/stat.h>
+#include <sys/sysmacros.h>
 #include <thread>
+#include <unistd.h>
 
 // lib includes
 #include <ffnvcodec/dynlink_loader.h>
@@ -273,6 +276,72 @@ namespace cuda {
     return -1;
   }
 
+  int get_cuda_device_index_for_drm_fd(int drm_fd) {
+    struct stat st;
+    if (fstat(drm_fd, &st) < 0) {
+      BOOST_LOG(error) << "Failed to fstat DRM FD: "sv << errno;
+      return -1;
+    }
+
+    unsigned major_dev = major(st.st_rdev);
+    unsigned minor_dev = minor(st.st_rdev);
+
+    char link_path[256];
+    std::snprintf(link_path, sizeof(link_path), "/sys/dev/char/%u:%u", major_dev, minor_dev);
+
+    char target[PATH_MAX];
+    ssize_t len = readlink(link_path, target, sizeof(target) - 1);
+    if (len < 0) {
+      BOOST_LOG(error) << "Failed to readlink "sv << link_path;
+      return -1;
+    }
+    target[len] = '\0';
+
+    // Extract PCI bus ID from path like ../../devices/pci0000:00/.../0000:03:00.0/drm/card2
+    std::string path(target);
+    auto drm_pos = path.find("/drm/card");
+    if (drm_pos == std::string::npos) {
+      BOOST_LOG(error) << "Unexpected sysfs path format: "sv << target;
+      return -1;
+    }
+
+    auto slash_pos = path.rfind('/', drm_pos - 1);
+    if (slash_pos == std::string::npos) {
+      BOOST_LOG(error) << "Unexpected sysfs path format: "sv << target;
+      return -1;
+    }
+
+    std::string drm_pci_id = path.substr(slash_pos + 1, drm_pos - slash_pos - 1);
+    BOOST_LOG(debug) << "DRM FD PCI bus ID: "sv << drm_pci_id;
+
+    int count;
+    if (cdf->cuDeviceGetCount(&count) != CUDA_SUCCESS) {
+      BOOST_LOG(error) << "Failed to get CUDA device count"sv;
+      return -1;
+    }
+
+    for (int i = 0; i < count; ++i) {
+      CUdevice device;
+      if (cdf->cuDeviceGet(&device, i) != CUDA_SUCCESS) continue;
+
+      std::array<char, 13> pci_bus_id;
+      if (cdf->cuDeviceGetPCIBusId(pci_bus_id.data(), pci_bus_id.size(), device) != CUDA_SUCCESS) continue;
+
+      // Lowercase for comparison
+      std::string cuda_pci_id(pci_bus_id.data());
+      std::transform(cuda_pci_id.begin(), cuda_pci_id.end(), cuda_pci_id.begin(), [](char c) { return std::tolower(c); });
+
+      BOOST_LOG(debug) << "CUDA device "sv << i << " PCI bus ID: "sv << cuda_pci_id;
+      if (cuda_pci_id == drm_pci_id) {
+        BOOST_LOG(info) << "Matched DRM FD to CUDA device "sv << i;
+        return i;
+      }
+    }
+
+    BOOST_LOG(warning) << "Could not find CUDA device matching DRM FD PCI bus ID: "sv << drm_pci_id;
+    return -1;
+  }
+
   class gl_cuda_vram_t: public platf::avcodec_encode_device_t {
   public:
     /**
@@ -283,16 +352,32 @@ namespace cuda {
      * @param offset_y Offset of content in captured frame.
      * @return 0 on success or -1 on failure.
      */
-    int init(int in_width, int in_height, int offset_x, int offset_y) {
+    int init(int in_width, int in_height, int offset_x, int offset_y, int drm_fd = -1) {
       // This must be non-zero to tell the video core that it's a hardware encoding device.
       data = (void *) 0x1;
 
       // TODO: Support more than one CUDA device
-      file = std::move(open_drm_fd_for_cuda_device(0));
+      if (drm_fd >= 0) {
+        file.el = dup(drm_fd);
+        if (file.el < 0) {
+          char string[1024];
+          BOOST_LOG(error) << "Couldn't dup DRM FD for CUDA device: "sv << strerror_r(errno, string, sizeof(string));
+          return -1;
+        }
+        BOOST_LOG(info) << "Using provided DRM FD for CUDA EGL device"sv;
+      } else {
+        file = std::move(open_drm_fd_for_cuda_device(0));
+      }
       if (file.el < 0) {
         char string[1024];
         BOOST_LOG(error) << "Couldn't open DRM FD for CUDA device: "sv << strerror_r(errno, string, sizeof(string));
         return -1;
+      }
+
+      // Map the DRM device to the corresponding CUDA device index for FFmpeg
+      int cuda_dev = get_cuda_device_index_for_drm_fd(file.el);
+      if (cuda_dev >= 0) {
+        hw_device_name = std::to_string(cuda_dev);
       }
 
       gbm.reset(gbm::create_device(file.el));
@@ -494,6 +579,20 @@ namespace cuda {
     auto cuda = std::make_unique<gl_cuda_vram_t>();
 
     if (cuda->init(width, height, offset_x, offset_y)) {
+      return nullptr;
+    }
+
+    return cuda;
+  }
+
+  std::unique_ptr<platf::avcodec_encode_device_t> make_avcodec_gl_encode_device(int width, int height, int offset_x, int offset_y, int drm_fd) {
+    if (init()) {
+      return nullptr;
+    }
+
+    auto cuda = std::make_unique<gl_cuda_vram_t>();
+
+    if (cuda->init(width, height, offset_x, offset_y, drm_fd)) {
       return nullptr;
     }
 

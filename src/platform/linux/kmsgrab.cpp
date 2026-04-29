@@ -210,6 +210,7 @@ namespace platf {
       _CONVERT("WRITEBACK"sv, WRITEBACK);
       _CONVERT("Writeback"sv, WRITEBACK);
       _CONVERT("SPI"sv, SPI);
+      _CONVERT("Meta"sv, VIRTUAL);
 #ifdef DRM_MODE_CONNECTOR_USB
       _CONVERT("USB"sv, USB);
 #endif
@@ -1351,7 +1352,7 @@ namespace platf {
 
 #ifdef SUNSHINE_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
-          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y);
+          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y, card.fd.el);
         }
 #endif
 

@@ -410,6 +410,7 @@ namespace platf {
   struct avcodec_encode_device_t: encode_device_t {
     void *data {};
     AVFrame *frame {};
+    std::string hw_device_name;
 
     int convert(platf::img_t &img) override {
       return -1;

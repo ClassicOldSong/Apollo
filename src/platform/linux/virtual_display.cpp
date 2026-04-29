@@ -334,17 +334,24 @@ namespace VDISPLAY {
   }
 
   static int find_available_evdi_device() {
-    // Find next available EVDI device
+    // First pass: find an already-available EVDI device
     for (int i = 0; i < 16; i++) {
       auto status = evdi.check_device(i);
       if (status == EVDI_AVAILABLE) {
         return i;
-      } else if (status == EVDI_NOT_PRESENT) {
-        // Device doesn't exist yet, we can add it
-        int result = evdi.add_device();
-        if (result >= 0) {
-          BOOST_LOG(info) << "[VDISPLAY] Added new EVDI device: " << result;
-          return result;
+      }
+    }
+
+    // No available device found; add a new one
+    int result = evdi.add_device();
+    if (result >= 0) {
+      BOOST_LOG(info) << "[VDISPLAY] Added new EVDI device, scanning for index...";
+      // Second pass: find the newly added device
+      for (int i = 0; i < 16; i++) {
+        auto status = evdi.check_device(i);
+        if (status == EVDI_AVAILABLE) {
+          BOOST_LOG(info) << "[VDISPLAY] Found new EVDI device at index: " << i;
+          return i;
         }
       }
     }
