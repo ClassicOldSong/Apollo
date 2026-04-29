@@ -355,7 +355,15 @@ namespace proc {
           // So we always set output_name to the newly created virtual display as a workaround for
           // empty name when probing graphics cards.
 
-          config::video.output_name = display_device::map_display_name(this->display_name);
+          auto mapped_display_name = display_device::map_display_name(this->display_name);
+#ifndef _WIN32
+          if (mapped_display_name.empty()) {
+            BOOST_LOG(warning) << "Virtual display [" << this->display_name << "] cannot be mapped on Linux; falling back to physical display capture.";
+            this->display_name.clear();
+            this->virtual_display = false;
+          }
+#endif
+          config::video.output_name = mapped_display_name;
         } else {
           BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
         }

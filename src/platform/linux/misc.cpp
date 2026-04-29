@@ -9,6 +9,7 @@
 #endif
 
 // standard includes
+#include <atomic>
 #include <fstream>
 #include <iostream>
 
@@ -55,6 +56,17 @@ namespace fs = std::filesystem;
 namespace bp = boost::process::v1;
 
 window_system_e window_system;
+
+namespace {
+  bool is_cgnat_v4(const boost::asio::ip::address &address) {
+    if (!address.is_v4()) {
+      return false;
+    }
+
+    const auto value = address.to_v4().to_uint();
+    return value >= 0x64400000u && value <= 0x647fffffu;
+  }
+}  // namespace
 
 namespace dyn {
   void *handle(const std::vector<const char *> &libs) {
@@ -507,9 +519,10 @@ std::string get_local_ip_for_gateway() {
     }
 
     auto const max_iovs_per_msg = send_info.payload_buffers.size() + (send_info.headers ? 1 : 0);
+    const auto allow_udp_gso = !is_cgnat_v4(send_info.target_address) && !is_cgnat_v4(send_info.source_address);
 
 #ifdef UDP_SEGMENT
-    {
+    if (allow_udp_gso) {
       // UDP GSO on Linux currently only supports sending 64K or 64 segments at a time
       size_t seg_index = 0;
       const size_t seg_max = 65536 / 1500;
@@ -590,6 +603,12 @@ std::string get_local_ip_for_gateway() {
       // If we sent something, return the status and don't fall back to the non-GSO path.
       if (seg_index != 0) {
         return seg_index >= send_info.block_count;
+      }
+    } else {
+      static std::atomic_bool logged_udp_gso_skip {false};
+      bool expected = false;
+      if (logged_udp_gso_skip.compare_exchange_strong(expected, true)) {
+        BOOST_LOG(info) << "Disabling UDP GSO for CGNAT/tailnet peer "sv << send_info.target_address.to_string();
       }
     }
 #endif
@@ -1022,6 +1041,9 @@ std::string get_local_ip_for_gateway() {
 #ifdef SUNSHINE_BUILD_DRM
     if ((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") {
       if (verify_kms()) {
+        sources[source::KMS] = true;
+      } else if (fs::exists("/sys/devices/evdi"sv)) {
+        BOOST_LOG(info) << "EVDI is available; enabling KMS capture for virtual displays"sv;
         sources[source::KMS] = true;
       }
     }

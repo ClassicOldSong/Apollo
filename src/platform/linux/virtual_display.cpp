@@ -732,8 +732,12 @@ namespace VDISPLAY {
     std::string guid_str = guid.string();
     std::string display_name = generate_display_name(guid);
 
-    // Convert fps from mHz to Hz
-    uint32_t fps_hz = fps / 1000;
+    uint32_t fps_hz = fps;
+    if (fps_hz == 0) {
+      fps_hz = 60;
+    } else if (fps_hz >= 1000) {
+      fps_hz /= 1000;
+    }
 
     BOOST_LOG(info) << "[VDISPLAY] Creating virtual display: " << display_name
                     << " (W: " << width << ", H: " << height << ", FPS: " << fps_hz << ")";
@@ -744,7 +748,7 @@ namespace VDISPLAY {
     vdinfo.guid_str = guid_str;
     vdinfo.width = width;
     vdinfo.height = height;
-    vdinfo.fps = fps;
+    vdinfo.fps = fps_hz * 1000;
     vdinfo.device_index = -1;
     vdinfo.handle = nullptr;
     vdinfo.drm_fd = -1;
@@ -831,7 +835,12 @@ namespace VDISPLAY {
     std::lock_guard<std::mutex> lock(vdisplay_mutex);
 
     // Convert from mHz to Hz
-    int refresh_hz = refresh_rate / 1000;
+    int refresh_hz = refresh_rate;
+    if (refresh_hz == 0) {
+      refresh_hz = 60;
+    } else if (refresh_hz >= 1000) {
+      refresh_hz /= 1000;
+    }
 
     BOOST_LOG(info) << "[VDISPLAY] Changing display settings for " << deviceName
                     << " to " << width << "x" << height << "@" << refresh_hz << "Hz";
@@ -841,7 +850,7 @@ namespace VDISPLAY {
       if (vdinfo.name == deviceName) {
         vdinfo.width = width;
         vdinfo.height = height;
-        vdinfo.fps = refresh_rate;
+        vdinfo.fps = refresh_hz * 1000;
 
         if (vdinfo.using_evdi && vdinfo.handle) {
           // Reconnect with new EDID for new resolution

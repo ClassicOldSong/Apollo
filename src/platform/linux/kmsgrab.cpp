@@ -27,6 +27,7 @@
 #include "src/utility.h"
 #include "src/video.h"
 #include "vaapi.h"
+#include "virtual_display.h"
 #include "wayland.h"
 
 using namespace std::literals;
@@ -590,37 +591,26 @@ namespace platf {
       int init(const std::string &display_name, const ::video::config_t &config) {
         delay = std::chrono::nanoseconds {1s} / config.framerate;
 
-        // Handle virtual display names (e.g., "VIRTUAL-80EE83C6")
-        // Virtual displays don't have a physical KMS representation, so we fall back to the primary monitor
-        int monitor_index = 0;
-        if (display_name.rfind("VIRTUAL-", 0) != 0) {
-          // Not a virtual display, parse as numeric index
-          monitor_index = util::from_view(display_name);
-        } else {
-          BOOST_LOG(debug) << "Virtual display detected ["sv << display_name << "], using primary monitor for KMS capture"sv;
+        const bool is_virtual_display = display_name.rfind("VIRTUAL-", 0) == 0;
+        const int monitor_index = is_virtual_display ? 0 : util::from_view(display_name);
+
+        if (is_virtual_display && !VDISPLAY::isEvdiDisplay(display_name)) {
+          BOOST_LOG(error) << "Virtual display ["sv << display_name << "] is not backed by EVDI"sv;
+          return -1;
         }
-        int monitor = 0;
 
-        fs::path card_dir {"/dev/dri"sv};
-        for (auto &entry : fs::directory_iterator {card_dir}) {
-          auto file = entry.path().filename();
-
-          auto filestring = file.generic_string();
-          if (filestring.size() < 4 || std::string_view {filestring}.substr(0, 4) != "card"sv) {
-            continue;
-          }
-
+        auto init_card = [&](const fs::path &card_path, const std::string &filestring, int &monitor) -> int {
           kms::card_t card;
-          if (card.init(entry.path().c_str())) {
-            continue;
+          if (card.init(card_path.c_str())) {
+            return 1;
           }
 
           // Skip non-Nvidia cards if we're looking for CUDA devices
           // unless NVENC is selected manually by the user
-          if (mem_type == mem_type_e::cuda && !card.is_nvidia()) {
-            BOOST_LOG(debug) << file << " is not a CUDA device"sv;
+          if (!is_virtual_display && mem_type == mem_type_e::cuda && !card.is_nvidia()) {
+            BOOST_LOG(debug) << filestring << " is not a CUDA device"sv;
             if (config::video.encoder != "nvenc") {
-              continue;
+              return 1;
             }
           }
 
@@ -679,7 +669,7 @@ namespace platf {
             if (pos == std::end(card_descriptors)) {
               // This code path shouldn't happen, but it's there just in case.
               // card_descriptors is part of the guesswork after all.
-              BOOST_LOG(error) << "Couldn't find ["sv << entry.path() << "]: This shouldn't have happened :/"sv;
+              BOOST_LOG(error) << "Couldn't find ["sv << card_path << "]: This shouldn't have happened :/"sv;
               return -1;
             }
 
@@ -746,11 +736,74 @@ namespace platf {
             }
 
             this->card = std::move(card);
-            goto break_loop;
+            return 0;
           }
+
+          return 1;
+        };
+
+        auto find_monitor = [&]() -> int {
+          int monitor = 0;
+
+          if (is_virtual_display) {
+            auto evdi_card_index = VDISPLAY::getEvdiCardIndex(display_name);
+            if (evdi_card_index < 0) {
+              BOOST_LOG(error) << "Couldn't find EVDI DRM card for ["sv << display_name << ']';
+              return -1;
+            }
+
+            std::string filestring = "card"s + std::to_string(evdi_card_index);
+            fs::path card_path = fs::path {"/dev/dri"sv} / filestring;
+            if (!fs::exists(card_path)) {
+              BOOST_LOG(error) << "EVDI DRM card ["sv << card_path << "] does not exist for ["sv << display_name << ']';
+              return -1;
+            }
+
+            auto status = init_card(card_path, filestring, monitor);
+            if (status > 0) {
+              BOOST_LOG(debug) << "EVDI display ["sv << display_name << "] does not have an active scanout yet"sv;
+            }
+            return status;
+          }
+
+          fs::path card_dir {"/dev/dri"sv};
+          for (auto &entry : fs::directory_iterator {card_dir}) {
+            auto file = entry.path().filename();
+
+            auto filestring = file.generic_string();
+            if (filestring.size() < 4 || std::string_view {filestring}.substr(0, 4) != "card"sv) {
+              continue;
+            }
+
+            auto status = init_card(entry.path(), filestring, monitor);
+            if (status <= 0) {
+              return status;
+            }
+          }
+
+          return 1;
+        };
+
+        if (is_virtual_display) {
+          for (int attempt = 0; attempt < 20; ++attempt) {
+            auto status = find_monitor();
+            if (status <= 0) {
+              if (!status && attempt > 0) {
+                BOOST_LOG(info) << "EVDI display ["sv << display_name << "] became capturable after "sv << (attempt * 100) << "ms"sv;
+              }
+              if (status) {
+                return status;
+              }
+              goto break_loop;
+            }
+
+            std::this_thread::sleep_for(100ms);
+          }
+        } else if (!find_monitor()) {
+          goto break_loop;
         }
 
-        BOOST_LOG(error) << "Couldn't find monitor ["sv << monitor_index << ']';
+        BOOST_LOG(error) << "Couldn't find monitor ["sv << display_name << ']';
         return -1;
 
       // Neatly break from nested for loop

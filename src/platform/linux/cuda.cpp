@@ -297,9 +297,9 @@ namespace cuda {
     }
     target[len] = '\0';
 
-    // Extract PCI bus ID from path like ../../devices/pci0000:00/.../0000:03:00.0/drm/card2
+    // Extract PCI bus ID from path like ../../devices/pci0000:00/.../0000:03:00.0/drm/card2 or .../drm/renderD129
     std::string path(target);
-    auto drm_pos = path.find("/drm/card");
+    auto drm_pos = path.find("/drm/");
     if (drm_pos == std::string::npos) {
       BOOST_LOG(error) << "Unexpected sysfs path format: "sv << target;
       return -1;

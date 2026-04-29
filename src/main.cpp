@@ -388,7 +388,12 @@ int main(int argc, char *argv[]) {
         *probe_guid
       );
 #else
-      VDISPLAY::createVirtualDisplay(
+      auto previous_output_name = config::video.output_name;
+      auto restore_output_name = util::fail_guard([&]() {
+        config::video.output_name = previous_output_name;
+      });
+
+      auto probe_display_name = VDISPLAY::createVirtualDisplay(
         probe_uuid_str.c_str(),
         "Probe",
         800,
@@ -396,6 +401,15 @@ int main(int argc, char *argv[]) {
         60,
         probe_uuid
       );
+
+      if (!probe_display_name.empty()) {
+        auto mapped_probe_display_name = display_device::map_display_name(probe_display_name);
+        if (!mapped_probe_display_name.empty()) {
+          config::video.output_name = mapped_probe_display_name;
+        } else {
+          BOOST_LOG(warning) << "Temporary virtual display [" << probe_display_name << "] cannot be mapped on Linux; probing physical display instead.";
+        }
+      }
 #endif
 
       std::this_thread::sleep_for(500ms);
