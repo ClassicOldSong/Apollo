@@ -1352,7 +1352,7 @@ namespace platf {
 
 #ifdef SUNSHINE_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
-          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y, card.fd.el);
+          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y, card.render_fd.el);
         }
 #endif
 
