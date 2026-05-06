@@ -347,6 +347,7 @@ namespace platf::audio {
     );
 
     if (FAILED(status)) {
+      BOOST_LOG(error) << "Couldn't get default audio endpoint [0x"sv << util::hex(status).to_string_view() << ']';
       return std::nullopt;
     }
 
