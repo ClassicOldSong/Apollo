@@ -26,6 +26,8 @@
 #ifdef _WIN32
   #include "platform/windows/misc.h"
   #include "platform/windows/virtual_display.h"
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+  #include "platform/linux/virtual_display.h"
 #endif
 
 #define PROBE_DISPLAY_UUID "38F72B96-B00C-4F21-8B6C-E1BFF1602B0E"
@@ -205,6 +207,12 @@ int main(int argc, char *argv[]) {
   if (!display_device_deinit_guard) {
     BOOST_LOG(error) << "Display device session failed to initialize"sv;
   }
+
+#if defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+  if (config::video.linux_virtual_display_experimental) {
+    linux_vdisplay::recover_crash_state();
+  }
+#endif
 
 #ifdef _WIN32
   // Modify relevant NVIDIA control panel settings if the system has corresponding gpu

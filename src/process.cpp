@@ -28,14 +28,14 @@
 #include "crypto.h"
 #include "display_device.h"
 #include "file_handler.h"
+#include "httpcommon.h"
 #include "logging.h"
 #include "platform/common.h"
 #include "process.h"
-#include "httpcommon.h"
 #include "system_tray.h"
 #include "utility.h"
-#include "video.h"
 #include "uuid.h"
+#include "video.h"
 
 #ifdef _WIN32
   // from_utf8() string conversion function
@@ -341,6 +341,31 @@ namespace proc {
     if (this->virtual_display) {
       display_device::reset_persistence();
     }
+
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+
+    if (
+      config::video.linux_virtual_display_experimental &&
+      (config::video.headless_mode || launch_session->virtual_display || _app.virtual_display)
+    ) {
+      std::string vdisplay_name;
+      auto status = linux_vdisplay::create(vdisplay_name, render_width, render_height, launch_session->fps, launch_session->unique_id);
+      if (status == linux_vdisplay::status_e::OK) {
+        BOOST_LOG(info) << "[Experimental] Linux virtual display created: "sv << vdisplay_name;
+        this->virtual_display = true;
+
+        auto kms_idx = linux_vdisplay::get_kms_index();
+        if (kms_idx >= 0) {
+          this->original_output_name = config::video.output_name;
+          config::video.output_name = std::to_string(kms_idx);
+          BOOST_LOG(info) << "[Experimental] Capturing virtual display at KMS index "sv << kms_idx;
+        }
+      } else {
+        BOOST_LOG(warning) << "[Experimental] Linux virtual display failed (status "sv << static_cast<int>(status) << ')';
+      }
+    }
+
+    display_device::configure_display(config::video, *launch_session);
 
 #else
 
@@ -771,6 +796,21 @@ namespace proc {
     // Since terminate() is always run when a new app has started
     if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
       if (used_virtual_display) {
+        display_device::reset_persistence();
+      } else {
+        display_device::revert_configuration();
+      }
+#elif defined(__linux__) && defined(SUNSHINE_BUILD_DRM)
+    if (this->virtual_display && linux_vdisplay::is_active()) {
+      linux_vdisplay::remove();
+      BOOST_LOG(info) << "[Experimental] Linux virtual display removed"sv;
+      if (!this->original_output_name.empty()) {
+        config::video.output_name = this->original_output_name;
+        BOOST_LOG(info) << "[Experimental] Restored output_name to "sv << this->original_output_name;
+      }
+    }
+    if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+      if (this->virtual_display) {
         display_device::reset_persistence();
       } else {
         display_device::revert_configuration();
@@ -1438,7 +1478,8 @@ namespace proc {
       if (ids.count(std::get<0>(possible_ids)) == 0) {
         // Avoid using index to generate id if possible
         ctx.id = std::get<0>(possible_ids);
-      } else {
+      }
+      else {
         // Fallback to include index on collision
         ctx.id = std::get<1>(possible_ids);
       }
@@ -1471,8 +1512,7 @@ namespace proc {
       if (ids.count(std::get<0>(possible_ids)) == 0) {
         // Avoid using index to generate id if possible
         ctx.id = std::get<0>(possible_ids);
-      }
-      else {
+      } else {
         // Fallback to include index on collision
         ctx.id = std::get<1>(possible_ids);
       }
