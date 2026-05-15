@@ -138,8 +138,8 @@ namespace audio {
       apply_surround_params(stream, config.customStreamParams);
     }
 
-    auto ref = get_audio_ctx_ref();
-    if (!ref) {
+    auto ctx = get_audio_ctx_ref();
+    if (!ctx) {
       return;
     }
 
@@ -152,32 +152,31 @@ namespace audio {
       return;
     });
 
-    auto &control = ref->control;
+    auto &control = ctx->control;
     if (!control) {
       return;
     }
 
     // Order of priority:
     // 1. Virtual sink
-    // 2. Audio sink
-    // 3. Host
-    std::string *sink = &ref->sink.host;
+    // 2. Host
+    std::string *sink = &ctx->sink.host;
     if (!config::audio.sink.empty()) {
       sink = &config::audio.sink;
     }
 
     // Prefer the virtual sink if host playback is disabled or there's no other sink
-    if (ref->sink.null && (!config.flags[config_t::HOST_AUDIO] || sink->empty())) {
-      auto &null = *ref->sink.null;
+    if (ctx->sink.null.has_value() && (!config.flags[config_t::HOST_AUDIO] || sink->empty())) {
+      auto &[stereo, surround51, surround71] = ctx->sink.null.value();
       switch (stream.channelCount) {
         case 2:
-          sink = &null.stereo;
+          sink = &stereo;
           break;
         case 6:
-          sink = &null.surround51;
+          sink = &surround51;
           break;
         case 8:
-          sink = &null.surround71;
+          sink = &surround71;
           break;
       }
     }
@@ -185,10 +184,10 @@ namespace audio {
     BOOST_LOG(info) << "Selected audio sink: "sv << *sink;
 
     // Only the first to start a session may change the default sink
-    if (!ref->sink_flag->exchange(true, std::memory_order_acquire)) {
-      // If the selected sink is different than the current one, change sinks.
-      ref->restore_sink = ref->sink.host != *sink;
-      if (ref->restore_sink) {
+    if (!ctx->sink_flag->exchange(true, std::memory_order_acquire)) {
+      // If the selected sink is different from the current one, change sinks.
+      ctx->restore_sink = ctx->sink.host != *sink;
+      if (ctx->restore_sink) {
         if (control->set_sink(*sink)) {
           return;
         }
@@ -291,18 +290,19 @@ namespace audio {
     // The default sink has not been replaced yet.
     ctx.restore_sink = false;
 
-    if (!(ctx.control = platf::audio_control())) {
+    ctx.control = platf::audio_control();
+    if (ctx.control == nullptr) {
       return 0;
     }
 
     auto sink = ctx.control->sink_info();
-    if (!sink) {
+    if (!sink.has_value()) {
       // Let the calling code know it failed
       ctx.control.reset();
       return 0;
     }
 
-    ctx.sink = std::move(*sink);
+    ctx.sink = std::move(sink.value());
 
     fg.disable();
     return 0;
