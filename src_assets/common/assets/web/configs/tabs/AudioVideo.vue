@@ -97,6 +97,13 @@ const validateFallbackMode = (event) => {
                   v-model="config.auto_capture_sink"
                   default="true"
         ></Checkbox>
+
+        <Checkbox class="mb-3"
+                  id="release_sink_on_pause"
+                  locale-prefix="config"
+                  v-model="config.release_sink_on_pause"
+                  default="false"
+        ></Checkbox>
       </template>
     </PlatformLayout>
 

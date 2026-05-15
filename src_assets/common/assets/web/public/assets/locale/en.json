@@ -417,6 +417,8 @@
     "qsv_preset_veryfast": "fastest (lowest quality)",
     "qsv_slow_hevc": "Allow Slow HEVC Encoding",
     "qsv_slow_hevc_desc": "This can enable HEVC encoding on older Intel GPUs, at the cost of higher GPU usage and worse performance.",
+    "release_sink_on_pause": "Release audio sink when paused",
+    "release_sink_on_pause_desc": "When enabled, Apollo will restore the original audio output device when all clients disconnect while a launched app is still running on the host. The virtual sink is re-applied automatically when a new client connects.",
     "restart_note": "Apollo is restarting to apply changes.",
     "server_cmd": "Server Commands",
     "server_cmd_desc": "Configure a list of commands to be executed when called from client during streaming.",

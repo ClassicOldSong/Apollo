@@ -308,18 +308,40 @@ namespace audio {
     return 0;
   }
 
+  static void revert_audio_sink(audio_ctx_t &ctx) {
+    // Change back to the host sink, unless there was none
+    const std::string &sink = ctx.sink.host.empty() ? config::audio.sink : ctx.sink.host;
+    if (!sink.empty()) {
+      BOOST_LOG(info) << "Restoring audio sink to: "sv << sink;
+      // Best effort, it's allowed to fail
+      ctx.control->set_sink(sink);
+    }
+  }
+
   void stop_audio_control(audio_ctx_t &ctx) {
     // restore audio-sink if applicable
     if (!ctx.restore_sink) {
       return;
     }
 
-    // Change back to the host sink, unless there was none
-    const std::string &sink = ctx.sink.host.empty() ? config::audio.sink : ctx.sink.host;
-    if (!sink.empty()) {
-      // Best effort, it's allowed to fail
-      ctx.control->set_sink(sink);
+    revert_audio_sink(ctx);
+  }
+
+  void restore_sink() {
+    auto ref = get_audio_ctx_ref();
+    if (!ref) {
+      return;
     }
+
+    auto *ctx = ref.get();
+    if (!ctx->control || !ctx->restore_sink) {
+      return;
+    }
+
+    revert_audio_sink(*ctx);
+
+    ctx->restore_sink = false;
+    ctx->sink_flag->store(false, std::memory_order_release);
   }
 
   void apply_surround_params(opus_stream_config_t &stream, const stream_params_t &params) {
