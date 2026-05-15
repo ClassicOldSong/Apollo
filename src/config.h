@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 // local includes
 #include "nvenc/nvenc_config.h"
@@ -215,6 +216,10 @@ namespace config {
 
     bool enable_input_only_mode;
     bool forward_rumble;
+    // Alternate Controller Numbering Mode
+    bool enable_alt_controller_numbering_mode;
+    int alt_controller_count;
+    std::string alt_controller_mode;
   };
 
   namespace flag {
@@ -289,7 +294,32 @@ namespace config {
     std::vector<prep_cmd_t> state_cmds;
     std::vector<server_cmd_t> server_cmds;
   };
+  
+  // Alternate Controller Numbering Mode
+  
+  struct sDeviceNameOrder {
+    std::string sDeviceName;
+    std::string sOrder;
+    std::vector < int > vOrder;
+    std::string sShared;
+    std::vector < int > vShared;
+    std::string sJitterJoysticks;
+    std::vector < int > vJitterJoysticks;
+    std::string sSwapJoysticks;
+    std::vector < int > vSwapJoysticks;
+    std::string sUuid;
+  };
+  
+  struct alt_gamepad_numbering_t {
+    std::recursive_mutex alt_gamepad_numbering_mutex;
+    std::vector< std::string > sDeviceNames;
+    volatile bool bFirstTimeControllerAllocation { true };
+    volatile bool bFirstTimeParsing { true };
+    volatile bool bFirstTimeFeedbackQueues { true };
+  }; 
 
+  extern std::vector< struct config::sDeviceNameOrder > VectorAlternateGamepadParameters;
+  extern alt_gamepad_numbering_t alt_gamepad_numbering;
   extern video_t video;
   extern audio_t audio;
   extern stream_t stream;
