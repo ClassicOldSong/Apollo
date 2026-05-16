@@ -4,8 +4,9 @@
  *
  * The default Ubuntu Wayland backend uses EVDI to provide a real compositor
  * monitor and GNOME Mutter ScreenCast/PipeWire to capture it. Pure
- * RecordVirtual and direct EVDI/KMS capture remain available as explicit
- * debug backends via APOLLO_LINUX_VIRTUAL_BACKEND.
+ * RecordVirtual and direct EVDI/KMS capture remain available through the
+ * linux_virtual_display_backend config key. APOLLO_LINUX_VIRTUAL_BACKEND is
+ * kept as an explicit developer override for diagnostics and bisection.
  */
 
 // standard includes
@@ -43,6 +44,7 @@
 
 // local includes
 #include "misc.h"
+#include "mutter_dbus.h"
 #include "src/config.h"
 #include "src/logging.h"
 #include "virtual_display.h"
@@ -94,13 +96,13 @@ namespace VDISPLAY {
     int rect_count;
   };
 
-  enum apollo_evdi_grabpix_mode {
-    APOLLO_EVDI_GRABPIX_MODE_RECTS = 0,
-    APOLLO_EVDI_GRABPIX_MODE_DIRTY = 1
+  enum evdi_grabpix_mode {
+    EVDI_GRABPIX_MODE_RECTS = 0,
+    EVDI_GRABPIX_MODE_DIRTY = 1
   };
 
-  struct apollo_drm_evdi_grabpix {
-    apollo_evdi_grabpix_mode mode;
+  struct evdi_grabpix_ioctl_t {
+    evdi_grabpix_mode mode;
     int32_t buf_width;
     int32_t buf_height;
     int32_t buf_byte_stride;
@@ -109,11 +111,11 @@ namespace VDISPLAY {
     drm_clip_rect *rects;
   };
 
-  static_assert(sizeof(apollo_drm_evdi_grabpix) == 40);
+  static_assert(sizeof(evdi_grabpix_ioctl_t) == 40);
 
-  static constexpr auto APOLLO_DRM_EVDI_GRABPIX = 0x02;
-  static constexpr unsigned long APOLLO_DRM_IOCTL_EVDI_GRABPIX =
-    DRM_IOWR(DRM_COMMAND_BASE + APOLLO_DRM_EVDI_GRABPIX, apollo_drm_evdi_grabpix);
+  static constexpr auto EVDI_GRABPIX_DRM_COMMAND = 0x02;
+  static constexpr unsigned long EVDI_GRABPIX_IOCTL =
+    DRM_IOWR(DRM_COMMAND_BASE + EVDI_GRABPIX_DRM_COMMAND, evdi_grabpix_ioctl_t);
 
   struct evdi_cursor_set {
     int32_t hot_x;
@@ -247,7 +249,7 @@ namespace VDISPLAY {
       });
 
       BOOST_LOG(info) << "[VDISPLAY] Started EVDI update pump for " << this->display_name
-                      << (this->publish_frames ? " with frame publishing." : " in vblank-only drain mode.");
+                      << (this->publish_frames ? " with frame publishing." : " as a PipeWire frame acknowledger.");
     }
 
     void stop() {
@@ -380,18 +382,18 @@ namespace VDISPLAY {
       event_context.cursor_move_handler = &evdi_painter_t::cursor_move_handler;
       event_context.user_data = this;
 
-      const int event_fd = evdi.get_event_ready(handle);
-      if (event_fd < 0) {
+      const int update_event_fd = evdi.get_event_ready(handle);
+      if (update_event_fd < 0) {
         BOOST_LOG(warning) << "[VDISPLAY] EVDI update pump has no event fd for " << display_name;
         return;
       }
 
-      drain_fd = event_fd;
+      event_fd = update_event_fd;
       while (running) {
         request_update();
 
         pollfd pfd {};
-        pfd.fd = event_fd;
+        pfd.fd = update_event_fd;
         pfd.events = POLLIN | POLLPRI;
 
         const int poll_status = poll(&pfd, 1, 100);
@@ -405,7 +407,7 @@ namespace VDISPLAY {
           BOOST_LOG(debug) << "[VDISPLAY] EVDI update pump poll failed for " << display_name << ": " << strerror(errno);
         }
       }
-      drain_fd = -1;
+      event_fd = -1;
     }
 
     void handle_mode_changed(const evdi_mode &mode) {
@@ -513,7 +515,7 @@ namespace VDISPLAY {
         rect_count = static_cast<int>(buffer->rects.size());
         evdi.grab_pixels(handle, buffer->rects.data(), &rect_count);
       } else {
-        drain_update_without_copy(rect_count);
+        acknowledge_update_without_frame_copy(rect_count);
       }
       const auto grab_done = std::chrono::steady_clock::now();
       {
@@ -534,16 +536,16 @@ namespace VDISPLAY {
       request_update();
     }
 
-    bool drain_update_without_copy(int &rect_count) {
+    bool acknowledge_update_without_frame_copy(int &rect_count) {
       rect_count = 0;
 
-      if (drain_fd < 0 || current_mode.width <= 0 || current_mode.height <= 0) {
+      if (event_fd < 0 || current_mode.width <= 0 || current_mode.height <= 0) {
         return false;
       }
 
       std::array<drm_clip_rect, 16> rects {};
-      apollo_drm_evdi_grabpix cmd {};
-      cmd.mode = APOLLO_EVDI_GRABPIX_MODE_DIRTY;
+      evdi_grabpix_ioctl_t cmd {};
+      cmd.mode = EVDI_GRABPIX_MODE_DIRTY;
       cmd.buf_width = 1;
       cmd.buf_height = 1;
       cmd.buf_byte_stride = 4;
@@ -553,7 +555,7 @@ namespace VDISPLAY {
 
       int status = -1;
       do {
-        status = ioctl(drain_fd, APOLLO_DRM_IOCTL_EVDI_GRABPIX, &cmd);
+        status = ioctl(event_fd, EVDI_GRABPIX_IOCTL, &cmd);
       } while (status < 0 && errno == EINTR);
 
       rect_count = std::max(0, cmd.num_rects);
@@ -564,14 +566,16 @@ namespace VDISPLAY {
 
       const int err = errno;
       if (err == EINVAL || err == EFAULT) {
-        // EVDI has no public "dirty drain without pixel copy" API. The driver
-        // clears dirty rects and sends vblank before rejecting these intentionally
-        // invalid dimensions, which keeps the real monitor moving while PipeWire
-        // remains the only frame source.
+        // Hybrid EVDI/PipeWire mode must keep EVDI's update/vblank loop moving,
+        // but it must not publish pixels from the CPU-side EVDI buffer. EVDI has
+        // no public "ack dirty rects without copying pixels" API. The DRM ioctl
+        // currently clears dirty rects and emits vblank before rejecting this
+        // deliberately undersized/null framebuffer, so PipeWire remains the sole
+        // frame source while the compositor sees a live monitor.
         return true;
       }
 
-      BOOST_LOG(debug) << "[VDISPLAY] EVDI vblank drain ioctl failed for " << display_name
+      BOOST_LOG(debug) << "[VDISPLAY] EVDI update acknowledge ioctl failed for " << display_name
                        << ": " << strerror(err);
       return false;
     }
@@ -752,7 +756,7 @@ namespace VDISPLAY {
     std::atomic<bool> running {false};
     std::thread thread;
     evdi_mode current_mode {};
-    int drain_fd {-1};
+    int event_fd {-1};
     std::vector<buffer_t> buffers;
     int next_buffer_id {};
     std::size_t next_buffer {};
@@ -867,7 +871,54 @@ namespace VDISPLAY {
     return value;
   }
 
-  static const char *backend_name(BACKEND backend) {
+  static std::string normalized_backend_token(std::string_view value) {
+    const auto begin = std::find_if_not(value.begin(), value.end(), [](unsigned char c) {
+      return std::isspace(c);
+    });
+    const auto end = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char c) {
+      return std::isspace(c);
+    }).base();
+    if (begin >= end) {
+      return {};
+    }
+
+    return lower_copy(std::string(begin, end));
+  }
+
+  std::optional<BACKEND> parseLinuxVirtualDisplayBackend(std::string_view value) {
+    auto backend = normalized_backend_token(value);
+    if (backend.empty()) {
+      return std::nullopt;
+    }
+
+    if (backend == "evdi_pipewire" || backend == "evdi-pipewire" || backend == "hybrid" || backend == "auto") {
+      return BACKEND::EVDI_PIPEWIRE;
+    }
+    if (backend == "mutter" || backend == "mutter_pipewire" || backend == "mutter-pipewire" || backend == "pipewire") {
+      return BACKEND::MUTTER_PIPEWIRE;
+    }
+    if (backend == "evdi" || backend == "evdi_kms" || backend == "evdi-kms") {
+      return BACKEND::EVDI;
+    }
+
+    return std::nullopt;
+  }
+
+  BACKEND resolveLinuxVirtualDisplayBackend(std::string_view config_value, const char *environment_override) {
+    if (environment_override && *environment_override) {
+      if (auto backend = parseLinuxVirtualDisplayBackend(environment_override)) {
+        return *backend;
+      }
+    }
+
+    if (auto backend = parseLinuxVirtualDisplayBackend(config_value)) {
+      return *backend;
+    }
+
+    return BACKEND::EVDI_PIPEWIRE;
+  }
+
+  const char *linuxVirtualDisplayBackendName(BACKEND backend) {
     switch (backend) {
       case BACKEND::MUTTER_PIPEWIRE:
         return "Mutter RecordVirtual/PipeWire";
@@ -882,69 +933,36 @@ namespace VDISPLAY {
   }
 
   static BACKEND configured_backend() {
-    const char *value = std::getenv("APOLLO_LINUX_VIRTUAL_BACKEND");
-    if (!value || !*value) {
-      return BACKEND::EVDI_PIPEWIRE;
+    const char *environment_override = std::getenv("APOLLO_LINUX_VIRTUAL_BACKEND");
+    if (environment_override && *environment_override) {
+      if (parseLinuxVirtualDisplayBackend(environment_override)) {
+        BOOST_LOG(info) << "[VDISPLAY] APOLLO_LINUX_VIRTUAL_BACKEND override is active.";
+      } else {
+        BOOST_LOG(warning) << "[VDISPLAY] Unknown APOLLO_LINUX_VIRTUAL_BACKEND=" << environment_override
+                           << "; ignoring environment override.";
+      }
     }
 
-    auto backend = lower_copy(value);
-    if (backend == "evdi_pipewire" || backend == "evdi-pipewire" || backend == "hybrid" || backend == "auto") {
-      return BACKEND::EVDI_PIPEWIRE;
-    }
-    if (backend == "mutter" || backend == "mutter_pipewire" || backend == "mutter-pipewire" || backend == "pipewire") {
-      return BACKEND::MUTTER_PIPEWIRE;
-    }
-    if (backend == "evdi" || backend == "evdi_kms" || backend == "evdi-kms") {
-      return BACKEND::EVDI;
+    if (!config::video.linux_virtual_display_backend.empty() &&
+        !parseLinuxVirtualDisplayBackend(config::video.linux_virtual_display_backend)) {
+      BOOST_LOG(warning) << "[VDISPLAY] Unknown linux_virtual_display_backend="
+                         << config::video.linux_virtual_display_backend
+                         << "; defaulting to EVDI monitor/PipeWire.";
     }
 
-    BOOST_LOG(warning) << "[VDISPLAY] Unknown APOLLO_LINUX_VIRTUAL_BACKEND=" << value
-                       << "; defaulting to EVDI monitor/PipeWire.";
-    return BACKEND::EVDI_PIPEWIRE;
+    return resolveLinuxVirtualDisplayBackend(config::video.linux_virtual_display_backend, environment_override);
   }
 
 #ifdef SUNSHINE_BUILD_PIPEWIRE
+  namespace mutter_dbus = platf::mutter_dbus;
+
   namespace {
-    constexpr char MUTTER_SCREENCAST[] = "org.gnome.Mutter.ScreenCast";
-    constexpr char MUTTER_SCREENCAST_PATH[] = "/org/gnome/Mutter/ScreenCast";
-    constexpr char MUTTER_REMOTE_DESKTOP[] = "org.gnome.Mutter.RemoteDesktop";
-    constexpr char MUTTER_REMOTE_DESKTOP_PATH[] = "/org/gnome/Mutter/RemoteDesktop";
-
-    struct gerror_deleter_t {
-      void operator()(GError *error) const {
-        if (error) {
-          g_error_free(error);
-        }
-      }
-    };
-
-    using gerror_ptr = std::unique_ptr<GError, gerror_deleter_t>;
-
     struct mutter_node_wait_t {
       std::mutex mutex;
       std::condition_variable cv;
       uint32_t node_id {};
     };
   }  // namespace
-
-  static uint32_t variant_uint32(GVariant *value) {
-    if (!value) {
-      return 0;
-    }
-    if (g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
-      return g_variant_get_uint32(value);
-    }
-    if (g_variant_is_of_type(value, G_VARIANT_TYPE_INT32)) {
-      return static_cast<uint32_t>(std::max(0, g_variant_get_int32(value)));
-    }
-    if (g_variant_is_of_type(value, G_VARIANT_TYPE_UINT64)) {
-      return static_cast<uint32_t>(g_variant_get_uint64(value));
-    }
-    if (g_variant_is_of_type(value, G_VARIANT_TYPE_INT64)) {
-      return static_cast<uint32_t>(std::max<int64_t>(0, g_variant_get_int64(value)));
-    }
-    return 0;
-  }
 
   static bool mutter_screencast_available() {
     if (!std::getenv("WAYLAND_DISPLAY")) {
@@ -954,56 +972,29 @@ namespace VDISPLAY {
 
     GError *raw_error = nullptr;
     auto bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &raw_error);
-    gerror_ptr dbus_error(raw_error);
+    mutter_dbus::gerror_ptr dbus_error(raw_error);
     if (!bus) {
       BOOST_LOG(error) << "[VDISPLAY] Unable to connect to the session bus for Mutter/PipeWire virtual display: "
                        << (dbus_error ? dbus_error->message : "unknown");
       return false;
     }
 
-    raw_error = nullptr;
-    auto owner_result = g_dbus_connection_call_sync(
-      bus,
-      "org.freedesktop.DBus",
-      "/org/freedesktop/DBus",
-      "org.freedesktop.DBus",
-      "NameHasOwner",
-      g_variant_new("(s)", MUTTER_SCREENCAST),
-      G_VARIANT_TYPE("(b)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
-      &raw_error
-    );
-    dbus_error.reset(raw_error);
-    if (!owner_result) {
-      BOOST_LOG(error) << "[VDISPLAY] Unable to query Mutter ScreenCast ownership: "
-                       << (dbus_error ? dbus_error->message : "unknown");
-      g_object_unref(bus);
-      return false;
-    }
-
-    gboolean has_owner = false;
-    g_variant_get(owner_result, "(b)", &has_owner);
-    g_variant_unref(owner_result);
-    if (!has_owner) {
+    if (!mutter_dbus::name_has_owner(bus, mutter_dbus::SCREENCAST_SERVICE, mutter_dbus::QUICK_CALL_TIMEOUT_MS)) {
       BOOST_LOG(error) << "[VDISPLAY] Mutter ScreenCast service is not available.";
       g_object_unref(bus);
       return false;
     }
 
     raw_error = nullptr;
-    auto version_result = g_dbus_connection_call_sync(
+    auto version_result = mutter_dbus::call_sync(
       bus,
-      MUTTER_SCREENCAST,
-      MUTTER_SCREENCAST_PATH,
+      mutter_dbus::SCREENCAST_SERVICE,
+      mutter_dbus::SCREENCAST_PATH,
       "org.freedesktop.DBus.Properties",
       "Get",
       g_variant_new("(ss)", "org.gnome.Mutter.ScreenCast", "Version"),
       G_VARIANT_TYPE("(v)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
     dbus_error.reset(raw_error);
@@ -1016,7 +1007,7 @@ namespace VDISPLAY {
 
     GVariant *version_value = nullptr;
     g_variant_get(version_result, "(v)", &version_value);
-    const auto version = variant_uint32(version_value);
+    const auto version = mutter_dbus::uint32_from_variant(version_value);
     if (version_value) {
       g_variant_unref(version_value);
     }
@@ -1040,7 +1031,7 @@ namespace VDISPLAY {
     }
 
     GError *raw_error = nullptr;
-    auto result = g_dbus_connection_call_sync(
+    auto result = mutter_dbus::call_sync(
       vdinfo.mutter_bus,
       destination,
       path.c_str(),
@@ -1048,14 +1039,12 @@ namespace VDISPLAY {
       method,
       nullptr,
       nullptr,
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
-    gerror_ptr dbus_error(raw_error);
+    mutter_dbus::gerror_ptr dbus_error(raw_error);
     if (!result) {
-      if (dbus_error && dbus_error->message && std::strstr(dbus_error->message, "Object does not exist")) {
+      if (mutter_dbus::error_is_missing_object(dbus_error.get())) {
         BOOST_LOG(debug) << "[VDISPLAY] Mutter DBus " << method
                          << " skipped because the object already disappeared.";
         return true;
@@ -1078,14 +1067,14 @@ namespace VDISPLAY {
     if (!vdinfo.mutter_remote_desktop_session_path.empty()) {
       call_dbus_no_args(
         vdinfo,
-        MUTTER_REMOTE_DESKTOP,
+        mutter_dbus::REMOTE_DESKTOP_SERVICE,
         vdinfo.mutter_remote_desktop_session_path,
         "org.gnome.Mutter.RemoteDesktop.Session",
         "Stop"
       );
     } else {
-      call_dbus_no_args(vdinfo, MUTTER_SCREENCAST, vdinfo.mutter_stream_path, "org.gnome.Mutter.ScreenCast.Stream", "Stop");
-      call_dbus_no_args(vdinfo, MUTTER_SCREENCAST, vdinfo.mutter_session_path, "org.gnome.Mutter.ScreenCast.Session", "Stop");
+      call_dbus_no_args(vdinfo, mutter_dbus::SCREENCAST_SERVICE, vdinfo.mutter_stream_path, "org.gnome.Mutter.ScreenCast.Stream", "Stop");
+      call_dbus_no_args(vdinfo, mutter_dbus::SCREENCAST_SERVICE, vdinfo.mutter_session_path, "org.gnome.Mutter.ScreenCast.Session", "Stop");
     }
 
     g_object_unref(vdinfo.mutter_bus);
@@ -1099,20 +1088,18 @@ namespace VDISPLAY {
 
   static bool create_mutter_remote_desktop_session(VirtualDisplayInfo &vdinfo) {
     GError *raw_error = nullptr;
-    auto session_result = g_dbus_connection_call_sync(
+    auto session_result = mutter_dbus::call_sync(
       vdinfo.mutter_bus,
-      MUTTER_REMOTE_DESKTOP,
-      MUTTER_REMOTE_DESKTOP_PATH,
+      mutter_dbus::REMOTE_DESKTOP_SERVICE,
+      mutter_dbus::REMOTE_DESKTOP_PATH,
       "org.gnome.Mutter.RemoteDesktop",
       "CreateSession",
       nullptr,
       G_VARIANT_TYPE("(o)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
-    gerror_ptr dbus_error(raw_error);
+    mutter_dbus::gerror_ptr dbus_error(raw_error);
     if (!session_result) {
       BOOST_LOG(error) << "[VDISPLAY] Unable to create Mutter RemoteDesktop session for " << vdinfo.name
                        << ": " << (dbus_error ? dbus_error->message : "unknown");
@@ -1125,17 +1112,15 @@ namespace VDISPLAY {
     g_variant_unref(session_result);
 
     raw_error = nullptr;
-    auto session_id_result = g_dbus_connection_call_sync(
+    auto session_id_result = mutter_dbus::call_sync(
       vdinfo.mutter_bus,
-      MUTTER_REMOTE_DESKTOP,
+      mutter_dbus::REMOTE_DESKTOP_SERVICE,
       vdinfo.mutter_remote_desktop_session_path.c_str(),
       "org.freedesktop.DBus.Properties",
       "Get",
       g_variant_new("(ss)", "org.gnome.Mutter.RemoteDesktop.Session", "SessionId"),
       G_VARIANT_TYPE("(v)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
     dbus_error.reset(raw_error);
@@ -1169,7 +1154,7 @@ namespace VDISPLAY {
   static bool create_mutter_virtual_stream(VirtualDisplayInfo &vdinfo) {
     GError *raw_error = nullptr;
     vdinfo.mutter_bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &raw_error);
-    gerror_ptr dbus_error(raw_error);
+    mutter_dbus::gerror_ptr dbus_error(raw_error);
     if (!vdinfo.mutter_bus) {
       BOOST_LOG(error) << "[VDISPLAY] Unable to connect to the session bus for " << vdinfo.name
                        << ": " << (dbus_error ? dbus_error->message : "unknown");
@@ -1191,17 +1176,15 @@ namespace VDISPLAY {
     );
 
     raw_error = nullptr;
-    auto session_result = g_dbus_connection_call_sync(
+    auto session_result = mutter_dbus::call_sync(
       vdinfo.mutter_bus,
-      MUTTER_SCREENCAST,
-      MUTTER_SCREENCAST_PATH,
+      mutter_dbus::SCREENCAST_SERVICE,
+      mutter_dbus::SCREENCAST_PATH,
       "org.gnome.Mutter.ScreenCast",
       "CreateSession",
       g_variant_new("(a{sv})", &session_props),
       G_VARIANT_TYPE("(o)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
     dbus_error.reset(raw_error);
@@ -1227,17 +1210,15 @@ namespace VDISPLAY {
     g_variant_builder_add(&props, "{sv}", "framerate", g_variant_new_uint32(std::max<uint32_t>(1, vdinfo.fps / 1000)));
 
     raw_error = nullptr;
-    auto stream_result = g_dbus_connection_call_sync(
+    auto stream_result = mutter_dbus::call_sync(
       vdinfo.mutter_bus,
-      MUTTER_SCREENCAST,
+      mutter_dbus::SCREENCAST_SERVICE,
       vdinfo.mutter_session_path.c_str(),
       "org.gnome.Mutter.ScreenCast.Session",
       "RecordVirtual",
       g_variant_new("(a{sv})", &props),
       G_VARIANT_TYPE("(o)"),
-      G_DBUS_CALL_FLAGS_NONE,
-      1000,
-      nullptr,
+      mutter_dbus::QUICK_CALL_TIMEOUT_MS,
       &raw_error
     );
     dbus_error.reset(raw_error);
@@ -1256,7 +1237,7 @@ namespace VDISPLAY {
     mutter_node_wait_t node_wait;
     const auto signal_id = g_dbus_connection_signal_subscribe(
       vdinfo.mutter_bus,
-      MUTTER_SCREENCAST,
+      mutter_dbus::SCREENCAST_SERVICE,
       "org.gnome.Mutter.ScreenCast.Stream",
       "PipeWireStreamAdded",
       vdinfo.mutter_stream_path.c_str(),
@@ -1279,12 +1260,12 @@ namespace VDISPLAY {
     const bool started = !vdinfo.mutter_remote_desktop_session_path.empty() ?
       call_dbus_no_args(
         vdinfo,
-        MUTTER_REMOTE_DESKTOP,
+        mutter_dbus::REMOTE_DESKTOP_SERVICE,
         vdinfo.mutter_remote_desktop_session_path,
         "org.gnome.Mutter.RemoteDesktop.Session",
         "Start"
       ) :
-      call_dbus_no_args(vdinfo, MUTTER_SCREENCAST, vdinfo.mutter_session_path, "org.gnome.Mutter.ScreenCast.Session", "Start");
+      call_dbus_no_args(vdinfo, mutter_dbus::SCREENCAST_SERVICE, vdinfo.mutter_session_path, "org.gnome.Mutter.ScreenCast.Session", "Start");
     if (!started) {
       if (signal_id) {
         g_dbus_connection_signal_unsubscribe(vdinfo.mutter_bus, signal_id);
@@ -2041,7 +2022,7 @@ print(
     BOOST_LOG(info) << "[VDISPLAY] Initializing Linux virtual display driver...";
 
     selected_backend = configured_backend();
-    BOOST_LOG(info) << "[VDISPLAY] Requested Linux virtual display backend: " << backend_name(selected_backend);
+    BOOST_LOG(info) << "[VDISPLAY] Requested Linux virtual display backend: " << linuxVirtualDisplayBackendName(selected_backend);
 
     if (selected_backend == BACKEND::MUTTER_PIPEWIRE) {
       evdi_available = false;
@@ -2066,7 +2047,7 @@ print(
     }
 
     if (!evdi_available) {
-      BOOST_LOG(error) << "[VDISPLAY] " << backend_name(selected_backend)
+      BOOST_LOG(error) << "[VDISPLAY] " << linuxVirtualDisplayBackendName(selected_backend)
                        << " backend requires EVDI, but EVDI is not available.";
       driver_status = DRIVER_STATUS::NOT_SUPPORTED;
       return driver_status;
@@ -2078,7 +2059,7 @@ print(
       return driver_status;
     }
 
-    BOOST_LOG(info) << "[VDISPLAY] " << backend_name(selected_backend) << " backend available.";
+    BOOST_LOG(info) << "[VDISPLAY] " << linuxVirtualDisplayBackendName(selected_backend) << " backend available.";
     driver_status = DRIVER_STATUS::OK;
     BOOST_LOG(info) << "[VDISPLAY] Linux virtual display driver initialized successfully.";
 
@@ -2261,7 +2242,7 @@ print(
             );
           } else {
             BOOST_LOG(info) << "[VDISPLAY] Skipping EVDI painter update pump for " << vdinfo.name
-                            << " for backend " << backend_name(vdinfo.backend) << '.';
+                            << " for backend " << linuxVirtualDisplayBackendName(vdinfo.backend) << '.';
           }
 
           // Find the DRM card for this EVDI device
@@ -2279,7 +2260,7 @@ print(
     }
 
     if ((selected_backend == BACKEND::EVDI || selected_backend == BACKEND::EVDI_PIPEWIRE) && !vdinfo.using_evdi) {
-      BOOST_LOG(error) << "[VDISPLAY] " << backend_name(selected_backend)
+      BOOST_LOG(error) << "[VDISPLAY] " << linuxVirtualDisplayBackendName(selected_backend)
                        << " virtual display creation failed; refusing fallback to a physical display.";
       return "";
     }
@@ -2289,7 +2270,7 @@ print(
     virtual_displays[guid_str] = std::move(vdinfo);
 
     BOOST_LOG(info) << "[VDISPLAY] Virtual display created successfully: " << display_name;
-    BOOST_LOG(info) << "[VDISPLAY] Mode: " << backend_name(backend)
+    BOOST_LOG(info) << "[VDISPLAY] Mode: " << linuxVirtualDisplayBackendName(backend)
                     << (using_evdi ? " (real EVDI monitor)" : "");
 
     return display_name;
@@ -2395,7 +2376,7 @@ print(
               );
             } else {
               BOOST_LOG(info) << "[VDISPLAY] Keeping EVDI painter update pump disabled for " << vdinfo.name
-                              << " for backend " << backend_name(vdinfo.backend) << '.';
+                              << " for backend " << linuxVirtualDisplayBackendName(vdinfo.backend) << '.';
             }
           }
 
@@ -2578,7 +2559,7 @@ print(
 
     g_dbus_connection_call(
       target.bus,
-      MUTTER_REMOTE_DESKTOP,
+      mutter_dbus::REMOTE_DESKTOP_SERVICE,
       target.session_path.c_str(),
       "org.gnome.Mutter.RemoteDesktop.Session",
       method,

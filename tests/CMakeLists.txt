@@ -108,7 +108,15 @@ target_link_libraries(${PROJECT_NAME}
         ${PLATFORM_LIBRARIES})
 target_compile_definitions(${PROJECT_NAME} PUBLIC ${SUNSHINE_DEFINITIONS} ${TEST_DEFINITIONS})
 target_compile_options(${PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>;$<$<COMPILE_LANGUAGE:CUDA>:${SUNSHINE_COMPILE_OPTIONS_CUDA};-std=c++17>)  # cmake-lint: disable=C0301
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(${PROJECT_NAME} PRIVATE -Wno-error=uninitialized)
+endif()
 target_link_options(${PROJECT_NAME} PRIVATE)
+
+add_test(
+        NAME linux_virtual_display_backend
+        COMMAND ${PROJECT_NAME} --gtest_filter=LinuxVirtualDisplayBackendTest.* --gtest_color=no)
+set_tests_properties(linux_virtual_display_backend PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
 if (WIN32)
     # prefer static libraries since we're linking statically

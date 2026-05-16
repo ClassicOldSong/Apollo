@@ -8,7 +8,9 @@
 #include <chrono>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // local includes
@@ -25,6 +27,28 @@ namespace VDISPLAY {
     MUTTER_PIPEWIRE,
     EVDI
   };
+
+  /**
+   * @brief Parse a Linux virtual display backend name.
+   * @param value Backend token from config or environment.
+   * @return Parsed backend, or nullopt when the token is not recognized.
+   */
+  std::optional<BACKEND> parseLinuxVirtualDisplayBackend(std::string_view value);
+
+  /**
+   * @brief Resolve Linux virtual display backend precedence.
+   * @param config_value Config-file backend value.
+   * @param environment_override Optional APOLLO_LINUX_VIRTUAL_BACKEND override.
+   * @return The selected backend. Environment value wins over config when valid.
+   */
+  BACKEND resolveLinuxVirtualDisplayBackend(std::string_view config_value, const char *environment_override);
+
+  /**
+   * @brief Human-readable Linux virtual display backend name.
+   * @param backend Backend enum value.
+   * @return Stable display name for logs and diagnostics.
+   */
+  const char *linuxVirtualDisplayBackendName(BACKEND backend);
 
   /**
    * @brief Status of the virtual display driver.

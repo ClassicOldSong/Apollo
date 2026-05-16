@@ -17,7 +17,6 @@
 #include <fstream>
 #include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -31,6 +30,7 @@
 
 // local includes
 #include "cuda.h"
+#include "mutter_dbus.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/video.h"
@@ -41,50 +41,11 @@ using namespace std::literals;
 
 namespace platf {
   namespace {
-    constexpr char MUTTER_SCREENCAST[] = "org.gnome.Mutter.ScreenCast";
-    constexpr char MUTTER_SCREENCAST_PATH[] = "/org/gnome/Mutter/ScreenCast";
-    constexpr int MUTTER_DBUS_TIMEOUT_MS = 5000;
-
-    struct gerror_deleter_t {
-      void operator()(GError *error) const {
-        if (error) {
-          g_error_free(error);
-        }
-      }
-    };
-
-	    using gerror_ptr = std::unique_ptr<GError, gerror_deleter_t>;
-
 	    std::string upper_copy(std::string value) {
 	      std::transform(std::begin(value), std::end(value), std::begin(value), [](unsigned char c) {
 	        return static_cast<char>(std::toupper(c));
 	      });
 	      return value;
-	    }
-
-	    std::optional<std::string> variant_child_string(GVariant *variant, guint index) {
-	      auto child = g_variant_get_child_value(variant, index);
-	      if (!child) {
-	        return std::nullopt;
-	      }
-
-	      std::optional<std::string> result;
-	      if (g_variant_is_of_type(child, G_VARIANT_TYPE_STRING)) {
-	        result = g_variant_get_string(child, nullptr);
-	      }
-	      g_variant_unref(child);
-	      return result;
-	    }
-
-	    std::string lookup_string_property(GVariant *properties, const char *name) {
-	      auto value = g_variant_lookup_value(properties, name, G_VARIANT_TYPE_STRING);
-	      if (!value) {
-	        return {};
-	      }
-
-	      std::string result = g_variant_get_string(value, nullptr);
-	      g_variant_unref(value);
-	      return result;
 	    }
 
 	    bool is_apollo_monitor_spec(const std::string &connector, const std::string &vendor, const std::string &product, const std::string &display_name) {
@@ -93,38 +54,19 @@ namespace platf {
 	    }
 
     bool mutter_screencast_available() {
-      gerror_ptr error;
       GError *raw_error = nullptr;
       auto bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &raw_error);
-      error.reset(raw_error);
+      mutter_dbus::gerror_ptr error(raw_error);
       if (!bus) {
         return false;
       }
 
-      raw_error = nullptr;
-      auto result = g_dbus_connection_call_sync(
+      const bool has_owner = mutter_dbus::name_has_owner(
         bus,
-        "org.freedesktop.DBus",
-        "/org/freedesktop/DBus",
-        "org.freedesktop.DBus",
-        "NameHasOwner",
-        g_variant_new("(s)", MUTTER_SCREENCAST),
-        G_VARIANT_TYPE("(b)"),
-        G_DBUS_CALL_FLAGS_NONE,
-        1000,
-        nullptr,
-        &raw_error
+        mutter_dbus::SCREENCAST_SERVICE,
+        mutter_dbus::QUICK_CALL_TIMEOUT_MS
       );
-      error.reset(raw_error);
       g_object_unref(bus);
-
-      if (!result) {
-        return false;
-      }
-
-      gboolean has_owner = false;
-      g_variant_get(result, "(b)", &has_owner);
-      g_variant_unref(result);
       return has_owner;
     }
 
@@ -371,7 +313,7 @@ namespace platf {
 	        GError *raw_error = nullptr;
 	        bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &raw_error);
         if (!bus) {
-          gerror_ptr dbus_error(raw_error);
+          mutter_dbus::gerror_ptr dbus_error(raw_error);
           BOOST_LOG(error) << "Unable to connect to session bus for GNOME PipeWire capture: "sv << (dbus_error ? dbus_error->message : "unknown");
           return false;
         }
@@ -379,21 +321,19 @@ namespace platf {
         GVariantBuilder session_props;
         g_variant_builder_init(&session_props, G_VARIANT_TYPE("a{sv}"));
 
-        auto session_result = g_dbus_connection_call_sync(
+        auto session_result = mutter_dbus::call_sync(
           bus,
-          MUTTER_SCREENCAST,
-          MUTTER_SCREENCAST_PATH,
+          mutter_dbus::SCREENCAST_SERVICE,
+          mutter_dbus::SCREENCAST_PATH,
           "org.gnome.Mutter.ScreenCast",
           "CreateSession",
           g_variant_new("(a{sv})", &session_props),
           G_VARIANT_TYPE("(o)"),
-          G_DBUS_CALL_FLAGS_NONE,
-          MUTTER_DBUS_TIMEOUT_MS,
-          nullptr,
+          mutter_dbus::STREAM_CALL_TIMEOUT_MS,
           &raw_error
         );
         if (!session_result) {
-          gerror_ptr dbus_error(raw_error);
+          mutter_dbus::gerror_ptr dbus_error(raw_error);
           BOOST_LOG(error) << "Unable to create GNOME ScreenCast session: "sv << (dbus_error ? dbus_error->message : "unknown");
           return false;
         }
@@ -425,21 +365,19 @@ namespace platf {
 	        }
 
 	        raw_error = nullptr;
-	        auto stream_result = g_dbus_connection_call_sync(
+	        auto stream_result = mutter_dbus::call_sync(
 	          bus,
-	          MUTTER_SCREENCAST,
+	          mutter_dbus::SCREENCAST_SERVICE,
 	          session_path.c_str(),
 	          "org.gnome.Mutter.ScreenCast.Session",
 	          record_existing_monitor ? "RecordMonitor" : "RecordVirtual",
 	          record_existing_monitor ? g_variant_new("(sa{sv})", connector_name.c_str(), &props) : g_variant_new("(a{sv})", &props),
 	          G_VARIANT_TYPE("(o)"),
-	          G_DBUS_CALL_FLAGS_NONE,
-	          MUTTER_DBUS_TIMEOUT_MS,
-          nullptr,
+	          mutter_dbus::STREAM_CALL_TIMEOUT_MS,
           &raw_error
         );
 	        if (!stream_result) {
-	          gerror_ptr dbus_error(raw_error);
+	          mutter_dbus::gerror_ptr dbus_error(raw_error);
 	          BOOST_LOG(error) << "Unable to create GNOME "sv
 	                           << (record_existing_monitor ? "monitor"sv : "virtual"sv)
 	                           << " ScreenCast stream: "sv
@@ -454,7 +392,7 @@ namespace platf {
 
         signal_id = g_dbus_connection_signal_subscribe(
           bus,
-          MUTTER_SCREENCAST,
+          mutter_dbus::SCREENCAST_SERVICE,
           "org.gnome.Mutter.ScreenCast.Stream",
           "PipeWireStreamAdded",
           stream_path.c_str(),
@@ -516,22 +454,20 @@ namespace platf {
 
 	      std::string find_apollo_monitor_connector_once() {
 	        GError *raw_error = nullptr;
-	        auto state = g_dbus_connection_call_sync(
+	        auto state = mutter_dbus::call_sync(
 	          bus,
-	          "org.gnome.Mutter.DisplayConfig",
-	          "/org/gnome/Mutter/DisplayConfig",
+	          mutter_dbus::DISPLAY_CONFIG_SERVICE,
+	          mutter_dbus::DISPLAY_CONFIG_PATH,
 	          "org.gnome.Mutter.DisplayConfig",
 	          "GetCurrentState",
 	          nullptr,
 	          nullptr,
-	          G_DBUS_CALL_FLAGS_NONE,
 	          2000,
-	          nullptr,
 	          &raw_error
 	        );
 
 	        if (!state) {
-	          gerror_ptr dbus_error(raw_error);
+	          mutter_dbus::gerror_ptr dbus_error(raw_error);
 	          BOOST_LOG(debug) << "Unable to query Mutter DisplayConfig for PipeWire monitor capture: "sv
 	                           << (dbus_error ? dbus_error->message : "unknown");
 	          return {};
@@ -565,10 +501,10 @@ namespace platf {
 	            continue;
 	          }
 
-	          auto connector = variant_child_string(spec, 0).value_or(std::string {});
-	          auto vendor = variant_child_string(spec, 1).value_or(std::string {});
-	          auto product = variant_child_string(spec, 2).value_or(std::string {});
-	          auto mutter_display_name = lookup_string_property(properties, "display-name");
+	          auto connector = mutter_dbus::child_string(spec, 0).value_or(std::string {});
+	          auto vendor = mutter_dbus::child_string(spec, 1).value_or(std::string {});
+	          auto product = mutter_dbus::child_string(spec, 2).value_or(std::string {});
+	          auto mutter_display_name = mutter_dbus::string_property(properties, "display-name");
 
 	          if (is_apollo_monitor_spec(connector, vendor, product, mutter_display_name)) {
 	            BOOST_LOG(info) << "Found Apollo Mutter monitor candidate: connector="sv << connector
@@ -615,8 +551,8 @@ namespace platf {
 	          auto width_value = g_variant_get_child_value(mode, 1);
 	          auto height_value = g_variant_get_child_value(mode, 2);
 	          if (width_value && height_value) {
-	            auto mode_width = variant_int(width_value);
-	            auto mode_height = variant_int(height_value);
+	            auto mode_width = mutter_dbus::int64_from_variant(width_value);
+	            auto mode_height = mutter_dbus::int64_from_variant(height_value);
 	            found = mode_width == width && mode_height == height;
 	          }
 
@@ -637,50 +573,16 @@ namespace platf {
 	        return found;
 	      }
 
-	      std::int64_t variant_int(GVariant *value) {
-	        if (g_variant_is_of_type(value, G_VARIANT_TYPE_INT32)) {
-	          return g_variant_get_int32(value);
-	        }
-	        if (g_variant_is_of_type(value, G_VARIANT_TYPE_UINT32)) {
-	          return g_variant_get_uint32(value);
-	        }
-	        if (g_variant_is_of_type(value, G_VARIANT_TYPE_INT64)) {
-	          return g_variant_get_int64(value);
-	        }
-	        if (g_variant_is_of_type(value, G_VARIANT_TYPE_UINT64)) {
-	          return static_cast<std::int64_t>(g_variant_get_uint64(value));
-	        }
-
-	        return -1;
-	      }
-
 	      bool call_no_args(const std::string &path, const char *interface, const char *method) {
-        GError *raw_error = nullptr;
-        auto result = g_dbus_connection_call_sync(
+        return mutter_dbus::call_no_args(
           bus,
-          MUTTER_SCREENCAST,
+          mutter_dbus::SCREENCAST_SERVICE,
           path.c_str(),
           interface,
           method,
-          nullptr,
-          nullptr,
-          G_DBUS_CALL_FLAGS_NONE,
-          MUTTER_DBUS_TIMEOUT_MS,
-          nullptr,
-          &raw_error
+          mutter_dbus::STREAM_CALL_TIMEOUT_MS,
+          "GNOME ScreenCast"
         );
-        if (!result) {
-          gerror_ptr dbus_error(raw_error);
-          if (dbus_error && dbus_error->message && std::strstr(dbus_error->message, "Object does not exist")) {
-            BOOST_LOG(debug) << "GNOME ScreenCast " << method << " skipped because the object already disappeared.";
-            return true;
-          }
-          BOOST_LOG(error) << "GNOME ScreenCast " << method << " failed: "sv << (dbus_error ? dbus_error->message : "unknown");
-          return false;
-        }
-
-        g_variant_unref(result);
-        return true;
       }
 
       bool start_pipewire_stream() {

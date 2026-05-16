@@ -149,13 +149,15 @@ if(WAYLAND_FOUND)
             "${CMAKE_SOURCE_DIR}/src/platform/linux/wayland.cpp")
 endif()
 
-pkg_check_modules(PIPEWIRE QUIET libpipewire-0.3 gio-2.0)
+pkg_check_modules(PIPEWIRE REQUIRED libpipewire-0.3 gio-2.0)
 if(PIPEWIRE_FOUND)
     add_compile_definitions(SUNSHINE_BUILD_PIPEWIRE)
     include_directories(SYSTEM ${PIPEWIRE_INCLUDE_DIRS})
     link_directories(${PIPEWIRE_LIBRARY_DIRS})
     list(APPEND PLATFORM_LIBRARIES ${PIPEWIRE_LIBRARIES})
     list(APPEND PLATFORM_TARGET_FILES
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/mutter_dbus.h"
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/mutter_dbus.cpp"
             "${CMAKE_SOURCE_DIR}/src/platform/linux/pipewiregrab.cpp")
 endif()
 

@@ -118,6 +118,16 @@ const validateFallbackMode = (event) => {
       :config="config"
     />
 
+    <div class="mb-3" v-if="platform === 'linux'">
+      <label for="linux_virtual_display_backend" class="form-label">{{ $t('config.linux_virtual_display_backend') }}</label>
+      <select class="form-select" id="linux_virtual_display_backend" v-model="config.linux_virtual_display_backend">
+        <option value="auto">auto</option>
+        <option value="mutter">mutter</option>
+        <option value="evdi">evdi</option>
+      </select>
+      <div class="form-text">{{ $t('config.linux_virtual_display_backend_desc') }}</div>
+    </div>
+
     <DisplayDeviceOptions
       :platform="platform"
       :config="config"

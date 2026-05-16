@@ -1040,6 +1040,45 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### linux_virtual_display_backend
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Select the Linux virtual display backend. The default uses EVDI to create
+            a real GNOME/Wayland monitor, then captures that monitor through Mutter
+            ScreenCast/PipeWire. This avoids direct CPU-side EVDI/KMS capture on
+            GNOME while still giving the compositor a real virtual monitor.
+            @note{Applies to Linux only. `APOLLO_LINUX_VIRTUAL_BACKEND` can override
+            this value for diagnostics.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}auto@endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            linux_virtual_display_backend = auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+        <td>Use the EVDI monitor/PipeWire hybrid backend.</td>
+    </tr>
+    <tr>
+        <td>mutter</td>
+        <td>Use GNOME Mutter RecordVirtual/PipeWire without creating an EVDI monitor.</td>
+    </tr>
+    <tr>
+        <td>evdi</td>
+        <td>Use direct EVDI/KMS capture. This is mainly retained for diagnostics.</td>
+    </tr>
+</table>
+
 ### isolated_virtual_display_option
 
 <table>

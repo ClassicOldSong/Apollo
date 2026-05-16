@@ -47,6 +47,12 @@ else()
                 RESULT_VARIABLE GIT_DESCRIBE_ERROR_CODE
                 OUTPUT_STRIP_TRAILING_WHITESPACE
         )
+        execute_process(
+                COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+                OUTPUT_VARIABLE GIT_DESCRIBE_COMMIT
+                RESULT_VARIABLE GIT_COMMIT_ERROR_CODE
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
         # Check if Dirty
         execute_process(
                 COMMAND ${GIT_EXECUTABLE} diff -b --quiet --exit-code
@@ -63,12 +69,26 @@ else()
                 set(PROJECT_VERSION ${PROJECT_VERSION}.dirty)
                 MESSAGE("Git tree is dirty!")
             endif()
+            if(NOT DEFINED GITHUB_BRANCH)
+                set(GITHUB_BRANCH ${GIT_DESCRIBE_BRANCH})
+            endif()
+            if(NOT DEFINED GITHUB_COMMIT AND NOT GIT_COMMIT_ERROR_CODE)
+                set(GITHUB_COMMIT ${GIT_DESCRIBE_COMMIT})
+            endif()
         else()
             MESSAGE(ERROR ": Got git error while fetching tags: ${GIT_DESCRIBE_ERROR_CODE}")
         endif()
     else()
         MESSAGE(WARNING ": Git not found, cannot find git version")
     endif()
+endif()
+
+if(NOT DEFINED GITHUB_CLONE_URL AND CMAKE_PROJECT_HOMEPAGE_URL)
+    set(GITHUB_CLONE_URL "${CMAKE_PROJECT_HOMEPAGE_URL}.git")
+endif()
+
+if(NOT DEFINED BUILD_VERSION OR BUILD_VERSION STREQUAL "")
+    set(BUILD_VERSION "${PROJECT_VERSION}")
 endif()
 
 # set date variables

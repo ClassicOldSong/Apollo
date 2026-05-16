@@ -231,10 +231,12 @@ function add_debian_based_deps() {
     "libdrm-dev"  # KMS
     "libevdev-dev"
     "libgbm-dev"
+    "libglib2.0-dev"  # GIO/GDBus for GNOME Mutter ScreenCast
     "libminiupnpc-dev"
     "libnotify-dev"
     "libnuma-dev"
     "libopus-dev"
+    "libpipewire-0.3-dev"  # GNOME ScreenCast/PipeWire capture
     "libpulse-dev"
     "libssl-dev"
     "libwayland-dev"  # Wayland
@@ -277,6 +279,11 @@ function add_debian_deps() {
 function add_ubuntu_deps() {
   add_test_ppa
   add_debian_based_deps
+  dependencies+=(
+    "evdi-dkms"  # Ubuntu virtual display kernel module
+    "libevdi-dev"  # EVDI userspace library for runtime loading
+    "libevdi1"
+  )
   if [ "$version" == "26.04" ]; then
     dependencies+=(
       "libayatana-appindicator3-dev"
@@ -596,11 +603,11 @@ function run_step_validation() {
   echo "Running step: Validation"
 
   # Run appstream validation, etc.
-  appstreamcli validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-  appstream-util validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-  desktop-file-validate "build/dev.lizardbyte.app.Sunshine.desktop"
+  appstreamcli validate "build/io.github.primezx.ApolloUbuntu.metainfo.xml"
+  appstream-util validate "build/io.github.primezx.ApolloUbuntu.metainfo.xml"
+  desktop-file-validate "build/io.github.primezx.ApolloUbuntu.desktop"
   if [ "$appimage_build" == 0 ]; then
-    desktop-file-validate "build/dev.lizardbyte.app.Sunshine.terminal.desktop"
+    desktop-file-validate "build/io.github.primezx.ApolloUbuntu.terminal.desktop"
   fi
 }
 

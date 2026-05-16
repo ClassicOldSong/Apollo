@@ -42,6 +42,7 @@
 
 # build directories
 build/
+build-flatpak-manifest/
 cmake-*/
 docs/doxyconfig*
 
