@@ -37,6 +37,9 @@
 # VSCode IDE
 .vscode/
 
+# Local Codex agent artifacts
+.codex
+
 # build directories
 build/
 cmake-*/

@@ -5,8 +5,10 @@
 // standard includes
 #include <codecvt>
 #include <csignal>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 // local includes
 #include "confighttp.h"
@@ -67,6 +69,102 @@ std::map<std::string_view, std::function<int(const char *name, int argc, char **
    }},
 #endif
 };
+
+#ifndef _WIN32
+bool parse_display_mode(const std::string &mode, uint32_t &width, uint32_t &height, uint32_t &fps) {
+  std::stringstream mode_stream {mode};
+  std::string segment;
+  int index = 0;
+
+  while (std::getline(mode_stream, segment, 'x')) {
+    switch (index) {
+      case 0:
+        width = std::strtoul(segment.c_str(), nullptr, 10);
+        break;
+      case 1:
+        height = std::strtoul(segment.c_str(), nullptr, 10);
+        break;
+      case 2: {
+        auto parsed_fps = std::strtof(segment.c_str(), nullptr);
+        if (parsed_fps < 1000) {
+          parsed_fps *= 1000;
+        }
+        fps = static_cast<uint32_t>(parsed_fps);
+        break;
+      }
+      default:
+        return false;
+    }
+
+    ++index;
+  }
+
+  return index == 3 && width != 0 && height != 0 && fps != 0;
+}
+
+int probe_encoders_with_temporary_virtual_display() {
+  if (proc::vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
+    BOOST_LOG(error) << "Video failed to probe virtual-display encoders: virtual display driver is not ready."sv;
+    return -1;
+  }
+
+  std::string probe_uuid_str = PROBE_DISPLAY_UUID;
+  auto probe_uuid = uuid_util::uuid_t::parse(probe_uuid_str);
+
+  BOOST_LOG(info) << "Creating a temporary Apollo virtual display to probe virtual-session encoders..."sv;
+
+  uint32_t probe_width = 0;
+  uint32_t probe_height = 0;
+  uint32_t probe_fps = 0;
+  if (!parse_display_mode(config::video.fallback_mode, probe_width, probe_height, probe_fps)) {
+    BOOST_LOG(error) << "Video failed to probe virtual-display encoders: invalid fallback mode ["sv << config::video.fallback_mode << "]."sv;
+    return -1;
+  }
+
+  if (!config::video.adapter_name.empty()) {
+    VDISPLAY::setRenderAdapterByName(config::video.adapter_name);
+  }
+
+  auto previous_output_name = config::video.output_name;
+  auto restore_output_name = util::fail_guard([&]() {
+    config::video.output_name = previous_output_name;
+  });
+
+  auto remove_probe_display = util::fail_guard([&]() {
+    VDISPLAY::removeVirtualDisplay(probe_uuid);
+  });
+
+  auto probe_display_name = VDISPLAY::createVirtualDisplay(
+    probe_uuid_str.c_str(),
+    "Probe",
+    probe_width,
+    probe_height,
+    probe_fps,
+    probe_uuid
+  );
+
+  if (probe_display_name.empty()) {
+    BOOST_LOG(error) << "Video failed to probe virtual-display encoders: temporary virtual display creation failed."sv;
+    return -1;
+  }
+
+  auto mapped_probe_display_name = display_device::map_display_name(probe_display_name);
+  if (!mapped_probe_display_name.empty()) {
+    config::video.output_name = mapped_probe_display_name;
+  } else if (VDISPLAY::isVirtualDisplay(probe_display_name)) {
+    BOOST_LOG(info) << "Using temporary Apollo virtual display [" << probe_display_name << "] for encoder probing.";
+    config::video.output_name = probe_display_name;
+  } else {
+    BOOST_LOG(error) << "Temporary virtual display [" << probe_display_name << "] cannot be mapped on Linux.";
+    return -1;
+  }
+
+  VDISPLAY::changeDisplaySettings2(probe_display_name.c_str(), probe_width, probe_height, probe_fps, false);
+  std::this_thread::sleep_for(500ms);
+
+  return video::probe_encoders();
+}
+#endif
 
 #ifdef _WIN32
 LRESULT CALLBACK SessionMonitorWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -360,6 +458,11 @@ int main(int argc, char *argv[]) {
     BOOST_LOG(warning) << "No gamepad input is available"sv;
   }
 
+#ifndef _WIN32
+  if (probe_encoders_with_temporary_virtual_display()) {
+    BOOST_LOG(error) << "Video failed to find a working encoder for virtual-display sessions."sv;
+  }
+#else
   if (video::probe_encoders()) {
     bool allow_probing = video::allow_encoder_probing();
     // Create a temporary virtual display for encoder capability probing
@@ -406,6 +509,9 @@ int main(int argc, char *argv[]) {
         auto mapped_probe_display_name = display_device::map_display_name(probe_display_name);
         if (!mapped_probe_display_name.empty()) {
           config::video.output_name = mapped_probe_display_name;
+        } else if (VDISPLAY::isVirtualDisplay(probe_display_name)) {
+          BOOST_LOG(info) << "Using temporary Apollo virtual display [" << probe_display_name << "] for encoder probing.";
+          config::video.output_name = probe_display_name;
         } else {
           BOOST_LOG(warning) << "Temporary virtual display [" << probe_display_name << "] cannot be mapped on Linux; probing physical display instead.";
         }
@@ -432,6 +538,7 @@ int main(int argc, char *argv[]) {
       BOOST_LOG(error) << "Video failed to find working encoder: probe failed and virtual display driver isn't initialized"sv;
     }
   }
+#endif
 
   if (http::init()) {
     BOOST_LOG(fatal) << "HTTP interface failed to initialize"sv;

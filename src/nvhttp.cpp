@@ -151,6 +151,8 @@ namespace nvhttp {
   client_t client_root;
   std::atomic<uint32_t> session_id_counter;
 
+  constexpr bool FORCE_VIRTUAL_DISPLAY_SESSIONS = true;
+
   using resp_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>;
   using req_https_t = std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Request>;
   using resp_http_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Response>;
@@ -330,7 +332,7 @@ namespace nvhttp {
             named_cert_p->perm = PERM::_all;
             named_cert_p->enable_legacy_ordering = true;
             named_cert_p->allow_client_commands = true;
-            named_cert_p->always_use_virtual_display = false;
+            named_cert_p->always_use_virtual_display = FORCE_VIRTUAL_DISPLAY_SESSIONS;
             client.named_devices.emplace_back(named_cert_p);
           }
         }
@@ -348,7 +350,7 @@ namespace nvhttp {
         named_cert_p->perm = (PERM)(util::get_non_string_json_value<uint32_t>(el, "perm", (uint32_t)PERM::_all)) & PERM::_all;
         named_cert_p->enable_legacy_ordering = el.value("enable_legacy_ordering", true);
         named_cert_p->allow_client_commands = el.value("allow_client_commands", true);
-        named_cert_p->always_use_virtual_display = el.value("always_use_virtual_display", false);
+        named_cert_p->always_use_virtual_display = FORCE_VIRTUAL_DISPLAY_SESSIONS || el.value("always_use_virtual_display", false);
         // Load command entries for "do" and "undo" keys.
         named_cert_p->do_cmds = extract_command_entries(el, "do");
         named_cert_p->undo_cmds = extract_command_entries(el, "undo");
@@ -459,7 +461,7 @@ namespace nvhttp {
     launch_session->surround_params = (get_arg(args, "surroundParams", ""));
     launch_session->gcmap = util::from_view(get_arg(args, "gcmap", "0"));
     launch_session->enable_hdr = util::from_view(get_arg(args, "hdrMode", "0"));
-    launch_session->virtual_display = util::from_view(get_arg(args, "virtualDisplay", "0")) || named_cert_p->always_use_virtual_display;
+    launch_session->virtual_display = FORCE_VIRTUAL_DISPLAY_SESSIONS || util::from_view(get_arg(args, "virtualDisplay", "0")) || named_cert_p->always_use_virtual_display;
     launch_session->scale_factor = util::from_view(get_arg(args, "scaleFactor", "100"));
 
     launch_session->client_do_cmds = named_cert_p->do_cmds;
@@ -634,7 +636,7 @@ namespace nvhttp {
 
       named_cert_p->enable_legacy_ordering = true;
       named_cert_p->allow_client_commands = true;
-      named_cert_p->always_use_virtual_display = false;
+      named_cert_p->always_use_virtual_display = FORCE_VIRTUAL_DISPLAY_SESSIONS;
 
       auto it = map_id_sess.find(client.uniqueID);
       map_id_sess.erase(it);
@@ -952,7 +954,10 @@ namespace nvhttp {
     // have that implemented. For now, we will emulate the behavior of GFE+GS-IPv6-Forwarder,
     // which returns 127.0.0.1 as LocalIP for IPv6 connections. Moonlight clients with IPv6
     // support know to ignore this bogus address.
-    if (local_endpoint.address().is_v6() && !local_endpoint.address().to_v6().is_v4_mapped()) {
+    auto default_lan_ip = platf::get_local_ip_for_gateway();
+    if (!default_lan_ip.empty()) {
+      tree.put("root.LocalIP", default_lan_ip);
+    } else if (local_endpoint.address().is_v6() && !local_endpoint.address().to_v6().is_v4_mapped()) {
       tree.put("root.LocalIP", "127.0.0.1");
     } else {
       tree.put("root.LocalIP", net::addr_to_normalized_string(local_endpoint.address()));
@@ -1847,7 +1852,7 @@ namespace nvhttp {
         named_cert_p->undo_cmds = undo_cmds;
         named_cert_p->enable_legacy_ordering = enable_legacy_ordering;
         named_cert_p->allow_client_commands = allow_client_commands;
-        named_cert_p->always_use_virtual_display = always_use_virtual_display;
+        named_cert_p->always_use_virtual_display = FORCE_VIRTUAL_DISPLAY_SESSIONS || always_use_virtual_display;
         save_state();
         return true;
       }

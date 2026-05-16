@@ -6,6 +6,39 @@
 
 #include <src/input.h>
 
+TEST(InputMappingTest, VirtualDisplayUsesVirtualBounds) {
+  input::touch_port_t touch_port {
+    {
+      0,
+      0,
+      2880,
+      1800,
+    },
+    2880,
+    1800,
+    0.0f,
+    0.0f,
+    1.0f,
+  };
+
+  auto top_left = input::map_client_to_touchport(touch_port, {0.0f, 0.0f}, {2880.0f, 1800.0f});
+  ASSERT_TRUE(top_left);
+  EXPECT_FLOAT_EQ(top_left->first, 0.0f);
+  EXPECT_FLOAT_EQ(top_left->second, 0.0f);
+
+  auto bottom_right = input::map_client_to_touchport(touch_port, {2880.0f, 1800.0f}, {2880.0f, 1800.0f});
+  ASSERT_TRUE(bottom_right);
+  EXPECT_FLOAT_EQ(bottom_right->first, 2880.0f);
+  EXPECT_FLOAT_EQ(bottom_right->second, 1800.0f);
+}
+
+TEST(InputMappingTest, VirtualDisplayRejectsMissingGeometry) {
+  input::touch_port_t touch_port {};
+
+  auto mapped = input::map_client_to_touchport(touch_port, {100.0f, 100.0f}, {2880.0f, 1800.0f});
+  EXPECT_FALSE(mapped);
+}
+
 struct MouseHIDTest: PlatformTestSuite, testing::WithParamInterface<util::point_t> {
   void SetUp() override {
 #ifdef _WIN32

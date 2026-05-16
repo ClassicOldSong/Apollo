@@ -1941,12 +1941,12 @@ namespace video {
     });
 
     // set max frame time based on client-requested target framerate.
-    double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target * 1000 : std::max(config.encodingFramerate / 5, 10000);
+    double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target * 1000 : std::max(config.encodingFramerate, 30000);
     auto max_frametime = std::chrono::nanoseconds(1000ms) * 1000 / minimum_fps_target;
     auto encode_frame_threshold = std::chrono::nanoseconds(1000ms) * 1000 / config.encodingFramerate;
     auto frame_variation_threshold = encode_frame_threshold / 4;
     auto min_frame_diff = encode_frame_threshold - frame_variation_threshold;
-    BOOST_LOG(info) << "Minimum FPS target set to ~"sv << (minimum_fps_target / 2000) << "fps ("sv << max_frametime * 2 << ")"sv;
+    BOOST_LOG(info) << "Minimum FPS target set to ~"sv << (minimum_fps_target / 1000) << "fps ("sv << max_frametime << ")"sv;
     BOOST_LOG(info) << "Encoding Frame threshold: "sv << encode_frame_threshold;
 
     auto shutdown_event = mail->event<bool>(mail::shutdown);
@@ -1984,6 +1984,7 @@ namespace video {
     }
 
     std::chrono::steady_clock::time_point encode_frame_timestamp;
+    std::chrono::steady_clock::time_point last_encoded_packet_time;
     bool missing_frame_timestamp_warning_logged = false;
 
     while (true) {
@@ -2016,10 +2017,16 @@ namespace video {
       }
 
       std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
+      bool got_image = false;
+      double image_wait_ms = 0.0;
+      double convert_ms = 0.0;
 
       // Encode at a minimum FPS to avoid image quality issues with static content
       if (!requested_idr_frame || images->peek()) {
+        const auto image_wait_started = std::chrono::steady_clock::now();
         if (auto img = images->pop(max_frametime)) {
+          image_wait_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - image_wait_started).count();
+          got_image = true;
           frame_timestamp = img->frame_timestamp;
           if (!frame_timestamp) {
             if (!missing_frame_timestamp_warning_logged) {
@@ -2037,10 +2044,12 @@ namespace video {
             continue;
           }
 
+          const auto convert_started = std::chrono::steady_clock::now();
           if (session->convert(*img)) {
             BOOST_LOG(error) << "Could not convert image"sv;
             break;
           }
+          convert_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - convert_started).count();
 
           if (time_diff < frame_variation_threshold) {
             *frame_timestamp = encode_frame_timestamp;
@@ -2057,6 +2066,22 @@ namespace video {
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
         BOOST_LOG(error) << "Could not encode video packet"sv;
         break;
+      }
+
+      const auto encode_done = std::chrono::steady_clock::now();
+      const auto encode_interval_ms = last_encoded_packet_time == std::chrono::steady_clock::time_point {} ?
+                                        0.0 :
+                                        std::chrono::duration<double, std::milli>(encode_done - last_encoded_packet_time).count();
+      last_encoded_packet_time = encode_done;
+
+      if (requested_idr_frame || image_wait_ms > 35.0 || convert_ms > 20.0 || encode_interval_ms > 50.0) {
+        auto f = stat_trackers::two_digits_after_decimal();
+        BOOST_LOG(info) << "Encode diag: frame="sv << (frame_nr - 1)
+                        << ", idr_request="sv << requested_idr_frame
+                        << ", image="sv << got_image
+                        << ", image_wait="sv << f % image_wait_ms << "ms"sv
+                        << ", convert="sv << f % convert_ms << "ms"sv
+                        << ", encode_interval="sv << f % encode_interval_ms << "ms"sv;
       }
 
       session->request_normal_frame();
@@ -2936,6 +2961,14 @@ namespace video {
 
     auto device_name = encode_device->hw_device_name.empty() ? nullptr : encode_device->hw_device_name.c_str();
     auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_CUDA, device_name, nullptr, 1 /* AV_CUDA_USE_PRIMARY_CONTEXT */);
+    if (status < 0) {
+      char string[AV_ERROR_MAX_STRING_SIZE];
+      BOOST_LOG(warning) << "Failed to create CUDA primary context: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status)
+                         << ". Retrying with a dedicated CUDA context."sv;
+
+      status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_CUDA, device_name, nullptr, 0);
+    }
+
     if (status < 0) {
       char string[AV_ERROR_MAX_STRING_SIZE];
       BOOST_LOG(error) << "Failed to create a CUDA device: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);
