@@ -1,4 +1,4 @@
-# Edit on github: https://github.com/LizardByte/Sunshine/blob/master/packaging/linux/Arch/PKGBUILD
+# Edit on github: https://github.com/primez-x/Apollo-Ubuntu-26-04/blob/linux-port/packaging/linux/Arch/PKGBUILD
 # Reference: https://wiki.archlinux.org/title/PKGBUILD
 
 ## options
@@ -22,6 +22,7 @@ _gcc_version=14
 depends=(
   'avahi'
   'curl'
+  'glib2'
   'libayatana-appindicator'
   'libcap'
   'libdrm'
@@ -39,6 +40,7 @@ depends=(
   'numactl'
   'openssl'
   'opus'
+  'pipewire'
   'udev'
   'which'
 )
@@ -123,9 +125,9 @@ build() {
       -D CMAKE_INSTALL_PREFIX=/usr
       -D SUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine
       -D SUNSHINE_ASSETS_DIR="share/sunshine"
-      -D SUNSHINE_PUBLISHER_NAME='LizardByte'
-      -D SUNSHINE_PUBLISHER_WEBSITE='https://app.lizardbyte.dev'
-      -D SUNSHINE_PUBLISHER_ISSUE_URL='https://app.lizardbyte.dev/support'
+      -D SUNSHINE_PUBLISHER_NAME='primez-x'
+      -D SUNSHINE_PUBLISHER_WEBSITE='https://github.com/primez-x/Apollo-Ubuntu-26-04'
+      -D SUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/primez-x/Apollo-Ubuntu-26-04/issues'
     )
 
     if [[ "${_use_cuda::1}" != "t" ]]; then
@@ -148,10 +150,10 @@ build() {
 
     cmake "${_cmake_options[@]}"
 
-    appstreamcli validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-    appstream-util validate "build/dev.lizardbyte.app.Sunshine.metainfo.xml"
-    desktop-file-validate "build/dev.lizardbyte.app.Sunshine.desktop"
-    desktop-file-validate "build/dev.lizardbyte.app.Sunshine.terminal.desktop"
+    appstreamcli validate "build/io.github.primezx.ApolloUbuntu.metainfo.xml"
+    appstream-util validate "build/io.github.primezx.ApolloUbuntu.metainfo.xml"
+    desktop-file-validate "build/io.github.primezx.ApolloUbuntu.desktop"
+    desktop-file-validate "build/io.github.primezx.ApolloUbuntu.terminal.desktop"
 
     make -C build
 }

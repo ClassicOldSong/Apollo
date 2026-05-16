@@ -1,0 +1,8 @@
+[
+    {
+        "commands": [
+            "ln -fs `pwd` /var/tmp/build-dir"
+        ],
+        "type": "shell"
+    }
+]

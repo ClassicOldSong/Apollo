@@ -392,6 +392,59 @@ namespace egl {
     return display;
   }
 
+#ifndef EGL_PLATFORM_DEVICE_EXT
+  #define EGL_PLATFORM_DEVICE_EXT 0x313F
+#endif
+#ifndef PFNEGLGETPLATFORMDISPLAYEXTPROC
+  typedef EGLDisplay(EGLAPIENTRYP PFNEGLGETPLATFORMDISPLAYEXTPROC)(EGLenum platform, void *native_display, const EGLint *attrib_list);
+#endif
+
+  display_t make_device_display(void *device) {
+    PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT =
+      (PFNEGLGETPLATFORMDISPLAYEXTPROC) eglGetProcAddress("eglGetPlatformDisplayEXT");
+
+    if (!eglGetPlatformDisplayEXT) {
+      BOOST_LOG(error) << "eglGetPlatformDisplayEXT not available"sv;
+      return nullptr;
+    }
+
+    display_t display = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, device, nullptr);
+    if (fail()) {
+      BOOST_LOG(error) << "Couldn't open EGL device display: ["sv << util::hex(eglGetError()).to_string_view() << ']';
+      return nullptr;
+    }
+
+    int major, minor;
+    if (!eglInitialize(display.get(), &major, &minor)) {
+      BOOST_LOG(error) << "Couldn't initialize EGL device display: ["sv << util::hex(eglGetError()).to_string_view() << ']';
+      return nullptr;
+    }
+
+    const char *extension_st = eglQueryString(display.get(), EGL_EXTENSIONS);
+    const char *version = eglQueryString(display.get(), EGL_VERSION);
+    const char *vendor = eglQueryString(display.get(), EGL_VENDOR);
+    const char *apis = eglQueryString(display.get(), EGL_CLIENT_APIS);
+
+    BOOST_LOG(debug) << "EGL device: ["sv << vendor << "]: version ["sv << version << ']';
+    BOOST_LOG(debug) << "API's supported: ["sv << apis << ']';
+
+    const char *extensions[] {
+      "EGL_KHR_create_context",
+      "EGL_KHR_surfaceless_context",
+      "EGL_EXT_image_dma_buf_import",
+      "EGL_EXT_image_dma_buf_import_modifiers",
+    };
+
+    for (auto ext : extensions) {
+      if (!std::strstr(extension_st, ext)) {
+        BOOST_LOG(error) << "Missing extension: ["sv << ext << ']';
+        return nullptr;
+      }
+    }
+
+    return display;
+  }
+
   std::optional<ctx_t> make_ctx(display_t::pointer display) {
     constexpr int conf_attr[] {
       EGL_RENDERABLE_TYPE,

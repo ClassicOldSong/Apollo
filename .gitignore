@@ -37,14 +37,17 @@
 # VSCode IDE
 .vscode/
 
+# Local Codex agent artifacts
+.codex
+
 # build directories
 build/
+build-flatpak-manifest/
 cmake-*/
 docs/doxyconfig*
 
 # npm
 node_modules/
-package-lock.json
 
 # Translations
 *.mo

@@ -1,240 +1,195 @@
-# Apollo Linux
+# Apollo Ubuntu
 
-> **Fork of [Apollo](https://github.com/ClassicOldSong/Apollo) with Linux Virtual Display support**
+Apollo Ubuntu is a Linux-focused fork of [Apollo](https://github.com/ClassicOldSong/Apollo) for Ubuntu GNOME Wayland hosts.
+It keeps Apollo's Moonlight/Artemis streaming workflow while maintaining the Linux virtual display and packaging work in this repository instead of trying to merge those Ubuntu-specific changes back into the Windows-first parent.
 
-Apollo is a self-hosted desktop stream host for [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android). Offering low latency, native client resolution, cloud gaming server capabilities with support for AMD, Intel, and Nvidia GPUs for hardware encoding. Software encoding is also available. A web UI is provided to allow configuration and client pairing from your favorite web browser. Pair from the local server or any mobile device.
+## What This Fork Provides
 
-Major features:
+- GNOME Wayland virtual display streaming for Ubuntu.
+- EVDI-backed real virtual monitors so streamed sessions do not mirror the physical display.
+- Mutter ScreenCast/PipeWire capture for smooth frame pacing on GNOME.
+- AMD, Intel, and Nvidia encoding through the Linux encoder stack available on the host.
+- User service packaging, udev rules, EVDI module loading, and Ubuntu install documentation.
+- A cautious upstream-tracking workflow for reviewing ClassicOldSong/Apollo changes before merging them into this Linux fork.
 
-- [x] Built-in Virtual Display with HDR support that matches the resolution/framerate config of your client automatically
-- [x] **Linux Virtual Display support using EVDI** *(new in this fork!)*
-- [x] Permission management for clients
-- [x] Clipboard sync
-- [x] Commands for client connection/disconnection (checkout [Auto pause/resume games](https://github.com/ClassicOldSong/Apollo/wiki/Auto-pause-resume-games))
-- [x] Input only mode
+## Supported Host
 
-## Linux Virtual Display Support
+This branch targets Ubuntu desktop hosts, especially:
 
-This fork adds **real virtual display support for Linux** using [EVDI](https://github.com/DisplayLink/evdi) (Extensible Virtual Display Interface). 
+- Ubuntu 24.04 LTS or newer.
+- Ubuntu 26.04 development/current testing builds.
+- GNOME on Wayland.
+- A Moonlight-compatible client such as Artemis or Moonlight.
 
-### Features
-- Creates isolated virtual displays that don't mirror your physical monitor
-- Supports resolutions up to 4K (3840x2160)
-- Dynamic loading of EVDI library (no hard dependency)
-- Automatic EVDI module loading on boot
-- Works with AMD, Intel, and Nvidia GPUs via VAAPI
+Other Linux distributions may still build, but Ubuntu is the supported release target for this fork.
 
-### Requirements
-- `evdi-dkms` package (for the kernel module)
-- `libevdi` library
+## Recommended Install
 
-### Installation on Arch/CachyOS
+Use the `.deb` artifact from this fork's releases when available.
 
 ```bash
-# Install EVDI
-sudo pacman -S evdi-dkms
-
-# Build and install Apollo
-makepkg -si
+sudo apt update
+sudo apt install ./ApolloUbuntu*.deb
+sudo reboot
 ```
 
-The install script will automatically:
-- Set up required capabilities (`cap_sys_admin`)
-- Load the EVDI kernel module
-- Configure automatic module loading on boot
+After reboot:
 
-## Usage
+```bash
+systemctl --user enable --now sunshine.service
+journalctl --user -u sunshine.service -f
+```
 
-Refer to LizardByte's documentation hosted on [Read the Docs](https://docs.lizardbyte.dev/projects/sunshine) for now.
+Open the web UI:
 
-## About Permission System
+```text
+https://localhost:47990
+```
 
-Check out the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/Permission-System)
+The browser will warn about the self-signed certificate. That is expected for the local web UI.
 
-> [!NOTE]
-> The **FIRST** client paired with Apollo will be granted with FULL permissions, then other newly paired clients will only be granted with `View Streams` and `List Apps` permission. If you encounter `Permission Denied` error when trying to launch any app, go check the permission for that device and grant `Launch Apps` permission. The same applies to the situation when you find that you can't move mouse or type with keyboard on newly paired clients, grant the corresponding client `Mouse Input` and `Keyboard Input` permissions.
+## Ubuntu Runtime Requirements
 
-## About Virtual Display
+The Debian package is intended to install the required runtime dependencies, including EVDI, PipeWire, GIO/GLib, DRM, VAAPI, and input rules. If you are preparing a host manually, install:
 
-> [!WARNING]
-> ***It is highly recommend to remove any other virtual display solutions from your system and Apollo/Sunshine config, to reduce confusions and compatibility issues.***
+```bash
+sudo apt update
+sudo apt install evdi-dkms libevdi1 pipewire wireplumber
+sudo modprobe evdi
+```
 
-> [!NOTE]
-> **TL;DR** Just treat your Artemis/Moonlight client like a dedicated PnP monitor with Apollo.
+Verify the virtual display prerequisites:
 
-Apollo uses SudoVDA for virtual display. It features auto resolution and framerate matching for your Artemis/Moonlight clients. The virtual display is created upon the stream starts and removed once the app quits. **If you do not see a new virtual display added or removed when the stream starts or stops, there may be a driver misconfiguration, or another persistent virtual display might still be active.**
+```bash
+lsmod | grep evdi
+systemctl --user status pipewire wireplumber
+```
 
-The virtual display works just like any physically attached monitors with SudoVDA, there's completely no need for a super complicated solution to "fix" resolution configurations for your devices. Unlike all other solutions that reuses one identity or generate a random one each time for any virtual display sessions, **Apollo assigns a fixed identity for each Artemis/Moonlight client, so your display configuration will be automatically remembered and managed by Windows natively.**
+If `evdi` is not loaded after a kernel update, reboot or run:
 
-## Configuration for dual GPU laptops
+```bash
+sudo dkms autoinstall
+sudo modprobe evdi
+```
 
-Apollo supports dual GPUs seamlessly.
+## Build From Source On Ubuntu
 
-If you want to use your dGPU, just set the `Adapter Name` to your dGPU and enable `Headless mode` in `Audio/Video` tab, save and restart your computer. No dummy plug is needed any more, the image will be rendered and encoded directly from your dGPU.
+Install build dependencies:
 
-## About HDR
+```bash
+./scripts/linux_build.sh deps
+```
 
-HDR starts supporting from Windows 11 23H2 and generally supported on 24H2. Some systems might not have HDR toggle on 23H2 and you just need to upgrade to 24H2. Any system lower than 23H2/Windows 10 will not have HDR option available.
+Build:
 
-> [!NOTE]
-> The below section is written for professional media workers. It doesn't stop you from enabling HDR if you know what you're doing and have deep understanding about how HDR works.
->
-> Apollo and SudoVDA can handle HDR just fine like any other streaming solutions.
->
-> If you have had good experience with HDR previously, you can safely ignore this section.
->
-> If you're curious, read on, but don't blame Apollo for poor HDR support.
+```bash
+cmake -B build -G Ninja -S . \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DSUNSHINE_ENABLE_WAYLAND=ON \
+  -DSUNSHINE_ENABLE_X11=ON \
+  -DSUNSHINE_ENABLE_DRM=ON
 
-Whether HDR streaming looks good, it depends completely on your client.
+cmake --build build -j"$(nproc)"
+```
 
-In short, ICC color correction should be totally useless while streaming HDR. It's your client's job to get HDR content displayed right, not the host. But in fact, it does affect the captured video stream and reflect changes on devices that can handle HDR correctly. On other devices that can't, the info is not respected at all.
+Install locally:
 
-It's very complicated to explain why HDR is a total mess, and why enabling HDR makes the image appear dark/yellow. If it's your first time got HDR streaming working, and thinks HDR looks awful, you're right, but that's not Apollo's fault, it's your device that tone mapped SDR content to the maximum of the capability of its screen, there's no headroom for anything beyond that actual peak brightness for HDR. For details, please take a look [here](https://github.com/ClassicOldSong/Apollo/issues/164).
+```bash
+sudo cmake --install build
+sudo setcap cap_sys_admin+p "$(command -v sunshine)"
+systemctl --user daemon-reload
+systemctl --user enable --now sunshine.service
+```
 
-For client devices, usually Apple products that have HDR capability can be trusted to have good results, other than that, your luck depends.
+Build a `.deb`:
 
-<details>
-<summary>DEPRECATION ALERT</summary>
+```bash
+cpack -G DEB --config build/CPackConfig.cmake
+```
 
-Enabling HDR is **generally not recommended** with **ANY streaming solutions** at this moment, probably in the long term. The issue with **HDR itself** is huge, with loads of semi-incompatible standards, and massive variance between device configurations and capabilities. Game support for HDR is still choppy.
+## Flatpak Status
 
-SDR actually provides much more stable color accuracy, and are widely supported throughout most devices you can imagine. For games, art style can easily overcome the shortcoming with no HDR, and SDR has pretty standard workflows to ensure their visual performance. So HDR isn't *that* important in most of the cases.
+Flatpak packaging is kept in-tree for experimentation and future distribution, but the Ubuntu `.deb` is the recommended install path for the virtual display backend.
 
-</details>
+EVDI is a host kernel module, so Flatpak cannot fully self-contain virtual display setup. Before running the Flatpak build, install EVDI on the host:
 
-## How to run multiple instances of Apollo for multiple virtual displays
+```bash
+sudo apt install evdi-dkms libevdi1
+sudo modprobe evdi
+```
 
-Follow the instructions in the [Wiki](https://github.com/ClassicOldSong/Apollo/wiki/How-to-start-multiple-instances-of-Apollo).
+After installing the Flatpak artifact:
 
-## FAQ
-Moved to [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/FAQ)
+```bash
+flatpak run --command=additional-install.sh io.github.primezx.ApolloUbuntu
+flatpak run io.github.primezx.ApolloUbuntu
+```
 
-## Stuttering Clinic
-Here're some common causes and solutions for stutters: [WiKi](https://github.com/ClassicOldSong/Apollo/wiki/Stuttering-Clinic).
+## Virtual Display Backend
 
-## Device specific setups
-- Pixel devices might not be able to use native resolution:
-  - Change the device resolution to Max: https://github.com/ClassicOldSong/Apollo/issues/700
+Default:
 
-## System Requirements
+```text
+linux_virtual_display_backend = auto
+```
 
-> **Warning**: This table is a work in progress. Do not purchase hardware based on this.
+`auto` uses the EVDI monitor plus Mutter ScreenCast/PipeWire backend. That is the supported GNOME Wayland path.
 
-**Minimum Requirements**
+Diagnostic alternatives:
 
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: VCE 1.0 or higher, see: [obs-amd hardware support](https://github.com/obsproject/obs-amd-encoder/wiki/Hardware-Support) |
-|               | Intel: VAAPI-compatible, see: [VAAPI hardware support](https://www.intel.com/content/www/us/en/developer/articles/technical/linuxmedia-vaapi.html) |
-|               | Nvidia: NVENC enabled cards, see: [nvenc support matrix](https://developer.nvidia.com/video-encode-and-decode-gpu-support-matrix-new) |
-| CPU           | AMD: Ryzen 3 or higher |
-|               | Intel: Core i3 or higher |
-| RAM           | 4GB or more |
-| OS            | Windows: 10+ (Windows Server requires [manual installation](https://github.com/nefarius/ViGEmBus/issues/153) for gamepad support) |
-|               | macOS: 12+ |
-|               | Linux/Debian: 11 (bullseye) |
-|               | Linux/Fedora: 39+ |
-|               | Linux/Ubuntu: 22.04+ (jammy) |
-| Network       | Host: 5GHz, 802.11ac |
-|               | Client: 5GHz, 802.11ac |
+- `mutter`: GNOME Mutter RecordVirtual/PipeWire without EVDI.
+- `evdi`: direct EVDI/KMS capture.
 
-**4k Suggestions**
+For temporary diagnostics only, the environment variable below overrides the config value:
 
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.1 or higher |
-|               | Intel: HD Graphics 510 or higher |
-|               | Nvidia: GeForce GTX 1080 or higher |
-| CPU           | AMD: Ryzen 5 or higher |
-|               | Intel: Core i5 or higher |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
+```bash
+APOLLO_LINUX_VIRTUAL_BACKEND=evdi systemctl --user restart sunshine.service
+```
 
-**HDR Suggestions**
+## Logs And Troubleshooting
 
-| **Component** | **Description** |
-|---------------|-----------------|
-| GPU           | AMD: Video Coding Engine 3.4 or higher |
-|               | Intel: UHD Graphics 730 or higher |
-|               | Nvidia: Pascal-based GPU (GTX 10-series) or higher |
-| CPU           | AMD: todo |
-|               | Intel: todo |
-| Network       | Host: CAT5e ethernet or better |
-|               | Client: CAT5e ethernet or better |
+Service logs:
 
-## Integrations
+```bash
+journalctl --user -u sunshine.service -f
+```
 
-SudoVDA: Virtual Display Adapter Driver used in Apollo
+Virtual display checks:
 
-[Artemis](https://github.com/ClassicOldSong/moonlight-android): Integrated Virtual Display options control from client side
+```bash
+lsmod | grep evdi
+ls /dev/dri
+systemctl --user status pipewire wireplumber
+```
 
-**NOTE**: Artemis currently supports Android only. Other platforms will come later.
+If Moonlight cannot see the host, verify the service is running and the web/API ports are listening:
+
+```bash
+systemctl --user status sunshine.service
+curl -k https://localhost:47990
+curl http://localhost:47989/serverinfo
+```
+
+## Fork Maintenance
+
+ClassicOldSong/Apollo remains the parent project for Apollo behavior, but this repository is the Ubuntu/Linux release line. Parent changes should be imported deliberately, tested against GNOME Wayland, EVDI, PipeWire, and Moonlight streaming, and then merged into this fork only after Linux compatibility is reviewed.
+
+See [docs/fork-maintenance.md](docs/fork-maintenance.md) for the upstream tracking workflow.
+
+## Credits
+
+This fork builds on:
+
+- [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo)
+- [LizardByte/Sunshine](https://github.com/LizardByte/Sunshine)
+- [DisplayLink EVDI](https://github.com/DisplayLink/evdi)
+- GNOME Mutter ScreenCast and PipeWire
 
 ## Support
 
-Currently support is only provided via GitHub Issues/Discussions.
+Use issues in this fork for Ubuntu/Linux virtual display bugs:
 
-No real time chat support will ever be provided for Apollo and Artemis. Including but not limited to:
-
-- Discord
-- Telegram
-- Whatsapp
-- QQ
-- WeChat 
-
-> When there's a chat, there're dramas. -- Confucius
-
-## Downloads
-
-### Direct Download
-
-**Recommended**
-
-[Releases](https://github.com/ClassicOldSong/Apollo/releases)
-
-### WinGet
-
-**Note:** Community maintained
-
-In an elevated PowerShell window, run
-
-```pwsh
-winget install ClassicOldSong.Apollo
-
+```text
+https://github.com/primez-x/Apollo-Ubuntu-26-04/issues
 ```
-
-You'll need WinGet installed first.
-
-### Chocolatey
-
-**Note:** Community maintained
-
-You can also install the apollo streaming server with chocolatey.
-
-Install Chocolatey if you don't have it, then run the following command in an elevated PowerShell/CMD window:
-
-```pwsh
-choco upgrade apollo -y 
-```
-
-Same command can be used to upgrade, add to a scheduled task to automate updates.
-
-See more details on the chocolatey package [here](https://community.chocolatey.org/packages/apollo)
-
-## Disclaimer
-
-I got kicked from Moonlight and Sunshine's Discord server and banned from Sunshine's GitHub repo literally for helping people out.
-
-This is what I got for finding a bug, opened an issue, getting no response, troubleshoot myself, fixed the issue myself, shared it by PR to the main repo hoping my efforts can help someone else during the maintenance gap.
-
-Yes, I'm going away. [Apollo](https://github.com/ClassicOldSong/Apollo) and [Artemis(Moonlight Noir)](https://github.com/ClassicOldSong/moonlight-android) will no longer be compatible with OG Sunshine and OG Moonlight eventually, but they'll work even better with much more carefully designed features.
-
-The Moonlight repo had stayed silent for 5 months, with nobody actually responding to issues, and people are getting totally no help besides the limited FAQ in their Discord server. I tried to answer issues and questions, solve problems within my ability but I got kicked out just for helping others.
-
-**PRs for feature improvements are welcomed here unlike the main repo, your ideas are more likely to be appreciated and your efforts are actually being respected. We welcome people who can and willing to share their efforts, helping yourselves and other people in need.**
-
-**Update**: They have contacted me and apologized for this incident, but the fact it **happened** still motivated me to start my own fork.
-
-## License
-
-GPLv3

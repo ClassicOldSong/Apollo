@@ -88,6 +88,12 @@ if(NOT Boost_FOUND)
     set(Boost_INCLUDE_DIRS  # cmake-lint: disable=C0103
             "$<BUILD_INTERFACE:${Boost_SOURCE_DIR}/libs/headers/include>")
 
+    if(NOT TARGET Boost::boost)
+        add_library(Boost::boost INTERFACE IMPORTED)
+        set_target_properties(Boost::boost PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${Boost_SOURCE_DIR}/libs/headers/include")
+    endif()
+
     if(WIN32)
         # Windows build is failing to create .h file in this directory
         file(MAKE_DIRECTORY ${Boost_BINARY_DIR}/libs/log/src/windows)

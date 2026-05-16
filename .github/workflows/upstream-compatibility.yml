@@ -1,0 +1,164 @@
+name: Upstream Apollo Compatibility Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: ClassicOldSong/Apollo branch or ref to test
+        required: false
+        default: master
+  schedule:
+    - cron: "17 10 * * 1"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  BUILD_TYPE: Release
+  BASE_BRANCH: linux-port
+  SYNC_BRANCH: automation/classic-upstream-sync
+
+jobs:
+  check-upstream:
+    name: Test parent merge against Ubuntu fork
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Ubuntu fork
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install Ubuntu build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            g++ \
+            gcc \
+            git \
+            libayatana-appindicator3-dev \
+            libboost-all-dev \
+            libcap-dev \
+            libcurl4-openssl-dev \
+            libdrm-dev \
+            libevdev-dev \
+            libgbm-dev \
+            libglib2.0-dev \
+            libminiupnpc-dev \
+            libnotify-dev \
+            libnuma-dev \
+            libopus-dev \
+            libpipewire-0.3-dev \
+            libpulse-dev \
+            libssl-dev \
+            libudev-dev \
+            libva-dev \
+            libwayland-dev \
+            libx11-dev \
+            libxfixes-dev \
+            libxrandr-dev \
+            libxtst-dev \
+            libxcb-shm0-dev \
+            libxcb-xfixes0-dev \
+            libxcb1-dev \
+            ninja-build \
+            nodejs \
+            npm \
+            xvfb
+
+      - name: Try ClassicOldSong merge
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          upstream_ref="${{ github.event.inputs.upstream_ref }}"
+          if [ -z "${upstream_ref}" ]; then
+            upstream_ref="master"
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote add classic https://github.com/ClassicOldSong/Apollo.git
+          git fetch origin "${BASE_BRANCH}"
+          git fetch classic "${upstream_ref}"
+          git switch -C "${SYNC_BRANCH}" "origin/${BASE_BRANCH}"
+
+          echo "upstream_ref=${upstream_ref}" >> "$GITHUB_OUTPUT"
+          echo "Testing merge of ClassicOldSong/Apollo ${upstream_ref} into ${BASE_BRANCH}." > upstream-compatibility-report.md
+
+          if git merge --no-edit "FETCH_HEAD"; then
+            if git diff --quiet "origin/${BASE_BRANCH}" HEAD; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              echo "No new upstream changes to review." >> upstream-compatibility-report.md
+            else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "Merge applied cleanly. Ubuntu build/tests will run before opening a draft PR." >> upstream-compatibility-report.md
+            fi
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Merge conflicts detected. Nothing was pushed or merged." >> upstream-compatibility-report.md
+            echo "" >> upstream-compatibility-report.md
+            echo "Conflicted files:" >> upstream-compatibility-report.md
+            git diff --name-only --diff-filter=U >> upstream-compatibility-report.md
+            cat upstream-compatibility-report.md
+            exit 1
+          fi
+
+      - name: Configure merged candidate
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          cmake -B build -G Ninja -S . \
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+            -DCMAKE_INSTALL_PREFIX=/usr \
+            -DBUILD_TESTS=ON \
+            -DSUNSHINE_ENABLE_WAYLAND=ON \
+            -DSUNSHINE_ENABLE_X11=ON \
+            -DSUNSHINE_ENABLE_DRM=ON \
+            -DSUNSHINE_ENABLE_CUDA=OFF
+
+      - name: Build merged candidate
+        if: steps.merge.outputs.changed == 'true'
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Test merged candidate
+        if: steps.merge.outputs.changed == 'true'
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Push sync branch and open draft PR
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force-with-lease origin "${SYNC_BRANCH}"
+
+          body="$(cat upstream-compatibility-report.md)
+
+          Automated check passed the Ubuntu build and test gate. Manual GNOME Wayland, EVDI, PipeWire, and Moonlight validation is still required before merge."
+
+          existing_pr="$(gh pr list --head "${SYNC_BRANCH}" --base "${BASE_BRANCH}" --json number --jq '.[0].number // empty')"
+          if [ -n "${existing_pr}" ]; then
+            gh pr edit "${existing_pr}" \
+              --title "Track ClassicOldSong/Apollo ${{ steps.merge.outputs.upstream_ref }}" \
+              --body "${body}"
+          else
+            gh pr create \
+              --draft \
+              --base "${BASE_BRANCH}" \
+              --head "${SYNC_BRANCH}" \
+              --title "Track ClassicOldSong/Apollo ${{ steps.merge.outputs.upstream_ref }}" \
+              --body "${body}"
+          fi
+
+      - name: Upload compatibility report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-compatibility-report
+          path: upstream-compatibility-report.md
+          if-no-files-found: ignore

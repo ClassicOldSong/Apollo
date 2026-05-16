@@ -496,6 +496,7 @@ namespace config {
     {},  // encoder
     {},  // adapter_name
     {},  // output_name
+    "auto",  // linux_virtual_display_backend
 
     {
       video_t::dd_t::config_option_e::disabled,  // configuration_option
@@ -514,7 +515,7 @@ namespace config {
     0,  // minimum_fps_target (0 = framerate)
 
     "1920x1080x60",  // fallback_mode
-    false, // isolated Display
+    true, // isolated Display
     false, // ignore_encoder_probe_failure
   };
 
@@ -1181,6 +1182,7 @@ namespace config {
     string_f(vars, "encoder", video.encoder);
     string_f(vars, "adapter_name", video.adapter_name);
     string_f(vars, "output_name", video.output_name);
+    string_f(vars, "linux_virtual_display_backend", video.linux_virtual_display_backend);
 
     generic_f(vars, "dd_configuration_option", video.dd.configuration_option, dd::config_option_from_view);
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);
@@ -1244,7 +1246,7 @@ namespace config {
     int_between_f(vars, "wan_encryption_mode", stream.wan_encryption_mode, {0, 2});
 
     path_f(vars, "file_apps", stream.file_apps);
-    int_between_f(vars, "fec_percentage", stream.fec_percentage, {1, 255});
+    int_between_f(vars, "fec_percentage", stream.fec_percentage, {0, 255});
 
     map_int_int_f(vars, "keybindings"s, input.keybindings);
 

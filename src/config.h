@@ -87,6 +87,7 @@ namespace config {
     std::string encoder;
     std::string adapter_name;
     std::string output_name;
+    std::string linux_virtual_display_backend;
 
     struct dd_t {
       struct workarounds_t {
@@ -144,7 +145,7 @@ namespace config {
     } dd;
 
     int max_bitrate;  // Maximum bitrate, sets ceiling in kbps for bitrate requested from client
-    double minimum_fps_target;  ///< Lowest framerate that will be used when streaming. Range 0-1000, 0 = half of client's requested framerate.
+    double minimum_fps_target;  ///< Lowest framerate that will be used when streaming. Range 0-1000, 0 = client's requested framerate.
 
     std::string fallback_mode;
     bool isolated_virtual_display_option;

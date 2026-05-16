@@ -457,14 +457,9 @@ namespace input {
    * @param size The size of the client's surface containing the value.
    * @return The host-relative coordinate pair if a touchport is available.
    */
-  std::optional<std::pair<float, float>> client_to_touchport(std::shared_ptr<input_t> &input, const std::pair<float, float> &val, const std::pair<float, float> &size) {
-    auto &touch_port_event = input->touch_port_event;
-    auto &touch_port = input->touch_port;
-    if (touch_port_event->peek()) {
-      touch_port = *touch_port_event->pop();
-    }
-    if (!touch_port) {
-      BOOST_LOG(verbose) << "Ignoring early absolute input without a touch port"sv;
+  std::optional<std::pair<float, float>>
+  map_client_to_touchport(const touch_port_t &touch_port, const std::pair<float, float> &val, const std::pair<float, float> &size) {
+    if (!touch_port || size.first <= 0.0f || size.second <= 0.0f) {
       return std::nullopt;
     }
 
@@ -481,6 +476,20 @@ namespace input {
     y = std::clamp(y, offsetY, (size.second * scalarY) - offsetY);
 
     return std::pair {(x - offsetX) * touch_port.scalar_inv, (y - offsetY) * touch_port.scalar_inv};
+  }
+
+  std::optional<std::pair<float, float>> client_to_touchport(std::shared_ptr<input_t> &input, const std::pair<float, float> &val, const std::pair<float, float> &size) {
+    auto &touch_port_event = input->touch_port_event;
+    auto &touch_port = input->touch_port;
+    if (touch_port_event->peek()) {
+      touch_port = *touch_port_event->pop();
+    }
+    if (!touch_port) {
+      BOOST_LOG(verbose) << "Ignoring early absolute input without a touch port"sv;
+      return std::nullopt;
+    }
+
+    return map_client_to_touchport(touch_port, val, size);
   }
 
   /**

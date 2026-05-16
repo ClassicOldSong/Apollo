@@ -81,8 +81,12 @@ namespace proc {
 
   class deinit_t: public platf::deinit_t {
   public:
-    ~deinit_t() {
+    ~deinit_t() override {
       proc.terminate();
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        VDISPLAY::closeVDisplayDevice();
+        vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
+      }
     }
   };
 
@@ -323,19 +327,8 @@ namespace proc {
         if (!vdisplayName.empty()) {
           BOOST_LOG(info) << "Virtual Display created at " << vdisplayName;
 
-          // Don't change display settings when no params are given
+          // Apollo virtual sessions are the active desktop while connected.
           if (launch_session->width && launch_session->height && launch_session->fps) {
-            // Apply display settings
-#ifdef _WIN32
-            VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, target_fps);
-#else
-            VDISPLAY::changeDisplaySettings(vdisplayName.c_str(), render_width, render_height, target_fps);
-#endif
-          }
-
-          // Check the ISOLATED DISPLAY configuration setting and rearrange the displays
-          if (config::video.isolated_virtual_display_option == true) {
-            // Apply the isolated display settings
 #ifdef _WIN32
             VDISPLAY::changeDisplaySettings2(vdisplayName.c_str(), render_width, render_height, target_fps, true);
 #else
@@ -355,13 +348,36 @@ namespace proc {
           // So we always set output_name to the newly created virtual display as a workaround for
           // empty name when probing graphics cards.
 
-          config::video.output_name = display_device::map_display_name(this->display_name);
+          auto mapped_display_name = display_device::map_display_name(this->display_name);
+#ifndef _WIN32
+          if (mapped_display_name.empty() && VDISPLAY::isVirtualDisplay(this->display_name)) {
+            const auto backend = VDISPLAY::virtualDisplayBackend(this->display_name);
+            if (backend == VDISPLAY::BACKEND::EVDI) {
+              BOOST_LOG(info) << "Using EVDI virtual display [" << this->display_name << "] for direct KMS capture.";
+            } else if (backend == VDISPLAY::BACKEND::EVDI_PIPEWIRE) {
+              BOOST_LOG(info) << "Using EVDI virtual display [" << this->display_name << "] for Mutter/PipeWire monitor capture.";
+            } else if (backend == VDISPLAY::BACKEND::MUTTER_PIPEWIRE) {
+              BOOST_LOG(info) << "Using Mutter/PipeWire virtual display [" << this->display_name << "] for direct GNOME capture.";
+            } else {
+              BOOST_LOG(info) << "Using Apollo virtual display [" << this->display_name << "].";
+            }
+            mapped_display_name = this->display_name;
+          } else if (mapped_display_name.empty()) {
+            BOOST_LOG(error) << "Virtual display [" << this->display_name << "] cannot be mapped on Linux; refusing physical display fallback.";
+            this->display_name.clear();
+            this->virtual_display = false;
+            return 503;
+          }
+#endif
+          config::video.output_name = mapped_display_name;
         } else {
-          BOOST_LOG(warning) << "Virtual Display creation failed, or cannot get created display name in time!";
+          BOOST_LOG(error) << "Virtual display is required but creation failed, or Apollo could not get the created display name in time.";
+          return 503;
         }
       } else {
-        // Driver isn't working so we don't need to track virtual display.
+        BOOST_LOG(error) << "Virtual display is required but the virtual display driver is not ready.";
         launch_session->virtual_display = false;
+        return 503;
       }
     }
 
@@ -786,6 +802,10 @@ namespace proc {
 
     bool used_virtual_display = vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK && _launch_session && _launch_session->virtual_display;
     if (used_virtual_display) {
+      if (this->virtual_display && !this->display_name.empty()) {
+        VDISPLAY::changeDisplaySettings2(this->display_name.c_str(), _launch_session->width, _launch_session->height, _launch_session->fps, false);
+      }
+
       if (VDISPLAY::removeVirtualDisplay(_launch_session->display_guid)) {
         BOOST_LOG(info) << "Virtual Display removed successfully";
       } else if (this->virtual_display) {

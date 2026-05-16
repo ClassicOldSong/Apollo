@@ -1040,19 +1040,59 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### linux_virtual_display_backend
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Select the Linux virtual display backend. The default uses EVDI to create
+            a real GNOME/Wayland monitor, then captures that monitor through Mutter
+            ScreenCast/PipeWire. This avoids direct CPU-side EVDI/KMS capture on
+            GNOME while still giving the compositor a real virtual monitor.
+            @note{Applies to Linux only. `APOLLO_LINUX_VIRTUAL_BACKEND` can override
+            this value for diagnostics.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}auto@endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            linux_virtual_display_backend = auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+        <td>Use the EVDI monitor/PipeWire hybrid backend.</td>
+    </tr>
+    <tr>
+        <td>mutter</td>
+        <td>Use GNOME Mutter RecordVirtual/PipeWire without creating an EVDI monitor.</td>
+    </tr>
+    <tr>
+        <td>evdi</td>
+        <td>Use direct EVDI/KMS capture. This is mainly retained for diagnostics.</td>
+    </tr>
+</table>
+
 ### isolated_virtual_display_option
 
 <table>
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Isolates the virtual display.
-            @note{Applies to Windows only.}
+            Isolates the virtual display by making it the only active display while streaming.
+            On Linux GNOME/Wayland, this disables the local physical monitor during a virtual
+            display session and restores the original layout when the virtual display is removed.
         </td>
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">@code{}disabled@endcode</td>
+        <td colspan="2">@code{}enabled@endcode</td>
     </tr>
     <tr>
         <td>enabled</td>
@@ -1445,7 +1485,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Sunshine tries to save bandwidth when content on screen is static or a low framerate. Because many clients expect a constant stream of video frames, a certain amount of duplicate frames are sent when this happens. This setting controls the lowest effective framerate a stream can reach.
+            Sunshine tries to save bandwidth when content on screen is static or a low framerate. Because many clients expect a constant stream of video frames, a certain amount of duplicate frames are sent when this happens. This setting controls the lowest effective framerate a stream can reach. A value of @code{}0@endcode uses the client-requested framerate.
         </td>
     </tr>
     <tr>
@@ -1870,7 +1910,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>Range</td>
-        <td colspan="2">1-255</td>
+        <td colspan="2">0-255 (0 disables FEC)</td>
     </tr>
     <tr>
         <td>Example</td>

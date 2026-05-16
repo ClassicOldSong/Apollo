@@ -47,6 +47,7 @@ INPUT = ../README.md \
         third_party_packages.md \
         gamestream_migration.md \
         legal.md \
+        fork-maintenance.md \
         configuration.md \
         app_examples.md \
         awesome_sunshine.md \

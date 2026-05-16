@@ -9,6 +9,7 @@
 #endif
 
 // standard includes
+#include <atomic>
 #include <fstream>
 #include <iostream>
 
@@ -16,6 +17,7 @@
 #include <arpa/inet.h>
 #include <dlfcn.h>
 #include <ifaddrs.h>
+#include <net/if.h>
 #include <netinet/udp.h>
 #include <pwd.h>
 
@@ -41,6 +43,7 @@
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "vaapi.h"
+#include "virtual_display.h"
 
 #include <linux/rtnetlink.h>
 
@@ -55,6 +58,17 @@ namespace fs = std::filesystem;
 namespace bp = boost::process::v1;
 
 window_system_e window_system;
+
+namespace {
+  bool is_cgnat_v4(const boost::asio::ip::address &address) {
+    if (!address.is_v4()) {
+      return false;
+    }
+
+    const auto value = address.to_v4().to_uint();
+    return value >= 0x64400000u && value <= 0x647fffffu;
+  }
+}  // namespace
 
 namespace dyn {
   void *handle(const std::vector<const char *> &libs) {
@@ -239,6 +253,27 @@ namespace platf {
   }
 
 std::string get_local_ip_for_gateway() {
+  int route_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (route_fd >= 0) {
+    sockaddr_in remote {};
+    remote.sin_family = AF_INET;
+    remote.sin_port = htons(9);
+    inet_pton(AF_INET, "1.1.1.1", &remote.sin_addr);
+
+    if (connect(route_fd, reinterpret_cast<sockaddr *>(&remote), sizeof(remote)) == 0) {
+      sockaddr_in local {};
+      socklen_t local_len = sizeof(local);
+      if (getsockname(route_fd, reinterpret_cast<sockaddr *>(&local), &local_len) == 0) {
+        char addr[INET_ADDRSTRLEN] {};
+        if (inet_ntop(AF_INET, &local.sin_addr, addr, sizeof(addr))) {
+          close(route_fd);
+          return addr;
+        }
+      }
+    }
+    close(route_fd);
+  }
+
   int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
   if (fd < 0) {
     BOOST_LOG(warning) << "Socket creation failed: " << strerror(errno);
@@ -265,21 +300,23 @@ std::string get_local_ip_for_gateway() {
   }
 
   std::string local_ip;
+  int default_ifindex = 0;
   bool found = false;
 
   while ((len = recv(fd, nlMsg, sizeof(buffer), 0)) > 0) {
-    for (; NLMSG_OK(nlMsg, len); nlMsg = NLMSG_NEXT(nlMsg, len)) {
-      if (nlMsg->nlmsg_type == NLMSG_DONE) {
+    struct nlmsghdr *route_msg = (struct nlmsghdr *)buffer;
+    for (; NLMSG_OK(route_msg, len); route_msg = NLMSG_NEXT(route_msg, len)) {
+      if (route_msg->nlmsg_type == NLMSG_DONE) {
         found = true;
         break;
       }
 
-      rtMsg = (struct rtmsg *)NLMSG_DATA(nlMsg);
+      rtMsg = (struct rtmsg *)NLMSG_DATA(route_msg);
       if (rtMsg->rtm_family != AF_INET || rtMsg->rtm_table != RT_TABLE_MAIN)
         continue;
 
       rtAttr = (struct rtattr *)RTM_RTA(rtMsg);
-      int rtLen = RTM_PAYLOAD(nlMsg);
+      int rtLen = RTM_PAYLOAD(route_msg);
 
       in_addr gateway;
       in_addr local;
@@ -293,6 +330,9 @@ std::string get_local_ip_for_gateway() {
             break;
           case RTA_PREFSRC:
             local.s_addr = *reinterpret_cast<uint32_t *>(RTA_DATA(rtAttr));
+            break;
+          case RTA_OIF:
+            default_ifindex = *reinterpret_cast<int *>(RTA_DATA(rtAttr));
             break;
           default:
             break;
@@ -310,6 +350,25 @@ std::string get_local_ip_for_gateway() {
   }
 
   close(fd);
+
+  if (local_ip.empty() && default_ifindex) {
+    ifaddrs *ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == 0) {
+      for (auto ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if (!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET || if_nametoindex(ifa->ifa_name) != static_cast<unsigned int>(default_ifindex)) {
+          continue;
+        }
+
+        char addr[INET_ADDRSTRLEN] {};
+        auto sin = reinterpret_cast<sockaddr_in *>(ifa->ifa_addr);
+        if (inet_ntop(AF_INET, &sin->sin_addr, addr, sizeof(addr))) {
+          local_ip = addr;
+          break;
+        }
+      }
+      freeifaddrs(ifaddr);
+    }
+  }
 
   if (local_ip.empty()) {
     BOOST_LOG(warning) << "No associated IP address found for the default gateway";
@@ -507,9 +566,11 @@ std::string get_local_ip_for_gateway() {
     }
 
     auto const max_iovs_per_msg = send_info.payload_buffers.size() + (send_info.headers ? 1 : 0);
+    const auto udp_gso_route_safe = !is_cgnat_v4(send_info.target_address) && !is_cgnat_v4(send_info.source_address);
+    const auto allow_udp_gso = false && udp_gso_route_safe;
 
 #ifdef UDP_SEGMENT
-    {
+    if (allow_udp_gso) {
       // UDP GSO on Linux currently only supports sending 64K or 64 segments at a time
       size_t seg_index = 0;
       const size_t seg_max = 65536 / 1500;
@@ -590,6 +651,16 @@ std::string get_local_ip_for_gateway() {
       // If we sent something, return the status and don't fall back to the non-GSO path.
       if (seg_index != 0) {
         return seg_index >= send_info.block_count;
+      }
+    } else {
+      static std::atomic_bool logged_udp_gso_skip {false};
+      bool expected = false;
+      if (logged_udp_gso_skip.compare_exchange_strong(expected, true)) {
+        if (udp_gso_route_safe) {
+          BOOST_LOG(info) << "UDP GSO disabled; using client-sized datagrams for reliable stream transport.";
+        } else {
+          BOOST_LOG(info) << "Disabling UDP GSO for CGNAT/tailnet peer "sv << send_info.target_address.to_string();
+        }
       }
     }
 #endif
@@ -867,6 +938,9 @@ std::string get_local_ip_for_gateway() {
 #ifdef SUNSHINE_BUILD_CUDA
       NVFBC,  ///< NvFBC
 #endif
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+      PIPEWIRE,  ///< GNOME/Mutter PipeWire
+#endif
 #ifdef SUNSHINE_BUILD_WAYLAND
       WAYLAND,  ///< Wayland
 #endif
@@ -888,6 +962,15 @@ std::string get_local_ip_for_gateway() {
 
   bool verify_nvfbc() {
     return !nvfbc_display_names().empty();
+  }
+#endif
+
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+  std::vector<std::string> pipewire_display_names();
+  std::shared_ptr<display_t> pipewire_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+
+  bool verify_pipewire() {
+    return window_system == window_system_e::WAYLAND && !pipewire_display_names().empty();
   }
 #endif
 
@@ -925,6 +1008,11 @@ std::string get_local_ip_for_gateway() {
       return nvfbc_display_names();
     }
 #endif
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+    if (sources[source::PIPEWIRE]) {
+      return pipewire_display_names();
+    }
+#endif
 #ifdef SUNSHINE_BUILD_WAYLAND
     if (sources[source::WAYLAND]) {
       return wl_display_names();
@@ -953,10 +1041,47 @@ std::string get_local_ip_for_gateway() {
   }
 
   std::shared_ptr<display_t> display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+    if (display_name.rfind("VIRTUAL-", 0) == 0) {
+      const auto backend = VDISPLAY::virtualDisplayBackend(display_name);
+      if (backend == VDISPLAY::BACKEND::MUTTER_PIPEWIRE ||
+          backend == VDISPLAY::BACKEND::EVDI_PIPEWIRE) {
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+        BOOST_LOG(info) << "Screencasting PipeWire virtual display ["sv << display_name << ']';
+        auto disp = pipewire_display(hwdevice_type, display_name, config);
+        if (!disp) {
+          BOOST_LOG(error) << "PipeWire virtual display capture failed; refusing fallback to KMS or a physical display."sv;
+        }
+        return disp;
+#else
+        BOOST_LOG(error) << "PipeWire virtual display capture requested, but PipeWire support is not compiled in."sv;
+        return nullptr;
+#endif
+      }
+
+      if (backend == VDISPLAY::BACKEND::EVDI) {
+#ifdef SUNSHINE_BUILD_DRM
+        BOOST_LOG(info) << "Screencasting EVDI virtual display with KMS"sv;
+        return kms_display(hwdevice_type, display_name, config);
+#else
+        BOOST_LOG(error) << "EVDI virtual display capture requested, but KMS support is not compiled in."sv;
+        return nullptr;
+#endif
+      }
+
+      BOOST_LOG(error) << "Virtual display ["sv << display_name << "] is not registered with Apollo; refusing physical display fallback."sv;
+      return nullptr;
+    }
+
 #ifdef SUNSHINE_BUILD_CUDA
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
       BOOST_LOG(info) << "Screencasting with NvFBC"sv;
       return nvfbc_display(hwdevice_type, display_name, config);
+    }
+#endif
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+    if (sources[source::PIPEWIRE]) {
+      BOOST_LOG(info) << "Screencasting with GNOME PipeWire"sv;
+      return pipewire_display(hwdevice_type, display_name, config);
     }
 #endif
 #ifdef SUNSHINE_BUILD_WAYLAND
@@ -1012,6 +1137,13 @@ std::string get_local_ip_for_gateway() {
       }
     }
 #endif
+#ifdef SUNSHINE_BUILD_PIPEWIRE
+    if ((config::video.capture.empty() && sources.none()) || config::video.capture == "pipewire") {
+      if (verify_pipewire()) {
+        sources[source::PIPEWIRE] = true;
+      }
+    }
+#endif
 #ifdef SUNSHINE_BUILD_WAYLAND
     if ((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") {
       if (verify_wl()) {
@@ -1020,8 +1152,11 @@ std::string get_local_ip_for_gateway() {
     }
 #endif
 #ifdef SUNSHINE_BUILD_DRM
-    if ((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") {
+    if (config::video.capture.empty() || config::video.capture == "kms") {
       if (verify_kms()) {
+        sources[source::KMS] = true;
+      } else if (fs::exists("/sys/devices/evdi"sv)) {
+        BOOST_LOG(info) << "EVDI is available; enabling KMS capture for virtual displays"sv;
         sources[source::KMS] = true;
       }
     }

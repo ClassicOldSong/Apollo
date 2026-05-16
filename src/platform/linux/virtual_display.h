@@ -5,14 +5,50 @@
 #pragma once
 
 // standard includes
+#include <chrono>
+#include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // local includes
 #include "src/uuid.h"
 
 namespace VDISPLAY {
+
+  /**
+   * @brief Linux virtual display backend implementation.
+   */
+  enum class BACKEND {
+    UNKNOWN,
+    EVDI_PIPEWIRE,
+    MUTTER_PIPEWIRE,
+    EVDI
+  };
+
+  /**
+   * @brief Parse a Linux virtual display backend name.
+   * @param value Backend token from config or environment.
+   * @return Parsed backend, or nullopt when the token is not recognized.
+   */
+  std::optional<BACKEND> parseLinuxVirtualDisplayBackend(std::string_view value);
+
+  /**
+   * @brief Resolve Linux virtual display backend precedence.
+   * @param config_value Config-file backend value.
+   * @param environment_override Optional APOLLO_LINUX_VIRTUAL_BACKEND override.
+   * @return The selected backend. Environment value wins over config when valid.
+   */
+  BACKEND resolveLinuxVirtualDisplayBackend(std::string_view config_value, const char *environment_override);
+
+  /**
+   * @brief Human-readable Linux virtual display backend name.
+   * @param backend Backend enum value.
+   * @return Stable display name for logs and diagnostics.
+   */
+  const char *linuxVirtualDisplayBackendName(BACKEND backend);
 
   /**
    * @brief Status of the virtual display driver.
@@ -134,6 +170,70 @@ namespace VDISPLAY {
   std::vector<std::string> matchDisplay(const std::string &sMatch);
 
   /**
+   * @brief Check whether a display name belongs to an Apollo virtual display.
+   * @param displayName The display name to check.
+   * @return true if the display is an active Apollo virtual display.
+   */
+  bool isVirtualDisplay(const std::string &displayName);
+
+  /**
+   * @brief Get the backend that owns an Apollo virtual display.
+   * @param displayName The display name to check.
+   * @return The backend, or UNKNOWN if the display is not registered.
+   */
+  BACKEND virtualDisplayBackend(const std::string &displayName);
+
+  /**
+   * @brief Get the current requested mode for an Apollo virtual display.
+   * @param displayName The virtual display name.
+   * @param width Output width.
+   * @param height Output height.
+   * @param fps Output refresh rate in mHz.
+   * @return true if the mode was found.
+   */
+  bool getVirtualDisplayMode(const std::string &displayName, uint32_t &width, uint32_t &height, uint32_t &fps);
+
+  /**
+   * @brief Get the PipeWire node id for a Mutter-owned virtual display.
+   * @param displayName The virtual display name.
+   * @param node_id Output PipeWire node id.
+   * @return true if the node id is available.
+   */
+  bool getMutterPipeWireNodeId(const std::string &displayName, uint32_t &node_id);
+
+  /**
+   * @brief Send relative pointer motion to the active Mutter remote desktop virtual display.
+   * @param dx Horizontal movement delta.
+   * @param dy Vertical movement delta.
+   * @return true if the event was queued to Mutter.
+   */
+  bool notifyMutterPointerMotionRelative(double dx, double dy);
+
+  /**
+   * @brief Send absolute pointer motion to the active Mutter remote desktop virtual display.
+   * @param x Stream-relative X coordinate.
+   * @param y Stream-relative Y coordinate.
+   * @return true if the event was queued to Mutter.
+   */
+  bool notifyMutterPointerMotionAbsolute(double x, double y);
+
+  /**
+   * @brief Send a pointer button event to the active Mutter remote desktop virtual display.
+   * @param button Linux input button code.
+   * @param release true when releasing the button, false when pressing it.
+   * @return true if the event was queued to Mutter.
+   */
+  bool notifyMutterPointerButton(int button, bool release);
+
+  /**
+   * @brief Send a pointer axis event to the active Mutter remote desktop virtual display.
+   * @param dx Horizontal axis delta.
+   * @param dy Vertical axis delta.
+   * @return true if the event was queued to Mutter.
+   */
+  bool notifyMutterPointerAxis(double dx, double dy);
+
+  /**
    * @brief Check if a display is an EVDI virtual display.
    * @param displayName The name of the display to check.
    * @return true if the display is an EVDI virtual display, false otherwise.
@@ -146,5 +246,37 @@ namespace VDISPLAY {
    * @return The card index, or -1 if not found or not an EVDI display.
    */
   int getEvdiCardIndex(const std::string &displayName);
+
+  /**
+   * @brief Copy the latest EVDI painter frame into a caller-owned buffer.
+   * @param displayName The EVDI display name.
+   * @param dst Destination buffer.
+   * @param width Expected frame width.
+   * @param height Expected frame height.
+   * @param dst_stride Destination row pitch in bytes.
+   * @param timeout Maximum time to wait for a frame newer than last_generation.
+   * @param last_generation Last generation consumed by the caller; updated on success.
+   * @param frame_timestamp Timestamp for the copied frame; updated on success.
+   * @return true if a new frame was copied, false otherwise.
+   */
+  bool copyLatestEvdiFrame(
+    const std::string &displayName,
+    std::uint8_t *dst,
+    int width,
+    int height,
+    int dst_stride,
+    std::chrono::milliseconds timeout,
+    std::uint64_t &last_generation,
+    std::chrono::steady_clock::time_point &frame_timestamp,
+    bool require_new_frame = true
+  );
+
+  /**
+   * @brief Check whether the EVDI painter is blocked in a grab operation.
+   * @param displayName The EVDI display name.
+   * @param minimum_duration Minimum grab age to report as busy.
+   * @return true if the current EVDI grab has exceeded minimum_duration.
+   */
+  bool isEvdiGrabBusy(const std::string &displayName, std::chrono::milliseconds minimum_duration);
 
 }  // namespace VDISPLAY

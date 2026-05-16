@@ -4,6 +4,7 @@
  */
 
 // standard includes
+#include <chrono>
 #include <fstream>
 #include <future>
 #include <queue>
@@ -374,6 +375,10 @@ namespace stream {
 
       safe::mail_raw_t::event_t<bool> idr_events;
       safe::mail_raw_t::event_t<std::pair<int64_t, int64_t>> invalidate_ref_frames_events;
+
+      std::int64_t pacing_target_kbps {};
+      size_t pacing_packets_per_ms {};
+      size_t pacing_send_batch_size {};
 
       std::unique_ptr<platf::deinit_t> qos;
     } video;
@@ -941,11 +946,25 @@ namespace stream {
     });
 
     server->map(packetTypes[IDX_LOSS_STATS], [&](session_t *session, const std::string_view &payload) {
+      if (payload.size() < sizeof(int32_t) * 4) {
+        BOOST_LOG(warning) << "Moonlight loss stats packet was too small: "sv << payload.size() << " bytes"sv;
+        return;
+      }
+
       int32_t *stats = (int32_t *) payload.data();
       auto count = stats[0];
       std::chrono::milliseconds t {stats[1]};
 
       auto lastGoodFrame = stats[3];
+
+      static auto last_loss_stats_log = std::chrono::steady_clock::time_point {};
+      auto now = std::chrono::steady_clock::now();
+      if (count > 0 || now - last_loss_stats_log >= 10s) {
+        BOOST_LOG(info) << "Moonlight loss stats: lost_packets="sv << count
+                        << ", interval="sv << t.count() << "ms"sv
+                        << ", last_good_frame="sv << lastGoodFrame;
+        last_loss_stats_log = now;
+      }
 
       BOOST_LOG(verbose)
         << "type [IDX_LOSS_STATS]"sv << std::endl
@@ -957,7 +976,7 @@ namespace stream {
     });
 
     server->map(packetTypes[IDX_REQUEST_IDR_FRAME], [&](session_t *session, const std::string_view &payload) {
-      BOOST_LOG(debug) << "type [IDX_REQUEST_IDR_FRAME]"sv;
+      BOOST_LOG(info) << "Moonlight requested an IDR frame."sv;
 
       session->video.idr_events->raise(true);
     });
@@ -966,6 +985,9 @@ namespace stream {
       auto frames = (std::int64_t *) payload.data();
       auto firstFrame = frames[0];
       auto lastFrame = frames[1];
+
+      BOOST_LOG(info) << "Moonlight requested reference-frame invalidation: first="sv << firstFrame
+                      << ", last="sv << lastFrame;
 
       BOOST_LOG(debug)
         << "type [IDX_INVALIDATE_REF_FRAMES]"sv << std::endl
@@ -1347,11 +1369,18 @@ namespace stream {
     }
 
     auto ratecontrol_next_frame_start = std::chrono::steady_clock::now();
+    auto last_video_packet_start = std::chrono::steady_clock::time_point {};
 
     while (auto packet = packets->pop()) {
       if (shutdown_event->peek()) {
         break;
       }
+
+      auto packet_start = std::chrono::steady_clock::now();
+      auto inter_packet_gap = last_video_packet_start == std::chrono::steady_clock::time_point {} ?
+                                std::chrono::steady_clock::duration {} :
+                                packet_start - last_video_packet_start;
+      last_video_packet_start = packet_start;
 
       frame_network_latency_logger.first_point_now();
 
@@ -1359,6 +1388,8 @@ namespace stream {
       auto lowseq = session->video.lowseq;
 
       std::string_view payload {(char *) packet->data(), packet->data_size()};
+      const auto encoded_payload_bytes = payload.size();
+      const bool frame_was_dupe = !packet->frame_timestamp;
       std::vector<uint8_t> payload_with_replacements;
 
       // Apply replacements on the packet payload before performing any other operations.
@@ -1406,6 +1437,7 @@ namespace stream {
       auto payload_new = concat_and_insert(sizeof(video_packet_raw_t), payload_blocksize, std::string_view {(char *) &frame_header, sizeof(frame_header)}, payload);
 
       payload = std::string_view {(char *) payload_new.data(), payload_new.size()};
+      const auto network_payload_bytes = payload.size();
 
       // There are 2 bits for FEC block count for a maximum of 4 FEC blocks
       constexpr auto MAX_FEC_BLOCKS = 4;
@@ -1460,8 +1492,18 @@ namespace stream {
       }
 
       try {
-        // Use around 80% of 1Gbps          1Gbps            percent    ms     packet      byte
-        size_t ratecontrol_packets_in_1ms = std::giga::num * 80 / 100 / 1000 / blocksize / 8;
+        auto fecPercentageForPacing = std::clamp(config::stream.fec_percentage, 0, 95);
+        std::int64_t targetNetworkKbps = std::max<std::int64_t>(session->config.monitor.bitrate, 1000);
+        if (fecPercentageForPacing > 0) {
+          targetNetworkKbps = (targetNetworkKbps * 100) / (100 - fecPercentageForPacing);
+        }
+
+        // Keep a small headroom for packet overhead and short encoder variation
+        // without returning to the old LAN-sized burst behavior.
+        targetNetworkKbps += std::min<std::int64_t>(targetNetworkKbps / 10, 5000);
+        targetNetworkKbps = std::clamp<std::int64_t>(targetNetworkKbps, 5000, 1000000);
+
+        size_t ratecontrol_packets_in_1ms = std::max<std::size_t>(1, (targetNetworkKbps / 8) / blocksize);
 
         // Send less than 64K in a single batch.
         // On Windows, batches above 64K seem to bypass SO_SNDBUF regardless of its size,
@@ -1472,12 +1514,30 @@ namespace stream {
         // unusually small packet size.
         // Generic Segmentation Offload on Linux can't do more than 64.
         send_batch_size = std::min<size_t>(64, send_batch_size);
+        send_batch_size = std::min(send_batch_size, ratecontrol_packets_in_1ms);
+        send_batch_size = std::max<std::size_t>(1, send_batch_size);
+
+        if (session->video.pacing_target_kbps != targetNetworkKbps ||
+            session->video.pacing_packets_per_ms != ratecontrol_packets_in_1ms ||
+            session->video.pacing_send_batch_size != send_batch_size) {
+          BOOST_LOG(info) << "Video UDP pacing: target="sv << targetNetworkKbps
+                          << "kbps, packets_per_ms="sv << ratecontrol_packets_in_1ms
+                          << ", send_batch="sv << send_batch_size
+                          << ", encoded_bitrate="sv << session->config.monitor.bitrate
+                          << "kbps, fec="sv << config::stream.fec_percentage << "%"sv;
+          session->video.pacing_target_kbps = targetNetworkKbps;
+          session->video.pacing_packets_per_ms = ratecontrol_packets_in_1ms;
+          session->video.pacing_send_batch_size = send_batch_size;
+        }
 
         // Don't ignore the last ratecontrol group of the previous frame
         auto ratecontrol_frame_start = std::max(ratecontrol_next_frame_start, std::chrono::steady_clock::now());
 
+        const auto frame_send_started = std::chrono::steady_clock::now();
         size_t ratecontrol_frame_packets_sent = 0;
         size_t ratecontrol_group_packets_sent = 0;
+        size_t total_shards_sent = 0;
+        int last_fec_percentage = 0;
 
         auto blockIndex = 0;
         std::for_each(fec_blocks_begin, fec_blocks_end, [&](std::string_view &current_payload) {
@@ -1506,6 +1566,8 @@ namespace stream {
           // If video encryption is enabled, we allocate space for the encryption header before each shard
           auto shards = fec::encode(current_payload, blocksize, fecPercentage, session->config.minRequiredFecPackets, session->video.cipher ? sizeof(video_packet_enc_prefix_t) : 0);
           frame_fec_latency_logger.second_point_now_and_log();
+          total_shards_sent += shards.size();
+          last_fec_percentage = shards.percentage;
 
           auto peer_address = session->video.peer.address();
           auto batch_info = platf::batched_send_info_t {
@@ -1639,6 +1701,35 @@ namespace stream {
         });
 
         session->video.lowseq = lowseq;
+
+        auto frame_send_done = std::chrono::steady_clock::now();
+        const auto network_ms = std::chrono::duration<double, std::milli>(frame_send_done - frame_send_started).count();
+        const auto inter_packet_ms = std::chrono::duration<double, std::milli>(inter_packet_gap).count();
+        const auto pipeline_ms = packet->frame_timestamp ?
+                                   std::chrono::duration<double, std::milli>(frame_send_done - *packet->frame_timestamp).count() :
+                                   0.0;
+        const bool anomalous_frame =
+          packet->is_idr() ||
+          packet->after_ref_frame_invalidation ||
+          inter_packet_ms > 50.0 ||
+          network_ms > 35.0 ||
+          encoded_payload_bytes > 1024 * 1024;
+
+        if (anomalous_frame) {
+          auto f = stat_trackers::two_digits_after_decimal();
+          BOOST_LOG(info) << "Stream diag: frame="sv << packet->frame_index()
+                          << ", idr="sv << packet->is_idr()
+                          << ", rfi="sv << packet->after_ref_frame_invalidation
+                          << ", dupe="sv << frame_was_dupe
+                          << ", encoded="sv << f % (encoded_payload_bytes / 1000.0) << "KB"sv
+                          << ", network_payload="sv << f % (network_payload_bytes / 1000.0) << "KB"sv
+                          << ", shards="sv << total_shards_sent
+                          << ", fec="sv << last_fec_percentage << "%"sv
+                          << ", inter_frame_gap="sv << f % inter_packet_ms << "ms"sv
+                          << ", network_send="sv << f % network_ms << "ms"sv
+                          << ", pipeline="sv << f % pipeline_ms << "ms"sv
+                          << ", peer="sv << session->video.peer;
+        }
       } catch (const std::exception &e) {
         BOOST_LOG(error) << "Broadcast video failed "sv << e.what();
         std::this_thread::sleep_for(100ms);

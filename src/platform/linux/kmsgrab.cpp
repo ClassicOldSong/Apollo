@@ -3,9 +3,12 @@
  * @brief Definitions for KMS screen capture.
  */
 // standard includes
+#include <algorithm>
+#include <cstdlib>
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <string_view>
 #include <thread>
 #include <unistd.h>
 
@@ -27,6 +30,7 @@
 #include "src/utility.h"
 #include "src/video.h"
 #include "vaapi.h"
+#include "virtual_display.h"
 #include "wayland.h"
 
 using namespace std::literals;
@@ -123,6 +127,22 @@ namespace platf {
     static int env_width;
     static int env_height;
 
+    bool env_flag_enabled(const char *name) {
+      const char *value = std::getenv(name);
+      if (!value || value[0] == '\0') {
+        return false;
+      }
+
+      const std::string_view flag {value};
+      return flag != "0"sv &&
+             flag != "false"sv &&
+             flag != "FALSE"sv &&
+             flag != "off"sv &&
+             flag != "OFF"sv &&
+             flag != "no"sv &&
+             flag != "NO"sv;
+    }
+
     std::string_view plane_type(std::uint64_t val) {
       switch (val) {
         case DRM_PLANE_TYPE_OVERLAY:
@@ -210,6 +230,7 @@ namespace platf {
       _CONVERT("WRITEBACK"sv, WRITEBACK);
       _CONVERT("Writeback"sv, WRITEBACK);
       _CONVERT("SPI"sv, SPI);
+      _CONVERT("Meta"sv, VIRTUAL);
 #ifdef DRM_MODE_CONNECTOR_USB
       _CONVERT("USB"sv, USB);
 #endif
@@ -527,6 +548,83 @@ namespace platf {
       plane_res_t plane_res;
     };
 
+    bool has_active_scanout(card_t &card) {
+      auto end = std::end(card);
+      for (auto plane = std::begin(card); plane != end; ++plane) {
+        if (!plane->fb_id || card.is_cursor(plane->plane_id)) {
+          continue;
+        }
+
+        auto crtc = card.crtc(plane->crtc_id);
+        if (crtc && crtc->width && crtc->height) {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    void drop_drm_master_if_held(file_t &fd, std::string_view context) {
+      if (fd.el < 0) {
+        return;
+      }
+
+      if (drmDropMaster(fd.el) == 0) {
+        BOOST_LOG(debug) << "Dropped DRM master for "sv << context;
+        return;
+      }
+
+      if (errno != EINVAL && errno != EACCES && errno != EPERM) {
+        BOOST_LOG(debug) << "DRM master drop skipped for "sv << context << ": "sv << strerror(errno);
+      }
+    }
+
+    file_t open_nvidia_render_fd_for_encoding() {
+      fs::path card_dir {"/dev/dri"sv};
+      if (!fs::exists(card_dir)) {
+        return {};
+      }
+
+      std::vector<fs::path> card_paths;
+      for (auto &entry : fs::directory_iterator {card_dir}) {
+        auto filestring = entry.path().filename().generic_string();
+        if (filestring.size() >= 4 && std::string_view {filestring}.substr(0, 4) == "card"sv) {
+          card_paths.emplace_back(entry.path());
+        }
+      }
+
+      std::sort(std::begin(card_paths), std::end(card_paths));
+
+      file_t fallback;
+      for (auto &card_path : card_paths) {
+        kms::card_t candidate;
+        if (candidate.init(card_path.c_str())) {
+          continue;
+        }
+
+        if (!candidate.is_nvidia() || candidate.render_fd.el < 0) {
+          continue;
+        }
+
+        auto active = has_active_scanout(candidate);
+        if (active) {
+          BOOST_LOG(info) << "Using active NVIDIA render device for EVDI CUDA encoding: "sv << card_path;
+          return std::move(candidate.render_fd);
+        }
+
+        if (fallback.el < 0) {
+          BOOST_LOG(debug) << "Using fallback NVIDIA render device candidate: "sv << card_path;
+          fallback = std::move(candidate.render_fd);
+        }
+      }
+
+      if (fallback.el >= 0) {
+        BOOST_LOG(info) << "Using fallback NVIDIA render device for EVDI CUDA encoding"sv;
+      }
+
+      return fallback;
+    }
+
     std::map<std::uint32_t, monitor_t> map_crtc_to_monitor(const std::vector<connector_t> &connectors) {
       std::map<std::uint32_t, monitor_t> result;
 
@@ -587,39 +685,34 @@ namespace platf {
       }
 
       int init(const std::string &display_name, const ::video::config_t &config) {
+        this->display_name = display_name;
         delay = std::chrono::nanoseconds {1s} / config.framerate;
 
-        // Handle virtual display names (e.g., "VIRTUAL-80EE83C6")
-        // Virtual displays don't have a physical KMS representation, so we fall back to the primary monitor
-        int monitor_index = 0;
-        if (display_name.rfind("VIRTUAL-", 0) != 0) {
-          // Not a virtual display, parse as numeric index
-          monitor_index = util::from_view(display_name);
-        } else {
-          BOOST_LOG(debug) << "Virtual display detected ["sv << display_name << "], using primary monitor for KMS capture"sv;
+        const bool is_virtual_display = display_name.rfind("VIRTUAL-", 0) == 0;
+        is_virtual_display_capture = is_virtual_display;
+        const int monitor_index = is_virtual_display ? 0 : util::from_view(display_name);
+
+        if (is_virtual_display && !VDISPLAY::isEvdiDisplay(display_name)) {
+          BOOST_LOG(error) << "Virtual display ["sv << display_name << "] is not backed by EVDI"sv;
+          return -1;
         }
-        int monitor = 0;
 
-        fs::path card_dir {"/dev/dri"sv};
-        for (auto &entry : fs::directory_iterator {card_dir}) {
-          auto file = entry.path().filename();
-
-          auto filestring = file.generic_string();
-          if (filestring.size() < 4 || std::string_view {filestring}.substr(0, 4) != "card"sv) {
-            continue;
+        auto init_card = [&](const fs::path &card_path, const std::string &filestring, int &monitor) -> int {
+          kms::card_t card;
+          if (card.init(card_path.c_str())) {
+            return 1;
           }
 
-          kms::card_t card;
-          if (card.init(entry.path().c_str())) {
-            continue;
+          if (is_virtual_display) {
+            drop_drm_master_if_held(card.fd, "EVDI capture probe"sv);
           }
 
           // Skip non-Nvidia cards if we're looking for CUDA devices
           // unless NVENC is selected manually by the user
-          if (mem_type == mem_type_e::cuda && !card.is_nvidia()) {
-            BOOST_LOG(debug) << file << " is not a CUDA device"sv;
+          if (!is_virtual_display && mem_type == mem_type_e::cuda && !card.is_nvidia()) {
+            BOOST_LOG(debug) << filestring << " is not a CUDA device"sv;
             if (config::video.encoder != "nvenc") {
-              continue;
+              return 1;
             }
           }
 
@@ -678,7 +771,7 @@ namespace platf {
             if (pos == std::end(card_descriptors)) {
               // This code path shouldn't happen, but it's there just in case.
               // card_descriptors is part of the guesswork after all.
-              BOOST_LOG(error) << "Couldn't find ["sv << entry.path() << "]: This shouldn't have happened :/"sv;
+              BOOST_LOG(error) << "Couldn't find ["sv << card_path << "]: This shouldn't have happened :/"sv;
               return -1;
             }
 
@@ -727,6 +820,23 @@ namespace platf {
               offset_y = crtc->y;
             }
 
+            if (is_virtual_display) {
+              // EVDI virtual sessions are isolated for the stream. Do not let
+              // stale physical-desktop geometry constrain absolute mouse input.
+              img_offset_x = 0;
+              img_offset_y = 0;
+              offset_x = 0;
+              offset_y = 0;
+              env_width = width;
+              env_height = height;
+
+              BOOST_LOG(info) << "EVDI virtual display geometry for capture/input: display=["sv << display_name
+                              << "], capture="sv << img_width << 'x' << img_height
+                              << ", stream="sv << width << 'x' << height
+                              << ", env="sv << env_width << 'x' << env_height
+                              << ", offset="sv << offset_x << 'x' << offset_y;
+            }
+
             plane_id = plane->plane_id;
             crtc_id = plane->crtc_id;
             crtc_index = card.get_crtc_index_by_id(plane->crtc_id);
@@ -745,11 +855,77 @@ namespace platf {
             }
 
             this->card = std::move(card);
-            goto break_loop;
+            if (is_virtual_display) {
+              drop_drm_master_if_held(this->card.fd, "EVDI capture card after monitor selection"sv);
+            }
+            return 0;
           }
+
+          return 1;
+        };
+
+        auto find_monitor = [&]() -> int {
+          int monitor = 0;
+
+          if (is_virtual_display) {
+            auto evdi_card_index = VDISPLAY::getEvdiCardIndex(display_name);
+            if (evdi_card_index < 0) {
+              BOOST_LOG(error) << "Couldn't find EVDI DRM card for ["sv << display_name << ']';
+              return -1;
+            }
+
+            std::string filestring = "card"s + std::to_string(evdi_card_index);
+            fs::path card_path = fs::path {"/dev/dri"sv} / filestring;
+            if (!fs::exists(card_path)) {
+              BOOST_LOG(error) << "EVDI DRM card ["sv << card_path << "] does not exist for ["sv << display_name << ']';
+              return -1;
+            }
+
+            auto status = init_card(card_path, filestring, monitor);
+            if (status > 0) {
+              BOOST_LOG(debug) << "EVDI display ["sv << display_name << "] does not have an active scanout yet"sv;
+            }
+            return status;
+          }
+
+          fs::path card_dir {"/dev/dri"sv};
+          for (auto &entry : fs::directory_iterator {card_dir}) {
+            auto file = entry.path().filename();
+
+            auto filestring = file.generic_string();
+            if (filestring.size() < 4 || std::string_view {filestring}.substr(0, 4) != "card"sv) {
+              continue;
+            }
+
+            auto status = init_card(entry.path(), filestring, monitor);
+            if (status <= 0) {
+              return status;
+            }
+          }
+
+          return 1;
+        };
+
+        if (is_virtual_display) {
+          for (int attempt = 0; attempt < 20; ++attempt) {
+            auto status = find_monitor();
+            if (status <= 0) {
+              if (!status && attempt > 0) {
+                BOOST_LOG(info) << "EVDI display ["sv << display_name << "] became capturable after "sv << (attempt * 100) << "ms"sv;
+              }
+              if (status) {
+                return status;
+              }
+              goto break_loop;
+            }
+
+            std::this_thread::sleep_for(100ms);
+          }
+        } else if (!find_monitor()) {
+          goto break_loop;
         }
 
-        BOOST_LOG(error) << "Couldn't find monitor ["sv << monitor_index << ']';
+        BOOST_LOG(error) << "Couldn't find monitor ["sv << display_name << ']';
         return -1;
 
       // Neatly break from nested for loop
@@ -783,6 +959,10 @@ namespace platf {
 
         if (cursor_plane_id < 0) {
           BOOST_LOG(warning) << "No KMS cursor plane found. Cursor may not be displayed while streaming!"sv;
+        }
+
+        if (is_virtual_display) {
+          drop_drm_master_if_held(card.fd, "EVDI capture card before streaming"sv);
         }
 
         return 0;
@@ -1126,6 +1306,9 @@ namespace platf {
       cursor_t captured_cursor {};
 
       card_t card;
+      file_t cuda_render_fd;
+      bool is_virtual_display_capture {};
+      std::string display_name;
     };
 
     class display_ram_t: public display_t {
@@ -1135,12 +1318,22 @@ namespace platf {
       }
 
       int init(const std::string &display_name, const ::video::config_t &config) {
-        if (!gbm::create_device) {
-          BOOST_LOG(warning) << "libgbm not initialized"sv;
+        if (display_t::init(display_name, config)) {
           return -1;
         }
 
-        if (display_t::init(display_name, config)) {
+        if (is_virtual_display_capture) {
+          BOOST_LOG(info) << "Using direct mmap capture path for EVDI display ["sv << display_name << ']';
+          direct_mmap_capture = true;
+          evdi_scanout_fallback_enabled = env_flag_enabled("APOLLO_EVDI_SCANOUT_FALLBACK");
+          if (evdi_scanout_fallback_enabled) {
+            BOOST_LOG(warning) << "EVDI direct KMS scanout fallback is enabled by APOLLO_EVDI_SCANOUT_FALLBACK ["sv << display_name << ']';
+          }
+          return 0;
+        }
+
+        if (!gbm::create_device) {
+          BOOST_LOG(warning) << "libgbm not initialized"sv;
           return -1;
         }
 
@@ -1226,6 +1419,329 @@ namespace platf {
         return std::make_unique<avcodec_encode_device_t>();
       }
 
+      bool is_codec_supported(std::string_view, const ::video::config_t &config) override {
+        if (is_virtual_display_capture && mem_type == mem_type_e::cuda) {
+          if (config.dynamicRange != 0 || config.chromaSamplingType == 1) {
+            BOOST_LOG(debug) << "EVDI direct mmap capture with CUDA supports 8-bit 4:2:0 encoder input only.";
+            return false;
+          }
+        }
+
+        return true;
+      }
+
+      capture_e snapshot_scanout_mmap(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, bool cursor) {
+        const auto capture_start = std::chrono::steady_clock::now();
+        file_t fb_fd[4];
+
+        egl::surface_descriptor_t sd;
+
+        std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
+        const auto refresh_start = std::chrono::steady_clock::now();
+        auto status = refresh(fb_fd, &sd, frame_timestamp);
+        const auto refresh_done = std::chrono::steady_clock::now();
+        if (status != capture_e::ok) {
+          return status;
+        }
+
+        if (!img_out && !pull_free_image_cb(img_out)) {
+          return platf::capture_e::interrupted;
+        }
+
+        if (sd.fds[0] < 0 || sd.pitches[0] == 0 || sd.width <= 0 || sd.height <= 0) {
+          BOOST_LOG(error) << "Invalid EVDI framebuffer descriptor for direct capture"sv;
+          return capture_e::error;
+        }
+
+        if (sd.fourcc != DRM_FORMAT_XRGB8888 && sd.fourcc != DRM_FORMAT_ARGB8888) {
+          BOOST_LOG(error) << "Unsupported EVDI framebuffer format for direct capture: "sv << util::view(sd.fourcc);
+          return capture_e::error;
+        }
+
+        auto mapped_size = static_cast<std::size_t>(sd.offsets[0]) + static_cast<std::size_t>(sd.pitches[0]) * height;
+        void *mapped_data = mmap(nullptr, mapped_size, PROT_READ, MAP_SHARED, sd.fds[0], 0);
+        if (mapped_data == MAP_FAILED) {
+          BOOST_LOG(error) << "Failed to mmap EVDI framebuffer: "sv << strerror(errno);
+          return capture_e::error;
+        }
+
+        struct dma_buf_sync sync;
+        sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
+        const auto sync_start = std::chrono::steady_clock::now();
+        drmIoctl(sd.fds[0], DMA_BUF_IOCTL_SYNC, &sync);
+        const auto sync_done = std::chrono::steady_clock::now();
+
+        auto src = static_cast<const std::uint8_t *>(mapped_data) + sd.offsets[0];
+        auto dst = static_cast<std::uint8_t *>(img_out->data);
+
+        const auto copy_start = std::chrono::steady_clock::now();
+        for (int y = 0; y < height; ++y) {
+          auto src_row = src + (static_cast<std::size_t>(y + img_offset_y) * sd.pitches[0]) + (img_offset_x * 4);
+          auto dst_row = dst + (static_cast<std::size_t>(y) * img_out->row_pitch);
+          memcpy(dst_row, src_row, static_cast<std::size_t>(width) * 4);
+        }
+        const auto copy_done = std::chrono::steady_clock::now();
+
+        sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
+        drmIoctl(sd.fds[0], DMA_BUF_IOCTL_SYNC, &sync);
+
+        munmap(mapped_data, mapped_size);
+
+        img_out->frame_timestamp = frame_timestamp;
+
+        double blend_ms = 0.0;
+        if (cursor && captured_cursor.visible) {
+          const auto blend_start = std::chrono::steady_clock::now();
+          blend_cursor(*img_out);
+          blend_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blend_start).count();
+        }
+
+        if (!logged_evdi_scanout_capture) {
+          BOOST_LOG(info) << "Using direct KMS scanout mmap for EVDI capture ["sv << display_name << ']';
+          logged_evdi_scanout_capture = true;
+        }
+
+        record_evdi_scanout_diag(
+          std::chrono::duration<double, std::milli>(refresh_done - refresh_start).count(),
+          std::chrono::duration<double, std::milli>(sync_done - sync_start).count(),
+          std::chrono::duration<double, std::milli>(copy_done - copy_start).count(),
+          blend_ms,
+          std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count()
+        );
+
+        return capture_e::ok;
+      }
+
+      capture_e snapshot_painter_mmap(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+        const auto capture_start = std::chrono::steady_clock::now();
+        if (!img_out && !pull_free_image_cb(img_out)) {
+          return platf::capture_e::interrupted;
+        }
+
+        if (is_virtual_display_capture) {
+          auto old_cursor = captured_cursor;
+          double cursor_ms = 0.0;
+          if (cursor) {
+            const auto cursor_start = std::chrono::steady_clock::now();
+            update_cursor();
+            cursor_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cursor_start).count();
+          }
+
+          auto cursor_changed = cursor && (
+                                  old_cursor.visible != captured_cursor.visible ||
+                                  (captured_cursor.visible &&
+                                   (old_cursor.x != captured_cursor.x ||
+                                    old_cursor.y != captured_cursor.y ||
+                                    old_cursor.dst_w != captured_cursor.dst_w ||
+                                    old_cursor.dst_h != captured_cursor.dst_h ||
+                                    old_cursor.serial != captured_cursor.serial))
+                                );
+
+          std::chrono::steady_clock::time_point frame_timestamp;
+          const auto frame_wait = std::min(timeout, 2ms);
+          const auto new_copy_start = std::chrono::steady_clock::now();
+          if (VDISPLAY::copyLatestEvdiFrame(display_name, img_out->data, width, height, img_out->row_pitch, frame_wait, evdi_frame_generation, frame_timestamp)) {
+            const auto copy_done = std::chrono::steady_clock::now();
+            double blend_ms = 0.0;
+            if (!logged_painter_capture) {
+              BOOST_LOG(info) << "Using EVDI painter frame source for direct capture ["sv << display_name << ']';
+              logged_painter_capture = true;
+            }
+
+            evdi_last_content_frame = std::chrono::steady_clock::now();
+            evdi_last_paced_frame = evdi_last_content_frame;
+            img_out->frame_timestamp = frame_timestamp;
+            if (cursor && captured_cursor.visible) {
+              const auto blend_start = std::chrono::steady_clock::now();
+              blend_cursor(*img_out);
+              blend_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blend_start).count();
+            }
+            record_evdi_capture_diag(
+              true,
+              false,
+              false,
+              cursor_changed,
+              cursor_ms,
+              std::chrono::duration<double, std::milli>(copy_done - new_copy_start).count(),
+              blend_ms,
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count()
+            );
+            return capture_e::ok;
+          }
+
+          if (evdi_frame_generation > 0) {
+            const auto now = std::chrono::steady_clock::now();
+            const auto repeat_interval = delay;
+            const auto should_repeat_latest_frame = cursor_changed || now - evdi_last_paced_frame >= repeat_interval;
+
+            if (should_repeat_latest_frame &&
+                VDISPLAY::copyLatestEvdiFrame(display_name, img_out->data, width, height, img_out->row_pitch, 0ms, evdi_frame_generation, frame_timestamp, false)) {
+              const auto copy_done = std::chrono::steady_clock::now();
+              double blend_ms = 0.0;
+              if (!cursor_changed && !logged_recent_update_pacing) {
+                BOOST_LOG(info) << "Pacing repeated EVDI frames to maintain target stream FPS ["sv << display_name << ']';
+                logged_recent_update_pacing = true;
+              }
+
+              evdi_last_paced_frame = now;
+              img_out->frame_timestamp = now;
+              if (cursor && captured_cursor.visible) {
+                const auto blend_start = std::chrono::steady_clock::now();
+                blend_cursor(*img_out);
+                blend_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blend_start).count();
+              }
+              record_evdi_capture_diag(
+                false,
+                true,
+                false,
+                cursor_changed,
+                cursor_ms,
+                std::chrono::duration<double, std::milli>(copy_done - new_copy_start).count(),
+                blend_ms,
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count()
+              );
+              return capture_e::ok;
+            }
+
+            record_evdi_capture_diag(
+              false,
+              false,
+              true,
+              cursor_changed,
+              cursor_ms,
+              0.0,
+              0.0,
+              std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - capture_start).count()
+            );
+            return capture_e::timeout;
+          }
+        }
+
+        return snapshot_scanout_mmap(pull_free_image_cb, img_out, cursor);
+      }
+
+      capture_e snapshot_mmap(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+        if (is_virtual_display_capture) {
+          auto painter_status = snapshot_painter_mmap(pull_free_image_cb, img_out, timeout, cursor);
+          if (painter_status == capture_e::ok || painter_status == capture_e::interrupted || painter_status == capture_e::reinit || painter_status == capture_e::error) {
+            return painter_status;
+          }
+
+          const bool painter_grab_busy = VDISPLAY::isEvdiGrabBusy(display_name, 35ms);
+          if (!painter_grab_busy && evdi_frame_generation > 0) {
+            return painter_status;
+          }
+
+          if (!evdi_scanout_fallback_enabled) {
+            if (!logged_evdi_scanout_fallback_disabled) {
+              BOOST_LOG(info) << "EVDI direct KMS scanout fallback is disabled; set APOLLO_EVDI_SCANOUT_FALLBACK=1 to test it ["sv << display_name << ']';
+              logged_evdi_scanout_fallback_disabled = true;
+            }
+            return painter_status;
+          }
+
+          if (!logged_evdi_scanout_fallback) {
+            BOOST_LOG(warning) << "EVDI painter has stalled during a grab; using direct KMS scanout as fallback ["sv << display_name << ']';
+            logged_evdi_scanout_fallback = true;
+          }
+
+          auto scanout_status = snapshot_scanout_mmap(pull_free_image_cb, img_out, cursor);
+          if (scanout_status == capture_e::ok || scanout_status == capture_e::interrupted || scanout_status == capture_e::reinit || scanout_status == capture_e::error) {
+            return scanout_status;
+          }
+
+          return painter_status;
+        }
+
+        return snapshot_scanout_mmap(pull_free_image_cb, img_out, cursor);
+      }
+
+      void record_evdi_capture_diag(bool content_frame, bool repeated_frame, bool timeout, bool cursor_changed, double cursor_ms, double copy_ms, double blend_ms, double total_ms) {
+        const auto now = std::chrono::steady_clock::now();
+        if (evdi_capture_diag_started.time_since_epoch().count() == 0) {
+          evdi_capture_diag_started = now;
+        }
+
+        ++evdi_capture_diag_frames;
+        if (content_frame) {
+          ++evdi_capture_diag_content_frames;
+        }
+        if (repeated_frame) {
+          ++evdi_capture_diag_repeated_frames;
+        }
+        if (timeout) {
+          ++evdi_capture_diag_timeouts;
+        }
+        if (cursor_changed) {
+          ++evdi_capture_diag_cursor_changes;
+        }
+
+        evdi_capture_diag_max_cursor_ms = std::max(evdi_capture_diag_max_cursor_ms, cursor_ms);
+        evdi_capture_diag_max_copy_ms = std::max(evdi_capture_diag_max_copy_ms, copy_ms);
+        evdi_capture_diag_max_blend_ms = std::max(evdi_capture_diag_max_blend_ms, blend_ms);
+        evdi_capture_diag_max_total_ms = std::max(evdi_capture_diag_max_total_ms, total_ms);
+
+        if (now - evdi_capture_diag_started < 1s && total_ms < 20.0 && cursor_ms < 8.0 && copy_ms < 8.0 && blend_ms < 4.0) {
+          return;
+        }
+
+        BOOST_LOG(info) << "EVDI capture diag display=" << display_name
+                        << " frames=" << evdi_capture_diag_frames
+                        << " content=" << evdi_capture_diag_content_frames
+                        << " repeated=" << evdi_capture_diag_repeated_frames
+                        << " timeouts=" << evdi_capture_diag_timeouts
+                        << " cursor_changes=" << evdi_capture_diag_cursor_changes
+                        << " max_cursor_ms=" << evdi_capture_diag_max_cursor_ms
+                        << " max_copy_ms=" << evdi_capture_diag_max_copy_ms
+                        << " max_blend_ms=" << evdi_capture_diag_max_blend_ms
+                        << " max_total_ms=" << evdi_capture_diag_max_total_ms;
+
+        evdi_capture_diag_started = now;
+        evdi_capture_diag_frames = 0;
+        evdi_capture_diag_content_frames = 0;
+        evdi_capture_diag_repeated_frames = 0;
+        evdi_capture_diag_timeouts = 0;
+        evdi_capture_diag_cursor_changes = 0;
+        evdi_capture_diag_max_cursor_ms = 0.0;
+        evdi_capture_diag_max_copy_ms = 0.0;
+        evdi_capture_diag_max_blend_ms = 0.0;
+        evdi_capture_diag_max_total_ms = 0.0;
+      }
+
+      void record_evdi_scanout_diag(double refresh_ms, double sync_ms, double copy_ms, double blend_ms, double total_ms) {
+        const auto now = std::chrono::steady_clock::now();
+        if (evdi_scanout_diag_started.time_since_epoch().count() == 0) {
+          evdi_scanout_diag_started = now;
+        }
+
+        ++evdi_scanout_diag_frames;
+        evdi_scanout_diag_max_refresh_ms = std::max(evdi_scanout_diag_max_refresh_ms, refresh_ms);
+        evdi_scanout_diag_max_sync_ms = std::max(evdi_scanout_diag_max_sync_ms, sync_ms);
+        evdi_scanout_diag_max_copy_ms = std::max(evdi_scanout_diag_max_copy_ms, copy_ms);
+        evdi_scanout_diag_max_blend_ms = std::max(evdi_scanout_diag_max_blend_ms, blend_ms);
+        evdi_scanout_diag_max_total_ms = std::max(evdi_scanout_diag_max_total_ms, total_ms);
+
+        if (now - evdi_scanout_diag_started < 1s && total_ms < 20.0 && sync_ms < 8.0 && copy_ms < 8.0) {
+          return;
+        }
+
+        BOOST_LOG(info) << "EVDI scanout diag display=" << display_name
+                        << " frames=" << evdi_scanout_diag_frames
+                        << " max_refresh_ms=" << evdi_scanout_diag_max_refresh_ms
+                        << " max_sync_ms=" << evdi_scanout_diag_max_sync_ms
+                        << " max_copy_ms=" << evdi_scanout_diag_max_copy_ms
+                        << " max_blend_ms=" << evdi_scanout_diag_max_blend_ms
+                        << " max_total_ms=" << evdi_scanout_diag_max_total_ms;
+
+        evdi_scanout_diag_started = now;
+        evdi_scanout_diag_frames = 0;
+        evdi_scanout_diag_max_refresh_ms = 0.0;
+        evdi_scanout_diag_max_sync_ms = 0.0;
+        evdi_scanout_diag_max_copy_ms = 0.0;
+        evdi_scanout_diag_max_blend_ms = 0.0;
+        evdi_scanout_diag_max_total_ms = 0.0;
+      }
+
       void blend_cursor(img_t &img) {
         // TODO: Cursor scaling is not supported in this codepath.
         // We always draw the cursor at the source size.
@@ -1275,6 +1791,10 @@ namespace platf {
       }
 
       capture_e snapshot(const pull_free_image_cb_t &pull_free_image_cb, std::shared_ptr<platf::img_t> &img_out, std::chrono::milliseconds timeout, bool cursor) {
+        if (direct_mmap_capture) {
+          return snapshot_mmap(pull_free_image_cb, img_out, timeout, cursor);
+        }
+
         file_t fb_fd[4];
 
         egl::surface_descriptor_t sd;
@@ -1334,6 +1854,33 @@ namespace platf {
       gbm::gbm_t gbm;
       egl::display_t display;
       egl::ctx_t ctx;
+      bool direct_mmap_capture {};
+      bool logged_painter_capture {};
+      bool logged_recent_update_pacing {};
+      bool logged_evdi_scanout_capture {};
+      bool logged_evdi_scanout_fallback {};
+      bool logged_evdi_scanout_fallback_disabled {};
+      std::uint64_t evdi_frame_generation {};
+      bool evdi_scanout_fallback_enabled {};
+      std::chrono::steady_clock::time_point evdi_last_content_frame {};
+      std::chrono::steady_clock::time_point evdi_last_paced_frame {};
+      std::chrono::steady_clock::time_point evdi_capture_diag_started {};
+      std::uint64_t evdi_capture_diag_frames {};
+      std::uint64_t evdi_capture_diag_content_frames {};
+      std::uint64_t evdi_capture_diag_repeated_frames {};
+      std::uint64_t evdi_capture_diag_timeouts {};
+      std::uint64_t evdi_capture_diag_cursor_changes {};
+      double evdi_capture_diag_max_cursor_ms {};
+      double evdi_capture_diag_max_copy_ms {};
+      double evdi_capture_diag_max_blend_ms {};
+      double evdi_capture_diag_max_total_ms {};
+      std::chrono::steady_clock::time_point evdi_scanout_diag_started {};
+      std::uint64_t evdi_scanout_diag_frames {};
+      double evdi_scanout_diag_max_refresh_ms {};
+      double evdi_scanout_diag_max_sync_ms {};
+      double evdi_scanout_diag_max_copy_ms {};
+      double evdi_scanout_diag_max_blend_ms {};
+      double evdi_scanout_diag_max_total_ms {};
     };
 
     class display_vram_t: public display_t {
@@ -1351,7 +1898,13 @@ namespace platf {
 
 #ifdef SUNSHINE_BUILD_CUDA
         if (mem_type == mem_type_e::cuda) {
-          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y);
+          auto render_fd = card.render_fd.el;
+          if (is_virtual_display_capture && cuda_render_fd.el >= 0) {
+            BOOST_LOG(info) << "Using NVIDIA render FD for EVDI CUDA encoding"sv;
+            render_fd = cuda_render_fd.el;
+          }
+
+          return cuda::make_avcodec_gl_encode_device(width, height, img_offset_x, img_offset_y, render_fd);
         }
 #endif
 
@@ -1470,6 +2023,24 @@ namespace platf {
         if (display_t::init(display_name, config)) {
           return -1;
         }
+
+	    if (is_virtual_display_capture) {
+  #ifdef SUNSHINE_BUILD_CUDA
+	      if (mem_type == mem_type_e::cuda && std::getenv("APOLLO_EVDI_DIRECT_DMABUF")) {
+	        cuda_render_fd = open_nvidia_render_fd_for_encoding();
+	        if (cuda_render_fd.el < 0) {
+	          BOOST_LOG(warning) << "Couldn't find a NVIDIA render device for EVDI DMA-BUF import. Reverting back to GPU -> RAM -> GPU"sv;
+	          return -1;
+	        }
+
+	        BOOST_LOG(info) << "Attempting direct EVDI DMA-BUF import through CUDA/GL for ["sv << display_name << ']';
+	        return 0;
+	      }
+  #endif
+
+	      BOOST_LOG(info) << "EVDI display ["sv << display_name << "] requires direct mmap capture; skipping GL dmabuf import path"sv;
+	      return -1;
+	    }
 
 #ifdef SUNSHINE_BUILD_VAAPI
         if (mem_type == mem_type_e::vaapi && !va::validate(card.render_fd.el)) {

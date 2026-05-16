@@ -238,6 +238,14 @@ namespace egl {
   };
 
   display_t make_display(std::variant<gbm::gbm_t::pointer, wl_display *, _XDisplay *> native_display);
+
+  /**
+   * @brief Create an EGL display from an EGLDeviceEXT (EGL_EXT_device_drm).
+   * @param device The EGL device to create a display from.
+   * @return An initialized EGL display or nullptr on failure.
+   */
+  display_t make_device_display(void *device);
+
   std::optional<ctx_t> make_ctx(display_t::pointer display);
 
   std::optional<rgb_t>

@@ -2,7 +2,7 @@
 Categories=RemoteAccess;Network;
 Comment=@PROJECT_DESCRIPTION@
 Exec=sunshine
-Icon=sunshine
+Icon=@SUNSHINE_DESKTOP_ICON@
 Keywords=gamestream;stream;moonlight;remote play;
 Name=@PROJECT_NAME@
 Terminal=true

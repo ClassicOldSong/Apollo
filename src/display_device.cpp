@@ -752,6 +752,12 @@ namespace display_device {
   }
 
   std::string map_output_name(const std::string &output_name) {
+#ifndef _WIN32
+    if (output_name.rfind("VIRTUAL-", 0) == 0) {
+      return output_name;
+    }
+#endif
+
     std::lock_guard lock {DD_DATA.mutex};
     if (!DD_DATA.sm_instance) {
       // Fallback to giving back the output name if the platform is not supported.

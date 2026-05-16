@@ -74,9 +74,9 @@ modules:
       - -DSUNSHINE_ENABLE_X11=ON
       - -DSUNSHINE_ENABLE_DRM=ON
       - -DSUNSHINE_ENABLE_CUDA=ON
-      - -DSUNSHINE_PUBLISHER_NAME='LizardByte'
-      - -DSUNSHINE_PUBLISHER_WEBSITE='https://app.lizardbyte.dev'
-      - -DSUNSHINE_PUBLISHER_ISSUE_URL='https://app.lizardbyte.dev/support'
+      - -DSUNSHINE_PUBLISHER_NAME='primez-x'
+      - -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/primez-x/Apollo-Ubuntu-26-04'
+      - -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/primez-x/Apollo-Ubuntu-26-04/issues'
     no-make-install: false
     post-install:
       - install -D $FLATPAK_BUILDER_BUILDDIR/packaging/linux/flatpak/scripts/* /app/bin
