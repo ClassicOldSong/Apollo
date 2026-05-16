@@ -48,7 +48,6 @@ docs/doxyconfig*
 
 # npm
 node_modules/
-package-lock.json
 
 # Translations
 *.mo

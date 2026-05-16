@@ -94,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ApolloUbuntu-deb
-          path: "*.deb"
+          path: build/cpack_artifacts/*.deb
           if-no-files-found: error
 
   flatpak-manifest:
@@ -125,5 +125,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ApolloUbuntu-flatpak-manifest
-          path: build-flatpak-manifest/io.github.primezx.ApolloUbuntu.yml
+          path: |
+            build-flatpak-manifest/io.github.primezx.ApolloUbuntu.yml
+            build-flatpak-manifest/generated-sources.json
+            build-flatpak-manifest/package-lock.json
           if-no-files-found: error
