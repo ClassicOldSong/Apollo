@@ -191,5 +191,5 @@ This fork builds on:
 Use issues in this fork for Ubuntu/Linux virtual display bugs:
 
 ```text
-https://github.com/primez-x/Apollo-Ubuntu-26-04/issues
+https://github.com/primez-x/Apollo-Ubuntu/issues
 ```
