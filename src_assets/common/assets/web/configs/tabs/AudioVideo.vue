@@ -128,6 +128,26 @@ const validateFallbackMode = (event) => {
       <div class="form-text">{{ $t('config.linux_virtual_display_backend_desc') }}</div>
     </div>
 
+    <div class="mb-3" v-if="platform === 'linux'">
+      <label for="linux_virtual_capture_backend" class="form-label">{{ $t('config.linux_virtual_capture_backend') }}</label>
+      <select class="form-select" id="linux_virtual_capture_backend" v-model="config.linux_virtual_capture_backend">
+        <option value="auto">auto</option>
+        <option value="pipewire">pipewire</option>
+        <option value="nvidia">nvidia</option>
+      </select>
+      <div class="form-text">{{ $t('config.linux_virtual_capture_backend_desc') }}</div>
+    </div>
+
+    <div class="mb-3" v-if="platform === 'linux'">
+      <label for="linux_pipewire_dmabuf" class="form-label">{{ $t('config.linux_pipewire_dmabuf') }}</label>
+      <select class="form-select" id="linux_pipewire_dmabuf" v-model="config.linux_pipewire_dmabuf">
+        <option value="auto">auto</option>
+        <option value="off">off</option>
+        <option value="force">force</option>
+      </select>
+      <div class="form-text">{{ $t('config.linux_pipewire_dmabuf_desc') }}</div>
+    </div>
+
     <DisplayDeviceOptions
       :platform="platform"
       :config="config"

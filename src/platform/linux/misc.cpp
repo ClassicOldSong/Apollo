@@ -1045,6 +1045,42 @@ std::string get_local_ip_for_gateway() {
       const auto backend = VDISPLAY::virtualDisplayBackend(display_name);
       if (backend == VDISPLAY::BACKEND::MUTTER_PIPEWIRE ||
           backend == VDISPLAY::BACKEND::EVDI_PIPEWIRE) {
+        const char *capture_override = std::getenv("APOLLO_LINUX_VIRTUAL_CAPTURE");
+        if (capture_override && *capture_override && !VDISPLAY::parseLinuxVirtualCaptureBackend(capture_override)) {
+          BOOST_LOG(warning) << "Unknown APOLLO_LINUX_VIRTUAL_CAPTURE=" << capture_override << "; ignoring environment override.";
+        }
+        if (!config::video.linux_virtual_capture_backend.empty() &&
+            !VDISPLAY::parseLinuxVirtualCaptureBackend(config::video.linux_virtual_capture_backend)) {
+          BOOST_LOG(warning) << "Unknown linux_virtual_capture_backend=" << config::video.linux_virtual_capture_backend
+                             << "; defaulting to auto.";
+        }
+        const auto capture_backend = VDISPLAY::resolveLinuxVirtualCaptureBackend(config::video.linux_virtual_capture_backend, capture_override);
+        BOOST_LOG(info) << "Virtual display capture backend preference: "
+                        << VDISPLAY::linuxVirtualCaptureBackendName(capture_backend);
+
+#ifdef SUNSHINE_BUILD_CUDA
+        if (capture_backend == VDISPLAY::CAPTURE_BACKEND::NVIDIA) {
+          if (hwdevice_type == mem_type_e::cuda && (sources[source::NVFBC] || verify_nvfbc())) {
+            BOOST_LOG(info) << "Attempting NVIDIA capture for virtual display ["sv << display_name << ']';
+            auto disp = nvfbc_display(hwdevice_type, "", config);
+            if (disp) {
+              return disp;
+            }
+
+            BOOST_LOG(warning) << "NVIDIA virtual display capture failed.";
+            return nullptr;
+          } else {
+            BOOST_LOG(error) << "NVIDIA virtual display capture was requested, but NvFBC/CUDA is unavailable.";
+            return nullptr;
+          }
+        }
+#else
+        if (capture_backend == VDISPLAY::CAPTURE_BACKEND::NVIDIA) {
+          BOOST_LOG(error) << "NVIDIA virtual display capture was requested, but CUDA/NvFBC support is not compiled in.";
+          return nullptr;
+        }
+#endif
+
 #ifdef SUNSHINE_BUILD_PIPEWIRE
         BOOST_LOG(info) << "Screencasting PipeWire virtual display ["sv << display_name << ']';
         auto disp = pipewire_display(hwdevice_type, display_name, config);

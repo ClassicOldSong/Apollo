@@ -222,6 +222,8 @@ Default:
 
 ```text
 linux_virtual_display_backend = auto
+linux_virtual_capture_backend = auto
+linux_pipewire_dmabuf = auto
 ```
 
 `auto` uses the EVDI monitor plus Mutter ScreenCast/PipeWire backend. That is the supported GNOME Wayland path.
@@ -231,10 +233,22 @@ Diagnostic alternatives:
 - `mutter`: GNOME Mutter RecordVirtual/PipeWire without EVDI.
 - `evdi`: direct EVDI/KMS capture.
 
+Capture acceleration:
+
+- `linux_virtual_capture_backend = auto`: use the PipeWire path with the configured DMA-BUF policy.
+- `linux_virtual_capture_backend = pipewire`: force the Mutter/PipeWire capture path.
+- `linux_virtual_capture_backend = nvidia`: explicitly try NVIDIA/NvFBC capture for the active virtual display session.
+- `linux_pipewire_dmabuf = auto`: negotiate PipeWire DMA-BUF capture when Mutter offers it.
+- `linux_pipewire_dmabuf = off`: keep the known-good mapped PipeWire frame path.
+- `linux_pipewire_dmabuf = force`: fail the session if DMA-BUF is not negotiated.
+
+When DMA-BUF diagnostics are enabled in logs, `data_type=3` means PipeWire delivered DMA-BUF. `data_type=1` or `data_type=2` means Apollo is on a mapped CPU/shared-memory fallback.
+
 For temporary diagnostics only, the environment variable below overrides the config value:
 
 ```bash
 APOLLO_LINUX_VIRTUAL_BACKEND=evdi systemctl --user restart sunshine.service
+APOLLO_LINUX_VIRTUAL_CAPTURE=pipewire APOLLO_PIPEWIRE_DMABUF=force systemctl --user restart sunshine.service
 ```
 
 ## Logs And Troubleshooting

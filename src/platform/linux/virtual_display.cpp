@@ -918,6 +918,98 @@ namespace VDISPLAY {
     return BACKEND::EVDI_PIPEWIRE;
   }
 
+  std::optional<CAPTURE_BACKEND> parseLinuxVirtualCaptureBackend(std::string_view value) {
+    auto backend = normalized_backend_token(value);
+    if (backend.empty()) {
+      return std::nullopt;
+    }
+
+    if (backend == "auto") {
+      return CAPTURE_BACKEND::AUTO;
+    }
+    if (backend == "pipewire" || backend == "mutter" || backend == "mutter_pipewire" || backend == "mutter-pipewire") {
+      return CAPTURE_BACKEND::PIPEWIRE;
+    }
+    if (backend == "nvidia" || backend == "nvfbc" || backend == "nvidia_capture" || backend == "nvidia-capture") {
+      return CAPTURE_BACKEND::NVIDIA;
+    }
+
+    return std::nullopt;
+  }
+
+  CAPTURE_BACKEND resolveLinuxVirtualCaptureBackend(std::string_view config_value, const char *environment_override) {
+    if (environment_override && *environment_override) {
+      if (auto backend = parseLinuxVirtualCaptureBackend(environment_override)) {
+        return *backend;
+      }
+    }
+
+    if (auto backend = parseLinuxVirtualCaptureBackend(config_value)) {
+      return *backend;
+    }
+
+    return CAPTURE_BACKEND::AUTO;
+  }
+
+  const char *linuxVirtualCaptureBackendName(CAPTURE_BACKEND backend) {
+    switch (backend) {
+      case CAPTURE_BACKEND::AUTO:
+        return "auto";
+      case CAPTURE_BACKEND::PIPEWIRE:
+        return "PipeWire";
+      case CAPTURE_BACKEND::NVIDIA:
+        return "NVIDIA";
+      default:
+        return "unknown";
+    }
+  }
+
+  std::optional<PIPEWIRE_DMABUF> parseLinuxPipeWireDmaBuf(std::string_view value) {
+    auto mode = normalized_backend_token(value);
+    if (mode.empty()) {
+      return std::nullopt;
+    }
+
+    if (mode == "auto") {
+      return PIPEWIRE_DMABUF::AUTO;
+    }
+    if (mode == "off" || mode == "false" || mode == "disabled" || mode == "disable" || mode == "0") {
+      return PIPEWIRE_DMABUF::OFF;
+    }
+    if (mode == "force" || mode == "forced" || mode == "on" || mode == "true" || mode == "enabled" || mode == "enable" || mode == "1") {
+      return PIPEWIRE_DMABUF::FORCE;
+    }
+
+    return std::nullopt;
+  }
+
+  PIPEWIRE_DMABUF resolveLinuxPipeWireDmaBuf(std::string_view config_value, const char *environment_override) {
+    if (environment_override && *environment_override) {
+      if (auto mode = parseLinuxPipeWireDmaBuf(environment_override)) {
+        return *mode;
+      }
+    }
+
+    if (auto mode = parseLinuxPipeWireDmaBuf(config_value)) {
+      return *mode;
+    }
+
+    return PIPEWIRE_DMABUF::AUTO;
+  }
+
+  const char *linuxPipeWireDmaBufName(PIPEWIRE_DMABUF mode) {
+    switch (mode) {
+      case PIPEWIRE_DMABUF::AUTO:
+        return "auto";
+      case PIPEWIRE_DMABUF::OFF:
+        return "off";
+      case PIPEWIRE_DMABUF::FORCE:
+        return "force";
+      default:
+        return "unknown";
+    }
+  }
+
   const char *linuxVirtualDisplayBackendName(BACKEND backend) {
     switch (backend) {
       case BACKEND::MUTTER_PIPEWIRE:

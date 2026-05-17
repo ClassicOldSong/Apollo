@@ -497,6 +497,8 @@ namespace config {
     {},  // adapter_name
     {},  // output_name
     "auto",  // linux_virtual_display_backend
+    "auto",  // linux_virtual_capture_backend
+    "auto",  // linux_pipewire_dmabuf
 
     {
       video_t::dd_t::config_option_e::disabled,  // configuration_option
@@ -1183,6 +1185,8 @@ namespace config {
     string_f(vars, "adapter_name", video.adapter_name);
     string_f(vars, "output_name", video.output_name);
     string_f(vars, "linux_virtual_display_backend", video.linux_virtual_display_backend);
+    string_f(vars, "linux_virtual_capture_backend", video.linux_virtual_capture_backend);
+    string_f(vars, "linux_pipewire_dmabuf", video.linux_pipewire_dmabuf);
 
     generic_f(vars, "dd_configuration_option", video.dd.configuration_option, dd::config_option_from_view);
     generic_f(vars, "dd_resolution_option", video.dd.resolution_option, dd::resolution_option_from_view);

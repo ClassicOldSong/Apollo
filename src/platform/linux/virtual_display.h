@@ -29,6 +29,24 @@ namespace VDISPLAY {
   };
 
   /**
+   * @brief Capture implementation preference for Linux virtual displays.
+   */
+  enum class CAPTURE_BACKEND {
+    AUTO,
+    PIPEWIRE,
+    NVIDIA
+  };
+
+  /**
+   * @brief PipeWire DMA-BUF acceleration policy.
+   */
+  enum class PIPEWIRE_DMABUF {
+    AUTO,
+    OFF,
+    FORCE
+  };
+
+  /**
    * @brief Parse a Linux virtual display backend name.
    * @param value Backend token from config or environment.
    * @return Parsed backend, or nullopt when the token is not recognized.
@@ -42,6 +60,18 @@ namespace VDISPLAY {
    * @return The selected backend. Environment value wins over config when valid.
    */
   BACKEND resolveLinuxVirtualDisplayBackend(std::string_view config_value, const char *environment_override);
+
+  std::optional<CAPTURE_BACKEND> parseLinuxVirtualCaptureBackend(std::string_view value);
+
+  CAPTURE_BACKEND resolveLinuxVirtualCaptureBackend(std::string_view config_value, const char *environment_override);
+
+  const char *linuxVirtualCaptureBackendName(CAPTURE_BACKEND backend);
+
+  std::optional<PIPEWIRE_DMABUF> parseLinuxPipeWireDmaBuf(std::string_view value);
+
+  PIPEWIRE_DMABUF resolveLinuxPipeWireDmaBuf(std::string_view config_value, const char *environment_override);
+
+  const char *linuxPipeWireDmaBufName(PIPEWIRE_DMABUF mode);
 
   /**
    * @brief Human-readable Linux virtual display backend name.

@@ -88,6 +88,8 @@ namespace config {
     std::string adapter_name;
     std::string output_name;
     std::string linux_virtual_display_backend;
+    std::string linux_virtual_capture_backend;
+    std::string linux_pipewire_dmabuf;
 
     struct dd_t {
       struct workarounds_t {

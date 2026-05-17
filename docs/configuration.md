@@ -1079,6 +1079,79 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### linux_virtual_capture_backend
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Select the capture path used after Apollo creates a Linux virtual display.
+            `auto` uses Mutter/PipeWire with the configured DMA-BUF policy. `nvidia`
+            is an explicit experimental path. `APOLLO_LINUX_VIRTUAL_CAPTURE` can
+            override this value for diagnostics.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}auto@endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            linux_virtual_capture_backend = pipewire
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+        <td>Use GNOME Mutter ScreenCast/PipeWire with the configured DMA-BUF policy.</td>
+    </tr>
+    <tr>
+        <td>pipewire</td>
+        <td>Use GNOME Mutter ScreenCast/PipeWire capture.</td>
+    </tr>
+    <tr>
+        <td>nvidia</td>
+        <td>Use NVIDIA/NvFBC capture when CUDA/NvFBC is available.</td>
+    </tr>
+</table>
+
+### linux_pipewire_dmabuf
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Control PipeWire DMA-BUF capture for Linux virtual displays. DMA-BUF avoids
+            the mapped PipeWire frame copy when Mutter negotiates GPU-native buffers.
+            `APOLLO_PIPEWIRE_DMABUF` can override this value for diagnostics.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}auto@endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            linux_pipewire_dmabuf = force
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+        <td>Negotiate DMA-BUF when possible and fall back to mapped PipeWire frames.</td>
+    </tr>
+    <tr>
+        <td>off</td>
+        <td>Disable DMA-BUF negotiation and use mapped PipeWire frames.</td>
+    </tr>
+    <tr>
+        <td>force</td>
+        <td>Require DMA-BUF negotiation and fail the stream if unavailable.</td>
+    </tr>
+</table>
+
 ### isolated_virtual_display_option
 
 <table>

@@ -45,4 +45,54 @@ TEST(LinuxVirtualDisplayBackendTest, InvalidConfigFallsBackToHybridDefault) {
   );
 }
 
+TEST(LinuxVirtualDisplayBackendTest, ParsesVirtualCaptureBackends) {
+  EXPECT_EQ(VDISPLAY::parseLinuxVirtualCaptureBackend("auto"), VDISPLAY::CAPTURE_BACKEND::AUTO);
+  EXPECT_EQ(VDISPLAY::parseLinuxVirtualCaptureBackend("pipewire"), VDISPLAY::CAPTURE_BACKEND::PIPEWIRE);
+  EXPECT_EQ(VDISPLAY::parseLinuxVirtualCaptureBackend("mutter-pipewire"), VDISPLAY::CAPTURE_BACKEND::PIPEWIRE);
+  EXPECT_EQ(VDISPLAY::parseLinuxVirtualCaptureBackend("nvidia"), VDISPLAY::CAPTURE_BACKEND::NVIDIA);
+  EXPECT_EQ(VDISPLAY::parseLinuxVirtualCaptureBackend("nvfbc"), VDISPLAY::CAPTURE_BACKEND::NVIDIA);
+  EXPECT_FALSE(VDISPLAY::parseLinuxVirtualCaptureBackend("kms"));
+}
+
+TEST(LinuxVirtualDisplayBackendTest, ResolvesVirtualCaptureBackendPrecedence) {
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxVirtualCaptureBackend("pipewire", "nvidia"),
+    VDISPLAY::CAPTURE_BACKEND::NVIDIA
+  );
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxVirtualCaptureBackend("pipewire", "unknown"),
+    VDISPLAY::CAPTURE_BACKEND::PIPEWIRE
+  );
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxVirtualCaptureBackend("unknown", nullptr),
+    VDISPLAY::CAPTURE_BACKEND::AUTO
+  );
+}
+
+TEST(LinuxVirtualDisplayBackendTest, ParsesPipeWireDmaBufModes) {
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("auto"), VDISPLAY::PIPEWIRE_DMABUF::AUTO);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("off"), VDISPLAY::PIPEWIRE_DMABUF::OFF);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("disabled"), VDISPLAY::PIPEWIRE_DMABUF::OFF);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("0"), VDISPLAY::PIPEWIRE_DMABUF::OFF);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("force"), VDISPLAY::PIPEWIRE_DMABUF::FORCE);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("enabled"), VDISPLAY::PIPEWIRE_DMABUF::FORCE);
+  EXPECT_EQ(VDISPLAY::parseLinuxPipeWireDmaBuf("1"), VDISPLAY::PIPEWIRE_DMABUF::FORCE);
+  EXPECT_FALSE(VDISPLAY::parseLinuxPipeWireDmaBuf("maybe"));
+}
+
+TEST(LinuxVirtualDisplayBackendTest, ResolvesPipeWireDmaBufPrecedence) {
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxPipeWireDmaBuf("off", "force"),
+    VDISPLAY::PIPEWIRE_DMABUF::FORCE
+  );
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxPipeWireDmaBuf("off", "unknown"),
+    VDISPLAY::PIPEWIRE_DMABUF::OFF
+  );
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxPipeWireDmaBuf("unknown", nullptr),
+    VDISPLAY::PIPEWIRE_DMABUF::AUTO
+  );
+}
+
 #endif
