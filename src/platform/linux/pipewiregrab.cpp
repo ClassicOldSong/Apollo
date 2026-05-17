@@ -410,7 +410,14 @@ namespace platf {
 	        }
 
 	        dmabuf_policy = VDISPLAY::resolveLinuxPipeWireDmaBuf(config::video.linux_pipewire_dmabuf, environment_override);
-	        const bool encoder_can_import_dmabuf = mem_type == mem_type_e::cuda || mem_type == mem_type_e::vaapi;
+	        const bool encoder_can_import_dmabuf =
+#ifdef SUNSHINE_BUILD_CUDA
+	          mem_type == mem_type_e::cuda ||
+#endif
+#ifdef SUNSHINE_BUILD_VAAPI
+	          mem_type == mem_type_e::vaapi ||
+#endif
+	          false;
 	        dmabuf_allowed = dmabuf_policy != VDISPLAY::PIPEWIRE_DMABUF::OFF && encoder_can_import_dmabuf;
 	        if (dmabuf_policy == VDISPLAY::PIPEWIRE_DMABUF::FORCE && !encoder_can_import_dmabuf) {
 	          dmabuf_policy_error = true;
