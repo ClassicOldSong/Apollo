@@ -9,6 +9,9 @@ on:
     branches: [master, main, linux-port]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   BUILD_TYPE: Release
 
@@ -71,6 +74,14 @@ jobs:
 
       - name: Configure
         run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            export BUILD_VERSION="${GITHUB_REF_NAME}"
+            export BRANCH="master"
+            export TAG="${GITHUB_REF_NAME}"
+            export COMMIT="${GITHUB_SHA}"
+            export CLONE_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
           cmake -B build -G Ninja -S . \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DCMAKE_INSTALL_PREFIX=/usr \
@@ -115,6 +126,14 @@ jobs:
 
       - name: Configure Flatpak manifest
         run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            export BUILD_VERSION="${GITHUB_REF_NAME}"
+            export BRANCH="master"
+            export TAG="${GITHUB_REF_NAME}"
+            export COMMIT="${GITHUB_SHA}"
+            export CLONE_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          fi
+
           cmake -B build-flatpak-manifest -S . \
             -DSUNSHINE_CONFIGURE_ONLY=ON \
             -DSUNSHINE_CONFIGURE_FLATPAK_MAN=ON \
@@ -130,3 +149,66 @@ jobs:
             build-flatpak-manifest/generated-sources.json
             build-flatpak-manifest/package-lock.json
           if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - ubuntu-deb
+      - flatpak-manifest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+
+          version="${GITHUB_REF_NAME#v}"
+          deb_name="ApolloUbuntu-${version}-ubuntu24.04-amd64.deb"
+          flatpak_manifest_name="ApolloUbuntu-flatpak-manifest-${version}.tar.gz"
+
+          mkdir -p dist/flatpak-manifest
+          cp release-artifacts/ApolloUbuntu-deb/*.deb "dist/${deb_name}"
+          cp release-artifacts/ApolloUbuntu-flatpak-manifest/* dist/flatpak-manifest/
+          tar -C dist -czf "dist/${flatpak_manifest_name}" flatpak-manifest
+
+          (
+            cd dist
+            sha256sum "${deb_name}" "${flatpak_manifest_name}" > SHA256SUMS
+          )
+
+          cat > release-notes.md <<EOF
+          Apollo Ubuntu ${version}
+
+          Standalone Ubuntu-focused Apollo build with the hybrid EVDI + Mutter/PipeWire virtual display backend.
+
+          Assets:
+          - ${deb_name}: recommended Ubuntu 24.04+ install package.
+          - ${flatpak_manifest_name}: experimental Flatpak manifest inputs for local Flatpak builds.
+          - SHA256SUMS: checksums for release assets.
+
+          Notes:
+          - The deb package is the recommended install path because EVDI is a host kernel module.
+          - Validate GNOME Wayland, PipeWire capture, EVDI, and Moonlight streaming on the target host.
+          EOF
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/ApolloUbuntu-*.deb \
+            dist/ApolloUbuntu-flatpak-manifest-*.tar.gz \
+            dist/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Apollo Ubuntu ${GITHUB_REF_NAME#v}" \
+            --notes-file release-notes.md \
+            --latest
