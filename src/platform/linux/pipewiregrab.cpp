@@ -406,7 +406,7 @@ namespace platf {
 	          BOOST_LOG(warning) << "Unknown APOLLO_PIPEWIRE_DMABUF="sv << environment_override << "; ignoring environment override.";
 	        }
 	        if (!config::video.linux_pipewire_dmabuf.empty() && !VDISPLAY::parseLinuxPipeWireDmaBuf(config::video.linux_pipewire_dmabuf)) {
-	          BOOST_LOG(warning) << "Unknown linux_pipewire_dmabuf="sv << config::video.linux_pipewire_dmabuf << "; defaulting to auto.";
+	          BOOST_LOG(warning) << "Unknown linux_pipewire_dmabuf="sv << config::video.linux_pipewire_dmabuf << "; defaulting to off.";
 	        }
 
 	        dmabuf_policy = VDISPLAY::resolveLinuxPipeWireDmaBuf(config::video.linux_pipewire_dmabuf, environment_override);
@@ -418,12 +418,12 @@ namespace platf {
 	          mem_type == mem_type_e::vaapi ||
 #endif
 	          false;
-	        dmabuf_allowed = dmabuf_policy != VDISPLAY::PIPEWIRE_DMABUF::OFF && encoder_can_import_dmabuf;
+	        dmabuf_allowed = dmabuf_policy == VDISPLAY::PIPEWIRE_DMABUF::FORCE && encoder_can_import_dmabuf;
 	        if (dmabuf_policy == VDISPLAY::PIPEWIRE_DMABUF::FORCE && !encoder_can_import_dmabuf) {
 	          dmabuf_policy_error = true;
 	          BOOST_LOG(error) << "PipeWire DMA-BUF capture was forced, but the selected encoder path cannot import DMA-BUF frames.";
-	        } else if (dmabuf_policy != VDISPLAY::PIPEWIRE_DMABUF::OFF && !encoder_can_import_dmabuf) {
-	          BOOST_LOG(info) << "PipeWire DMA-BUF capture requires CUDA or VAAPI import; using mapped PipeWire frames for this encoder.";
+	        } else if (dmabuf_policy == VDISPLAY::PIPEWIRE_DMABUF::AUTO) {
+	          BOOST_LOG(info) << "PipeWire DMA-BUF auto negotiation is disabled pending live validation; using mapped PipeWire frames.";
 	        }
 
 	        BOOST_LOG(info) << "GNOME PipeWire DMA-BUF policy is "sv << VDISPLAY::linuxPipeWireDmaBufName(dmabuf_policy)
@@ -1239,7 +1239,7 @@ namespace platf {
 		      std::chrono::steady_clock::time_point latest_timestamp {};
 		      spa_video_format pipewire_format {SPA_VIDEO_FORMAT_UNKNOWN};
 	      std::uint64_t pipewire_modifier {DRM_FORMAT_MOD_INVALID};
-	      VDISPLAY::PIPEWIRE_DMABUF dmabuf_policy {VDISPLAY::PIPEWIRE_DMABUF::AUTO};
+	      VDISPLAY::PIPEWIRE_DMABUF dmabuf_policy {VDISPLAY::PIPEWIRE_DMABUF::OFF};
 	      pipewire_capture_mode_e active_capture_mode {pipewire_capture_mode_e::MAPPED};
 	      bool dmabuf_allowed {};
 	      bool dmabuf_policy_error {};

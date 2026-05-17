@@ -91,7 +91,11 @@ TEST(LinuxVirtualDisplayBackendTest, ResolvesPipeWireDmaBufPrecedence) {
   );
   EXPECT_EQ(
     VDISPLAY::resolveLinuxPipeWireDmaBuf("unknown", nullptr),
-    VDISPLAY::PIPEWIRE_DMABUF::AUTO
+    VDISPLAY::PIPEWIRE_DMABUF::OFF
+  );
+  EXPECT_EQ(
+    VDISPLAY::resolveLinuxPipeWireDmaBuf("", nullptr),
+    VDISPLAY::PIPEWIRE_DMABUF::OFF
   );
 }
 

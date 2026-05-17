@@ -1122,14 +1122,15 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Control PipeWire DMA-BUF capture for Linux virtual displays. DMA-BUF avoids
-            the mapped PipeWire frame copy when Mutter negotiates GPU-native buffers.
-            `APOLLO_PIPEWIRE_DMABUF` can override this value for diagnostics.
+            Control PipeWire DMA-BUF capture for Linux virtual displays. The supported
+            default uses mapped PipeWire frames. `force` is an experimental diagnostics
+            path for GPU-native buffers and may fail the stream when Mutter rejects the
+            negotiated format. `APOLLO_PIPEWIRE_DMABUF` can override this value for diagnostics.
         </td>
     </tr>
     <tr>
         <td>Default</td>
-        <td colspan="2">@code{}auto@endcode</td>
+        <td colspan="2">@code{}off@endcode</td>
     </tr>
     <tr>
         <td>Example</td>
@@ -1140,7 +1141,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td rowspan="3">Choices</td>
         <td>auto</td>
-        <td>Negotiate DMA-BUF when possible and fall back to mapped PipeWire frames.</td>
+        <td>Reserved for future automatic DMA-BUF negotiation; currently uses mapped PipeWire frames.</td>
     </tr>
     <tr>
         <td>off</td>
@@ -1148,7 +1149,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>force</td>
-        <td>Require DMA-BUF negotiation and fail the stream if unavailable.</td>
+        <td>Require DMA-BUF negotiation and fail the stream if unavailable or rejected by the compositor.</td>
     </tr>
 </table>
 

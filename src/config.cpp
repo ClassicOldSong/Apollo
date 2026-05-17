@@ -498,7 +498,7 @@ namespace config {
     {},  // output_name
     "auto",  // linux_virtual_display_backend
     "auto",  // linux_virtual_capture_backend
-    "auto",  // linux_pipewire_dmabuf
+    "off",  // linux_pipewire_dmabuf
 
     {
       video_t::dd_t::config_option_e::disabled,  // configuration_option

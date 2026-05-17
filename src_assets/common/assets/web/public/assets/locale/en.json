@@ -313,7 +313,7 @@
     "linux_virtual_capture_backend": "Linux Virtual Capture Backend",
     "linux_virtual_capture_backend_desc": "Select the capture path used after Apollo creates a Linux virtual display. Auto uses PipeWire with the configured DMA-BUF policy; NVIDIA is an explicit experimental path.",
     "linux_pipewire_dmabuf": "PipeWire DMA-BUF Capture",
-    "linux_pipewire_dmabuf_desc": "Control GPU-native PipeWire DMA-BUF capture. Auto negotiates DMA-BUF when possible, off keeps mapped PipeWire frames, and force fails if DMA-BUF is unavailable.",
+    "linux_pipewire_dmabuf_desc": "Control experimental GPU-native PipeWire DMA-BUF capture. Off keeps the supported mapped PipeWire frame path, auto currently behaves like off, and force may fail the stream if DMA-BUF is unavailable or rejected.",
     "keep_sink_default": "Keep virtual sink as default",
     "keep_sink_default_desc": "Whether to force selected virtual sink as default (effective when host audio output is disabled).",
     "key_repeat_delay": "Key Repeat Delay",

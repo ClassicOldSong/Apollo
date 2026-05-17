@@ -994,7 +994,7 @@ namespace VDISPLAY {
       return *mode;
     }
 
-    return PIPEWIRE_DMABUF::AUTO;
+    return PIPEWIRE_DMABUF::OFF;
   }
 
   const char *linuxPipeWireDmaBufName(PIPEWIRE_DMABUF mode) {
