@@ -11,6 +11,26 @@ sudo apt install evdi-dkms libevdi1 flatpak flatpak-builder
 sudo modprobe evdi
 ```
 
+If Secure Boot is enabled, the host must trust the DKMS signing key before EVDI
+can load. Enroll the MOK key during the `evdi-dkms` install prompt, then reboot
+and complete the blue MOK Manager enrollment screen. If the prompt was missed:
+
+```bash
+sudo update-secureboot-policy --enroll-key
+sudo dkms autoinstall
+sudo reboot
+```
+
+After reboot, verify:
+
+```bash
+sudo modprobe evdi
+lsmod | grep evdi
+```
+
+`Required key not available` or `Key was rejected by service` means Secure Boot
+is still blocking the EVDI module.
+
 ## Build
 
 Configure the manifest from the repository root:

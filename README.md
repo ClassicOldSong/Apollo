@@ -72,6 +72,48 @@ sudo dkms autoinstall
 sudo modprobe evdi
 ```
 
+### Secure Boot And MOK Enrollment
+
+On systems with UEFI Secure Boot enabled, Ubuntu will only load DKMS-built
+kernel modules after the module-signing key has been enrolled through MOK
+(`Machine Owner Key`). This is a host firmware/Secure Boot trust step, not an
+Apollo setting.
+
+Check Secure Boot state:
+
+```bash
+mokutil --sb-state
+```
+
+If Secure Boot is enabled, `apt install ./ApolloUbuntu*.deb` may prompt you to
+create a one-time MOK enrollment password while `evdi-dkms` is being installed.
+After the package install completes, reboot and use the blue MOK Manager screen
+to enroll the key:
+
+```text
+Enroll MOK -> Continue -> Yes -> enter the one-time password -> Reboot
+```
+
+If the prompt was skipped, or if EVDI later fails to load after a kernel update,
+re-run the enrollment flow and rebuild the DKMS module:
+
+```bash
+sudo update-secureboot-policy --enroll-key
+sudo dkms autoinstall
+sudo reboot
+```
+
+After reboot:
+
+```bash
+sudo modprobe evdi
+lsmod | grep evdi
+```
+
+If `modprobe evdi` reports `Required key not available` or `Key was rejected by
+service`, Secure Boot is blocking the EVDI module and MOK enrollment is still
+required.
+
 ## Build From Source On Ubuntu
 
 Install build dependencies:

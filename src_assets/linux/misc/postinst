@@ -7,7 +7,12 @@ modprobe uhid
 # Load EVDI for Ubuntu virtual display support. Keep this non-fatal so package
 # installation still succeeds while DKMS is rebuilding for a new kernel.
 echo "Loading evdi kernel module for Apollo Ubuntu virtual displays."
-modprobe evdi || echo "warning: evdi module is not available yet; reboot or run 'sudo modprobe evdi' after DKMS finishes."
+if ! modprobe evdi; then
+  echo "warning: evdi module is not available yet; reboot or run 'sudo modprobe evdi' after DKMS finishes."
+  if command -v mokutil >/dev/null 2>&1 && mokutil --sb-state 2>/dev/null | grep -qi enabled; then
+    echo "warning: Secure Boot is enabled. If 'sudo modprobe evdi' reports 'Required key not available' or 'Key was rejected by service', enroll the DKMS MOK key and reboot."
+  fi
+fi
 
 # Check if we're in an rpm-ostree environment
 if [ ! -x "$(command -v rpm-ostree)" ]; then
