@@ -18,7 +18,7 @@ This branch targets Ubuntu desktop hosts, especially:
 
 - Ubuntu 24.04 LTS or newer.
 - Ubuntu 26.04 development/current testing builds.
-- GNOME on Wayland.
+- GNOME on Wayland with the streaming user already logged in.
 - A Moonlight-compatible client such as Artemis or Moonlight.
 
 Other Linux distributions may still build, but Ubuntu is the supported release target for this fork.
@@ -47,6 +47,54 @@ https://localhost:47990
 ```
 
 The browser will warn about the self-signed certificate. That is expected for the local web UI.
+
+## Required GNOME User Session
+
+Apollo Ubuntu's supported virtual display path requires an active GNOME Wayland
+desktop session for the streaming user. The host cannot stream from the GDM
+login screen before that user has logged in.
+
+This is a GNOME/Wayland session boundary, not just a systemd startup ordering
+issue:
+
+- `sunshine.service` is installed as a user service under
+  `xdg-desktop-autostart.target`.
+- The default backend talks to the logged-in user's session bus.
+- Mutter ScreenCast, Mutter RemoteDesktop, PipeWire, display layout state, and
+  pointer injection are all owned by the active user session.
+- `loginctl enable-linger` can keep a user systemd manager alive after logout,
+  but it does not create a GNOME Shell, Mutter, Wayland, or PipeWire desktop
+  session.
+
+For reboot-and-stream hosts, enable GNOME automatic login for the streaming
+user. The user account can still have a password; automatic login only tells
+GDM to enter the desktop session after boot.
+
+Edit `/etc/gdm3/custom.conf`:
+
+```bash
+sudo nano /etc/gdm3/custom.conf
+```
+
+Set the login user:
+
+```ini
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=your-username
+```
+
+Then reboot and verify the desktop session and Apollo service:
+
+```bash
+sudo reboot
+loginctl
+systemctl --user status sunshine.service
+curl -k https://localhost:47990
+```
+
+If the system uses full-disk encryption, the disk still has to be unlocked
+before GDM can start the automatic login.
 
 ## Ubuntu Runtime Requirements
 
@@ -212,6 +260,11 @@ systemctl --user status sunshine.service
 curl -k https://localhost:47990
 curl http://localhost:47989/serverinfo
 ```
+
+If the machine rebooted and is sitting at the GDM login screen, log in locally
+or enable GNOME automatic login. The Apollo service and the virtual display
+backend are expected to become usable only after the user's GNOME Wayland
+session exists.
 
 ## Fork Maintenance
 
