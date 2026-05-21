@@ -1,0 +1,216 @@
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release.yml"
+      - "CMakeLists.txt"
+      - "cmake/**"
+      - "package.json"
+      - "package-lock.json"
+      - "src/**"
+      - "third-party/**"
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish, for example v0.4.9"
+        required: true
+        type: string
+      draft:
+        description: "Create the GitHub Release as a draft"
+        required: true
+        default: true
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub Release as a pre-release"
+        required: true
+        default: false
+        type: boolean
+      create_release:
+        description: "Create or update the GitHub Release after building"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  windows:
+    name: Windows installer
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Resolve build metadata
+        id: metadata
+        shell: pwsh
+        env:
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') {
+            $releaseTag = $env:INPUT_RELEASE_TAG
+            $packageVersion = $releaseTag
+            $artifactSuffix = $releaseTag
+          } elseif ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $releaseTag = $env:GITHUB_REF_NAME
+            $packageVersion = $releaseTag
+            $artifactSuffix = $releaseTag
+          } else {
+            $releaseTag = "pr-$env:PR_NUMBER"
+            $packageVersion = "v0.0.$env:GITHUB_RUN_NUMBER"
+            $artifactSuffix = $releaseTag
+          }
+
+          $artifactSuffix = $artifactSuffix -replace '[^A-Za-z0-9._-]', '-'
+
+          "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
+          "package_version=$packageVersion" >> $env:GITHUB_OUTPUT
+          "artifact_suffix=$artifactSuffix" >> $env:GITHUB_OUTPUT
+          "RELEASE_TAG=$releaseTag" >> $env:GITHUB_ENV
+          "PACKAGE_VERSION=$packageVersion" >> $env:GITHUB_ENV
+          "ARTIFACT_SUFFIX=$artifactSuffix" >> $env:GITHUB_ENV
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-boost
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-cppwinrt
+            mingw-w64-ucrt-x86_64-curl-winssl
+            mingw-w64-ucrt-x86_64-MinHook
+            mingw-w64-ucrt-x86_64-miniupnpc
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-nsis
+            mingw-w64-ucrt-x86_64-onevpl
+            mingw-w64-ucrt-x86_64-openssl
+            mingw-w64-ucrt-x86_64-opus
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-nlohmann_json
+
+      - name: Verify toolchain
+        shell: msys2 {0}
+        run: |
+          cmake --version
+          ninja --version
+          npm --version
+
+      - name: Configure
+        shell: msys2 {0}
+        env:
+          BRANCH: ${{ github.ref_name }}
+          BUILD_VERSION: ${{ steps.metadata.outputs.package_version }}
+          CLONE_URL: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          TAG: ${{ steps.metadata.outputs.release_tag }}
+        run: |
+          cmake -B build -G Ninja -S . -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+
+      - name: Build
+        shell: msys2 {0}
+        run: |
+          cmake --build build --config ${BUILD_TYPE}
+
+      - name: Package installer
+        shell: msys2 {0}
+        run: |
+          cpack -G NSIS --config ./build/CPackConfig.cmake
+
+      - name: Collect installer
+        id: collect
+        shell: pwsh
+        run: |
+          $version = $env:ARTIFACT_SUFFIX -replace '^v', ''
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+
+          $installer = Get-ChildItem -Path build -Recurse -Filter '*.exe' |
+            Where-Object { $_.FullName -match 'cpack_artifacts|_CPack_Packages' } |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $installer) {
+            throw 'No NSIS installer was produced by CPack.'
+          }
+
+          $assetPath = "dist/Apollo-$version.exe"
+          Copy-Item -LiteralPath $installer.FullName -Destination $assetPath -Force
+          "asset_path=$assetPath" >> $env:GITHUB_OUTPUT
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apollo-${{ steps.metadata.outputs.artifact_suffix }}-windows-installer
+          path: ${{ steps.collect.outputs.asset_path }}
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
+          DRAFT: ${{ github.event_name == 'workflow_dispatch' && inputs.draft || false }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || contains(steps.metadata.outputs.release_tag, '-') }}
+          ASSET_PATH: ${{ steps.collect.outputs.asset_path }}
+        run: |
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+
+          if ($releaseExists) {
+            $editArgs = @(
+              'release', 'edit', $env:RELEASE_TAG,
+              '--repo', $env:GITHUB_REPOSITORY,
+              '--title', $env:RELEASE_TAG,
+              "--draft=$($env:DRAFT.ToLowerInvariant())",
+              "--prerelease=$($env:PRERELEASE.ToLowerInvariant())"
+            )
+
+            gh @editArgs
+            gh release upload $env:RELEASE_TAG $env:ASSET_PATH --repo $env:GITHUB_REPOSITORY --clobber
+          } else {
+            $createArgs = @(
+              'release', 'create', $env:RELEASE_TAG,
+              $env:ASSET_PATH,
+              '--repo', $env:GITHUB_REPOSITORY,
+              '--title', $env:RELEASE_TAG,
+              '--target', $env:GITHUB_SHA,
+              '--generate-notes'
+            )
+
+            if ($env:DRAFT -eq 'true') {
+              $createArgs += '--draft'
+            }
+
+            if ($env:PRERELEASE -eq 'true') {
+              $createArgs += '--prerelease'
+            }
+
+            gh @createArgs
+          }
