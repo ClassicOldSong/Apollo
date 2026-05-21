@@ -149,6 +149,8 @@ namespace config {
     std::string fallback_mode;
     bool isolated_virtual_display_option;
     bool ignore_encoder_probe_failure;
+    bool linux_virtual_display_experimental;
+    std::string vdisplay_connector;
   };
 
   struct audio_t {

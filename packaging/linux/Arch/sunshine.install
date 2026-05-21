@@ -2,6 +2,17 @@ do_setcap() {
   setcap cap_sys_admin+p $(readlink -f usr/bin/sunshine)
 }
 
+do_vdisplay_helper() {
+  local helper=$(readlink -f usr/bin/apollo-vdisplay-helper 2>/dev/null)
+  if [ -x "$helper" ]; then
+    if getent group apollo >/dev/null 2>&1; then
+      chown root:apollo "$helper"
+      chmod 0750 "$helper"
+    fi
+    setcap cap_dac_override+ep "$helper"
+  fi
+}
+
 do_udev_reload() {
   udevadm control --reload-rules
   udevadm trigger --property-match=DEVNAME=/dev/uinput
@@ -12,12 +23,14 @@ do_udev_reload() {
 
 post_install() {
   do_setcap
+  do_vdisplay_helper
   do_udev_reload
   modprobe uhid
 }
 
 post_upgrade() {
   do_setcap
+  do_vdisplay_helper
   do_udev_reload
   modprobe uhid
 }
