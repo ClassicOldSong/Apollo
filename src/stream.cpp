@@ -20,6 +20,7 @@ extern "C" {
 }
 
 // local includes
+#include "audio.h"
 #include "config.h"
 #include "crypto.h"
 #include "display_device.h"
@@ -2071,6 +2072,9 @@ namespace stream {
         bool revert_display_config {config::video.dd.config_revert_on_disconnect};
         if (proc::proc.running()) {
           proc::proc.pause();
+          if (config::audio.release_sink_on_pause) {
+            audio::restore_sink();
+          }
         } else {
           // We have no app running and also no clients anymore.
           revert_display_config = true;
