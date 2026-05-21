@@ -12,12 +12,16 @@
 #include "thread_safe.h"
 #include "crypto.h"
 
+namespace config {
+  extern std::vector<platf::feedback_queue_t> placeholder_feedback_queues;
+}
+
 namespace input {
   struct input_t;
 
   void print(void *input);
   void reset(std::shared_ptr<input_t> &input);
-  void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data, const crypto::PERM& permission);
+  void passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data, const crypto::PERM& permission, int iAltControllerNameIndex );
 
   [[nodiscard]] std::unique_ptr<platf::deinit_t> init();
 
