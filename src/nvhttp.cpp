@@ -636,15 +636,21 @@ namespace nvhttp {
       named_cert_p->allow_client_commands = true;
       named_cert_p->always_use_virtual_display = false;
 
-      auto it = map_id_sess.find(client.uniqueID);
-      map_id_sess.erase(it);
-
       add_authorized_client(named_cert_p);
     } else {
       tree.put("root.paired", 0);
       BOOST_LOG(warning) << "Pair attempt failed due to same_hash: " << same_hash << ", verify: " << verify;
     }
 
+    // The previous code performed an eager erase of the session from
+    // map_id_sess on the success branch (before add_authorized_client) and
+    // then called remove_session(sess) below, leaving `sess` (a reference into
+    // the destroyed map slot) dangling. add_authorized_client() invokes
+    // save_state()/load_state(), which allocate heavily and reuse the freed
+    // pair_session_t storage; remove_session() then dereferences
+    // sess.client.uniqueID against corrupted memory, producing a
+    // deterministic 0xc0000005 access violation right after a successful
+    // pair handshake. Single erase via remove_session(sess) is sufficient.
     remove_session(sess);
     tree.put("root.<xmlattr>.status_code", 200);
   }
