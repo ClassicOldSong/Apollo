@@ -30,7 +30,7 @@ endif()
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.30")
     cmake_policy(SET CMP0167 NEW)  # Get BoostConfig.cmake from upstream
 endif()
-find_package(Boost CONFIG ${BOOST_VERSION} EXACT COMPONENTS ${BOOST_COMPONENTS})
+find_package(Boost CONFIG COMPONENTS ${BOOST_COMPONENTS})
 if(NOT Boost_FOUND)
     message(STATUS "Boost v${BOOST_VERSION} package not found in the system. Falling back to FetchContent.")
     include(FetchContent)
