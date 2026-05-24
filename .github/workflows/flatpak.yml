@@ -1,0 +1,61 @@
+---
+name: Flatpak
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_version:
+        description: 'Version tag for the build (e.g. v0.1.0). Defaults to the commit SHA.'
+        required: false
+        default: ''
+
+jobs:
+  flatpak:
+    name: Build Flatpak
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install flatpak-node-generator dependencies
+        run: pip install aiohttp toml
+
+      - name: Generate npm sources for Flatpak
+        run: |
+          python3 packaging/linux/flatpak/deps/flatpak-builder-tools/node/flatpak-node-generator.py \
+            npm package-lock.json \
+            --output generated-sources.json
+
+      - name: Configure Flatpak manifest
+        env:
+          BRANCH: ${{ github.ref_name }}
+          BUILD_VERSION: ${{ inputs.build_version || github.sha }}
+          CLONE_URL: ${{ github.server_url }}/${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          cmake -B cmake-build \
+            -DSUNSHINE_CONFIGURE_FLATPAK_MAN=ON \
+            -DSUNSHINE_CONFIGURE_ONLY=ON
+
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: Apollo.flatpak
+          manifest-path: cmake-build/io.github.filobus97.Apollo.yml
+          cache-key: flatpak-builder-${{ hashFiles('cmake-build/io.github.filobus97.Apollo.yml') }}
+
+      - name: Upload Flatpak bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Apollo-flatpak
+          path: Apollo.flatpak
+          retention-days: 30
