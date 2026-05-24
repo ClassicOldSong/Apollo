@@ -18,8 +18,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
           fetch-depth: 0
+
+      - name: Initialize Flatpak submodules
+        run: |
+          git submodule update --init packaging/linux/flatpak/deps/flatpak-builder-tools
+          git submodule update --init packaging/linux/flatpak/deps/shared-modules
 
       - name: Set up Python
         uses: actions/setup-python@v5
