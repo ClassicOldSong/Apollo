@@ -1121,10 +1121,32 @@ namespace video {
 
     // If we had a name previously, let's try to find it in the new list
     if (!current_display_name.empty()) {
-      for (int x = 0; x < display_names.size(); ++x) {
-        if (display_names[x] == current_display_name) {
-          current_display_index = x;
-          return;
+      // When the user has explicitly pinned an output (output_name set), give it
+      // a brief grace period to appear before falling back. An on-demand virtual
+      // display (e.g. a headless connector brought up only for a stream) can
+      // still be settling in the compositor at the instant the encoder binds;
+      // without this we silently latch onto the wrong physical monitor for the
+      // whole session. Re-enumerate Apollo's own output list each attempt, since
+      // that — not the compositor's view — is the source of truth for capture.
+      const bool pinned = !output_name.empty() && current_display_name == output_name;
+      const int grace_attempts = pinned ? 10 : 1;  // pinned: up to ~10 * 200ms = 2s
+      for (int attempt = 0; attempt < grace_attempts; ++attempt) {
+        for (int x = 0; x < display_names.size(); ++x) {
+          if (display_names[x] == current_display_name) {
+            current_display_index = x;
+            return;
+          }
+        }
+
+        if (attempt + 1 < grace_attempts) {
+          if (attempt == 0) {
+            BOOST_LOG(info) << "Pinned output ["sv << current_display_name << "] not present yet; waiting for it to settle"sv;
+          }
+          std::this_thread::sleep_for(200ms);
+          auto refreshed = platf::display_names(dev_type);
+          if (!refreshed.empty()) {
+            display_names = std::move(refreshed);
+          }
         }
       }
 
