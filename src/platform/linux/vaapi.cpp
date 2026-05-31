@@ -239,6 +239,26 @@ namespace va {
         BOOST_LOG(info) << "Using normal encoding mode"sv;
       }
 
+      // Apply VAAPI quality preset. ffmpeg's -quality knob is "higher = faster".
+      // On AMD VCN the slowest preset (0) is still well under typical frame budgets
+      // even at 4K, so default to best image quality for AMD when the user hasn't
+      // overridden it. Other vendors (Intel iHD, etc.) receive driver default.
+      int quality = -1;
+      if (ctx->codec_id == AV_CODEC_ID_HEVC) {
+        quality = config::video.vaapi.hevc_quality;
+      } else if (ctx->codec_id == AV_CODEC_ID_H264) {
+        quality = config::video.vaapi.h264_quality;
+      } else if (ctx->codec_id == AV_CODEC_ID_AV1) {
+        quality = config::video.vaapi.av1_quality;
+      }
+      if (quality < 0 && vendor && strstr(vendor, "AMD")) {
+        quality = 0;
+      }
+      if (quality >= 0) {
+        BOOST_LOG(info) << "Using VAAPI quality preset: "sv << quality;
+        av_dict_set_int(options, "quality", quality, 0);
+      }
+
       VAConfigAttrib rc_attr = {VAConfigAttribRateControl};
       auto status = vaGetConfigAttributes(va_display, va_profile, va_entrypoint, &rc_attr, 1);
       if (status != VA_STATUS_SUCCESS) {

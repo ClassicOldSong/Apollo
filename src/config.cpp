@@ -490,6 +490,9 @@ namespace config {
 
     {
       false,  // strict_rc_buffer
+      -1,  // h264_quality (driver default; AMD vendor receives 0 below)
+      -1,  // hevc_quality
+      -1,  // av1_quality
     },  // vaapi
 
     {},  // capture
@@ -1176,6 +1179,9 @@ namespace config {
     int_f(vars, "vt_realtime", video.vt.vt_realtime, vt::rt_from_view);
 
     bool_f(vars, "vaapi_strict_rc_buffer", video.vaapi.strict_rc_buffer);
+    int_f(vars, "vaapi_h264_quality", video.vaapi.h264_quality);
+    int_f(vars, "vaapi_hevc_quality", video.vaapi.hevc_quality);
+    int_f(vars, "vaapi_av1_quality", video.vaapi.av1_quality);
 
     string_f(vars, "capture", video.capture);
     string_f(vars, "encoder", video.encoder);

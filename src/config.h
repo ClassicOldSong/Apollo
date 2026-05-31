@@ -81,6 +81,9 @@ namespace config {
 
     struct {
       bool strict_rc_buffer;
+      int h264_quality;  ///< VAAPI ffmpeg -quality preset (h264). -1 = driver default; on AMD, 0 = best, higher = faster.
+      int hevc_quality;  ///< VAAPI ffmpeg -quality preset (hevc). -1 = driver default; on AMD, 0 = best, higher = faster.
+      int av1_quality;  ///< VAAPI ffmpeg -quality preset (av1). -1 = driver default; on AMD, 0 = best, higher = faster.
     } vaapi;
 
     std::string capture;
