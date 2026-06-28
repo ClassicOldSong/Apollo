@@ -401,6 +401,10 @@ namespace platf::dualsense {
     return static_cast<std::uint8_t>(interface_index & 0xFF) == DUALSENSE_EDGE_INTERFACE_HID;
   }
 
+  constexpr bool dualsense_edge_has_interface(std::uint16_t interface_index) {
+    return static_cast<std::uint8_t>(interface_index & 0xFF) <= DUALSENSE_EDGE_INTERFACE_HID;
+  }
+
   constexpr bool dualsense_edge_descriptor_is_interface_scoped(std::uint8_t descriptor_type) {
     return descriptor_type == usb::DESCRIPTOR_HID ||
            descriptor_type == usb::DESCRIPTOR_HID_REPORT;
@@ -588,7 +592,8 @@ namespace platf::dualsense {
           if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
             return handled_control_response(STATUS_SELF_POWERED, setup.length);
           }
-          if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+          if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+              dualsense_edge_has_interface(setup.index)) {
             return handled_control_response(STATUS_INTERFACE, setup.length);
           }
           return unsupported_control_response();
@@ -600,6 +605,10 @@ namespace platf::dualsense {
 
           const auto type = usb::descriptor_type(setup.value);
           if (type == usb::DESCRIPTOR_STRING) {
+            if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_DEVICE) {
+              return unsupported_control_response();
+            }
+
             const auto descriptor = dualsense_edge_string_descriptor(usb::descriptor_index(setup.value));
             if (descriptor.empty()) {
               return unsupported_control_response();
@@ -613,6 +622,8 @@ namespace platf::dualsense {
                 !dualsense_edge_targets_hid_interface(setup.index)) {
               return unsupported_control_response();
             }
+          } else if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_DEVICE) {
+            return unsupported_control_response();
           }
 
           const auto descriptor = dualsense_edge_descriptor(type);
@@ -639,14 +650,16 @@ namespace platf::dualsense {
 
         case usb::REQUEST_GET_INTERFACE:
           if (usb::setup_is_in(setup.request_type) &&
-              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+              dualsense_edge_has_interface(setup.index)) {
             return handled_control_response(INTERFACE_ALTERNATE_SETTING, setup.length);
           }
           return unsupported_control_response();
 
         case usb::REQUEST_SET_INTERFACE:
           if (!usb::setup_is_in(setup.request_type) &&
-              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+              dualsense_edge_has_interface(setup.index)) {
             return handled_empty_control_response();
           }
           return unsupported_control_response();

@@ -411,6 +411,32 @@ TEST(DualSenseReportTests, RejectsHidRequestsForNonHidInterfaces) {
   )).empty());
 }
 
+TEST(DualSenseReportTests, RejectsDescriptorsWithWrongRecipient) {
+  auto interface_recipient_device_descriptor = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_DEVICE,
+    0,
+    18
+  );
+  interface_recipient_device_descriptor.request_type = platf::usb::REQUEST_DIRECTION_IN |
+                                                       platf::usb::RECIPIENT_INTERFACE;
+
+  const auto device = platf::dualsense::dualsense_edge_control_transfer_response(interface_recipient_device_descriptor);
+  EXPECT_FALSE(device.handled);
+  EXPECT_TRUE(device.payload.empty());
+
+  auto interface_recipient_string_descriptor = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_STRING,
+    2,
+    255
+  );
+  interface_recipient_string_descriptor.request_type = platf::usb::REQUEST_DIRECTION_IN |
+                                                       platf::usb::RECIPIENT_INTERFACE;
+
+  const auto string = platf::dualsense::dualsense_edge_control_transfer_response(interface_recipient_string_descriptor);
+  EXPECT_FALSE(string.handled);
+  EXPECT_TRUE(string.payload.empty());
+}
+
 TEST(DualSenseReportTests, ProvidesDualSenseEdgeStringDescriptorsForUsbEnumeration) {
   const auto language = platf::dualsense::dualsense_edge_control_response(
     get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 0, 255)
@@ -574,6 +600,15 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_interface_in, platf::usb::REQUEST_GET_INTERFACE, 0, 1)),
     (std::vector<std::uint8_t> {0})
   );
+  const auto invalid_interface = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_in,
+    platf::usb::REQUEST_GET_INTERFACE,
+    0,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID + 1
+  ));
+  EXPECT_FALSE(invalid_interface.handled);
+  EXPECT_TRUE(invalid_interface.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       class_interface_in,
