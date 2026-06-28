@@ -681,6 +681,12 @@ function Write-TestSystemEvidenceFiles {
       'GameInputSvc GameInput Service    Running Manual',
       'GamingServices Gaming Services    Running Manual'
     )
+    Set-Content -LiteralPath (Join-Path $OutputDir 'gameinput-registry.txt') -Encoding utf8 -Value @(
+      '### GameInput registry context',
+      '### reg.exe query HKLM\SYSTEM\CurrentControlSet\Control\GameInput\Devices /s /f 0DF2',
+      'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GameInput\Devices\VID_054C&PID_0DF2',
+      '    DisplayName    REG_SZ    Sony DualSense Edge Wireless Controller'
+    )
   }
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
     '1-1: Sony Corp. : DualSense Edge Wireless Controller (054c:0df2)'
@@ -1047,6 +1053,7 @@ Test-SystemSummary `
     'MATCH: USB/IP driver package evidence was captured',
     'MATCH: USB/IP signed driver evidence was captured',
     'MATCH: GameInput/Gaming Services context was captured',
+    'MATCH: GameInput registry context was captured',
     'MATCH: usbip port shows requested busid',
     'MATCH: usbip port shows virtual Edge VID/PID',
     'MATCH: usbip port shows requested virtual Edge import on one line',
@@ -1116,7 +1123,8 @@ Test-SystemSummary `
   -IncludeGameInputEvidence $false `
   -ExpectedOverall 'PASS' `
   -ExpectedSummaryLines @(
-    'SKIPPED_OR_MISSING: GameInput/Gaming Services context was captured'
+    'SKIPPED_OR_MISSING: GameInput/Gaming Services context was captured',
+    'SKIPPED_OR_MISSING: GameInput registry context was captured'
   )
 
 Test-SystemSummary `

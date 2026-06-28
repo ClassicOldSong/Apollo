@@ -325,8 +325,8 @@ The key evidence to capture during validation is:
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
-- GameInput/Gaming Services context when validating games that use
-  Windows.Gaming.Input or GameInput.
+- GameInput/Gaming Services service, package, and registry context when
+  validating games that use Windows.Gaming.Input or GameInput.
 - Host-side HID/gamepad inspector evidence showing the four Edge paddle/Fn
   controls as separate inputs, not face-button remaps.
 
@@ -342,10 +342,11 @@ The helper writes a timestamped directory under `%TEMP%` containing
 `usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
 matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 USB/IP-related driver package and signed-driver details, GameInput/Gaming
-Services service and package context, environment details, all present
-`VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP health/status
-details, present HIDClass nodes, matching CIM `Win32_PnPEntity` rows, and
-selected PnP properties. Pass one complete Apollo log and one complete Moonlight
+Services service/package context, filtered GameInput registry context for Sony
+Edge VID/PID entries, environment details, all present `VID_054C&PID_0DF2` PnP
+devices, the expected `MI_03` child, PnP health/status details, present HIDClass
+nodes, matching CIM `Win32_PnPEntity` rows, and selected PnP properties. Pass
+one complete Apollo log and one complete Moonlight
 log from the same end-to-end run with `-LogPath` to copy them into the same
 evidence bundle; the log manifest records each copied
 path's source path, destination path, type, last write time, file size, and
@@ -392,9 +393,9 @@ Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener's
 requested host and port, `usbip.exe`, requested busid, attach result, optional
-USB/IP service/driver package evidence, optional GameInput/Gaming Services
-context, `usbip port` entries for both the requested busid and the virtual Edge
-VID/PID on the same imported-device line, and Windows PnP
+USB/IP service/driver package evidence, optional GameInput/Gaming Services and
+registry context, `usbip port` entries for both the requested busid and the
+virtual Edge VID/PID on the same imported-device line, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence,
 including healthy PnP status checks and the first matching lines from the
 captured files. It also writes
@@ -440,9 +441,10 @@ When finished, remove the verbose logging flag:
 
 If a GameInput/Windows.Gaming.Input-sensitive game alternates between input
 devices, ignores input, or sees duplicate Edge controls while the HID evidence
-still shows four distinct paddle/Fn bits, attach `gameinput-service.txt` from
-the evidence bundle and keep that as an application compatibility follow-up.
-That symptom is different from Apollo failing to transport the Edge button bits.
+still shows four distinct paddle/Fn bits, attach `gameinput-service.txt` and
+`gameinput-registry.txt` from the evidence bundle and keep that as an
+application compatibility follow-up. That symptom is different from Apollo
+failing to transport the Edge button bits.
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
@@ -648,8 +650,9 @@ same end-to-end run:
   tools may expose the Edge extras as vendor/Edge-specific bits rather than
   numbered generic buttons, so prefer DS5/Edge-aware HID evidence when possible.
 - If a GameInput/Windows.Gaming.Input-sensitive game was used for validation,
-  include `gameinput-service.txt` with the raw HID evidence so duplicate
-  enumeration can be triaged separately from button transport.
+  include `gameinput-service.txt` and `gameinput-registry.txt` with the raw HID
+  evidence so duplicate enumeration can be triaged separately from button
+  transport.
 - If `-ArchivePath` was supplied, `archive-summary.txt` ends with
   `overall=PASS` and records the zip file SHA-256 hash. The archive itself
   contains `evidence-artifacts-manifest.txt` for the captured bundle contents,

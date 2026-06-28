@@ -674,6 +674,7 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'USB/IP driver package evidence was captured'; Required = $false; Path = 'usbip-driver-packages.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'USB/IP signed driver evidence was captured'; Required = $false; Path = 'usbip-signed-drivers.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'GameInput/Gaming Services context was captured'; Required = $false; Path = 'gameinput-service.txt'; Pattern = 'GameInput|GamingServices|Gaming Services' },
+    @{ Name = 'GameInput registry context was captured'; Required = $false; Path = 'gameinput-registry.txt'; Pattern = 'GameInput|054C|0DF2|DualSense|Sony|HKLM\\SYSTEM\\CurrentControlSet\\Control\\GameInput' },
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
@@ -834,6 +835,40 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'gameinput-service.txt') -S
   Get-AppxPackage -Name '*GamingServices*' -ErrorAction SilentlyContinue |
     Select-Object Name,PackageFullName,Version,InstallLocation |
     Format-List
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'gameinput-registry.txt') -Script {
+  function Invoke-RegistryQuery {
+    param(
+      [Parameter(Mandatory = $true)][string[]]$QueryArgs,
+      [int]$MaxLines = 500
+    )
+
+    "### reg.exe query $($QueryArgs -join ' ')"
+    $lines = @(& reg.exe query @QueryArgs 2>&1)
+    "exit_code=$LASTEXITCODE"
+    $lines | Select-Object -First $MaxLines
+    if ($lines.Count -gt $MaxLines) {
+      "truncated_line_count=$($lines.Count - $MaxLines)"
+    }
+    ""
+  }
+
+  "### GameInput registry context"
+  Invoke-RegistryQuery -QueryArgs @('HKLM\SYSTEM\CurrentControlSet\Control\GameInput')
+  Invoke-RegistryQuery -QueryArgs @('HKLM\SYSTEM\CurrentControlSet\Control\GameInput\Devices')
+
+  $gameInputRoots = @(
+    'HKLM\SYSTEM\CurrentControlSet\Control\GameInput',
+    'HKLM\SOFTWARE\Microsoft\GameInput',
+    'HKCU\Software\Microsoft\GameInput'
+  )
+  $terms = @('054C', '0DF2', 'VID_054C', 'PID_0DF2', 'DualSense', 'Sony')
+  foreach ($root in $gameInputRoots) {
+    foreach ($term in $terms) {
+      Invoke-RegistryQuery -QueryArgs @($root, '/s', '/f', $term) -MaxLines 150
+    }
+  }
 }
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'apollo-listener.txt') -Script {
