@@ -35,6 +35,19 @@ namespace {
     };
   }
 
+  platf::usbip::unlink_request_t unlink_request(std::uint32_t seqnum, std::uint32_t unlink_seqnum) {
+    return platf::usbip::unlink_request_t {
+      .header = {
+        .command_code = platf::usbip::command::cmd_unlink,
+        .seqnum = seqnum,
+        .devid = 7,
+        .transfer_direction = platf::usbip::direction::out,
+        .endpoint = 0,
+      },
+      .unlink_seqnum = unlink_seqnum,
+    };
+  }
+
   std::array<std::uint8_t, 8> get_descriptor_setup(std::uint8_t descriptor_type, std::uint16_t length) {
     return {
       0x80,
@@ -292,4 +305,105 @@ TEST(DualSenseUsbIpTests, DeviceReturnsErrorForUnsupportedSubmitEndpoint) {
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 23);
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
   EXPECT_FALSE(result.has_output_report);
+}
+
+TEST(DualSenseUsbIpTests, SessionQueuesInterruptInSubmitsUntilTaken) {
+  platf::dualsense_usbip::session_t session;
+  session.update_input(platf::gamepad_state_t {
+    .buttonFlags = platf::PADDLE1,
+    .lt = 0,
+    .rt = 0,
+    .lsX = 0,
+    .lsY = 0,
+    .rsX = 0,
+    .rsY = 0,
+  });
+
+  const auto result = session.handle_submit(submit_request(
+    30,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+
+  EXPECT_TRUE(result.reply.empty());
+  EXPECT_TRUE(session.has_pending_interrupt_in());
+  EXPECT_EQ(session.pending_interrupt_in_count(), 1);
+
+  const auto reply = session.take_next_interrupt_in_reply();
+  const auto payload = submit_payload(reply);
+
+  EXPECT_FALSE(reply.empty());
+  EXPECT_FALSE(session.has_pending_interrupt_in());
+  EXPECT_EQ(platf::usbip::read_be32(reply, 4), 30);
+  ASSERT_EQ(payload.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  EXPECT_EQ(payload[10], platf::dualsense::BUTTONS2_EDGE_RIGHT_PADDLE);
+}
+
+TEST(DualSenseUsbIpTests, SessionUnlinksQueuedInterruptInSubmit) {
+  platf::dualsense_usbip::session_t session;
+  session.handle_submit(submit_request(
+    31,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+
+  ASSERT_EQ(session.pending_interrupt_in_count(), 1);
+
+  const auto result = session.handle_unlink(unlink_request(32, 31));
+
+  EXPECT_TRUE(result.removed);
+  EXPECT_EQ(session.pending_interrupt_in_count(), 0);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_unlink));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 32);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), 0);
+  EXPECT_TRUE(session.take_next_interrupt_in_reply().empty());
+}
+
+TEST(DualSenseUsbIpTests, SessionReportsFailedUnlinkForUnknownSequence) {
+  platf::dualsense_usbip::session_t session;
+
+  const auto result = session.handle_unlink(unlink_request(33, 99));
+
+  EXPECT_FALSE(result.removed);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_unlink));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 33);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
+}
+
+TEST(DualSenseUsbIpTests, SessionPassesThroughImmediateControlAndOutputSubmits) {
+  platf::dualsense_usbip::session_t session;
+
+  const auto control = session.handle_submit(submit_request(
+    34,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE,
+    get_descriptor_setup(platf::usb::DESCRIPTOR_HID_REPORT, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE)
+  ));
+  EXPECT_FALSE(control.reply.empty());
+  EXPECT_FALSE(control.has_output_report);
+  EXPECT_EQ(platf::usbip::read_be32(control.reply, 4), 34);
+
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[4] = 0x80;
+
+  const auto output = session.handle_submit(
+    submit_request(
+      35,
+      platf::usbip::direction::out,
+      platf::dualsense_usbip::ENDPOINT_INTERRUPT_OUT,
+      platf::dualsense::OUTPUT_REPORT_USB_SIZE
+    ),
+    report
+  );
+
+  EXPECT_FALSE(output.reply.empty());
+  EXPECT_TRUE(output.has_output_report);
+  EXPECT_TRUE(output.output_report.has_rumble);
+  EXPECT_EQ(output.output_report.motor_left, 0x80);
+  EXPECT_EQ(platf::usbip::read_be32(output.reply, 4), 35);
 }

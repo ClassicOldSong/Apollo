@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -54,6 +55,11 @@ namespace platf::dualsense_usbip {
     std::vector<std::uint8_t> reply;
     bool has_output_report;
     dualsense::output_report_state_t output_report;
+  };
+
+  struct unlink_result_t {
+    std::vector<std::uint8_t> reply;
+    bool removed;
   };
 
   inline std::vector<std::uint8_t> make_devlist_reply() {
@@ -221,5 +227,72 @@ namespace platf::dualsense_usbip {
   private:
     gamepad_state_t input_state_ {};
     std::uint8_t sequence_number_ {};
+  };
+
+  class session_t {
+  public:
+    std::vector<std::uint8_t> handle_op_request(std::span<const std::uint8_t> request) {
+      return dualsense_usbip::handle_op_request(request);
+    }
+
+    void update_input(const gamepad_state_t &state) {
+      device_.update_input(state);
+    }
+
+    const gamepad_state_t &input_state() const {
+      return device_.input_state();
+    }
+
+    submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
+      if (is_interrupt_in_submit(request)) {
+        pending_interrupt_in_.push_back(request);
+        return {};
+      }
+
+      return device_.handle_submit(request, out_payload);
+    }
+
+    unlink_result_t handle_unlink(const usbip::unlink_request_t &request) {
+      bool removed = false;
+      for (auto it = pending_interrupt_in_.begin(); it != pending_interrupt_in_.end();) {
+        if (it->header.seqnum == request.unlink_seqnum) {
+          it = pending_interrupt_in_.erase(it);
+          removed = true;
+        } else {
+          ++it;
+        }
+      }
+
+      return {
+        .reply = usbip::make_ret_unlink(
+          request.header.seqnum,
+          request.header.devid,
+          removed ? 0 : -1
+        ),
+        .removed = removed,
+      };
+    }
+
+    bool has_pending_interrupt_in() const {
+      return !pending_interrupt_in_.empty();
+    }
+
+    std::size_t pending_interrupt_in_count() const {
+      return pending_interrupt_in_.size();
+    }
+
+    std::vector<std::uint8_t> take_next_interrupt_in_reply() {
+      if (pending_interrupt_in_.empty()) {
+        return {};
+      }
+
+      const auto request = pending_interrupt_in_.front();
+      pending_interrupt_in_.pop_front();
+      return device_.handle_submit(request).reply;
+    }
+
+  private:
+    device_t device_;
+    std::deque<usbip::submit_request_t> pending_interrupt_in_;
   };
 }  // namespace platf::dualsense_usbip

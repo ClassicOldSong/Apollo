@@ -105,6 +105,11 @@ namespace platf::usbip {
     std::array<std::uint8_t, 8> setup;
   };
 
+  struct unlink_request_t {
+    basic_header_t header;
+    std::uint32_t unlink_seqnum;
+  };
+
   inline void append_u8(std::vector<std::uint8_t> &out, std::uint8_t value) {
     out.push_back(value);
   }
@@ -181,6 +186,13 @@ namespace platf::usbip {
     std::copy_n(data.begin() + 40, request.setup.size(), request.setup.begin());
 
     return request;
+  }
+
+  inline unlink_request_t parse_unlink_request(std::span<const std::uint8_t> data) {
+    return unlink_request_t {
+      .header = parse_basic_header(data),
+      .unlink_seqnum = read_be32(data, 20),
+    };
   }
 
   inline void append_fixed_string(std::vector<std::uint8_t> &out, std::string_view text, std::size_t width) {

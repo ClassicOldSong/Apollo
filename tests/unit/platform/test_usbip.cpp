@@ -187,6 +187,31 @@ TEST(UsbIpTests, ParsesSubmitRequestWithControlSetupPacket) {
   EXPECT_EQ(setup.length, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
 }
 
+TEST(UsbIpTests, ParsesUnlinkRequest) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_basic_header(
+    request,
+    platf::usbip::command::cmd_unlink,
+    0x10203040,
+    0x50607080,
+    platf::usbip::direction::out,
+    0
+  );
+  platf::usbip::append_be32(request, 0x01020304);
+  for (std::size_t i = 0; i < 24; ++i) {
+    platf::usbip::append_u8(request, 0);
+  }
+
+  ASSERT_EQ(request.size(), platf::usbip::SUBMIT_HEADER_SIZE);
+
+  const auto parsed = platf::usbip::parse_unlink_request(request);
+
+  EXPECT_EQ(parsed.header.command_code, platf::usbip::command::cmd_unlink);
+  EXPECT_EQ(parsed.header.seqnum, 0x10203040);
+  EXPECT_EQ(parsed.header.devid, 0x50607080);
+  EXPECT_EQ(parsed.unlink_seqnum, 0x01020304);
+}
+
 TEST(UsbIpTests, BuildsUnlinkReplyWithSignedStatus) {
   const auto reply = platf::usbip::make_ret_unlink(3, 4, -2);
 
