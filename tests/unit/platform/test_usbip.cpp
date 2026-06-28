@@ -11,6 +11,7 @@
 #include <vector>
 
 #include <src/platform/dualsense.h>
+#include <src/platform/usb.h>
 #include <src/platform/usbip.h>
 
 namespace {
@@ -115,6 +116,48 @@ TEST(UsbIpTests, BuildsSubmitReplyWithPayload) {
   EXPECT_EQ(platf::usbip::read_be32(reply, 24), static_cast<std::uint32_t>(payload.size()));
   EXPECT_EQ(std::vector<std::uint8_t>(reply.begin() + platf::usbip::SUBMIT_HEADER_SIZE, reply.end()),
             std::vector<std::uint8_t>(payload.begin(), payload.end()));
+}
+
+TEST(UsbIpTests, ParsesSubmitRequestWithControlSetupPacket) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_basic_header(
+    request,
+    platf::usbip::command::cmd_submit,
+    0x10203040,
+    0x50607080,
+    platf::usbip::direction::in,
+    0
+  );
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_be32(request, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_be32(request, 0);
+  request.insert(request.end(), {
+    0x80,
+    platf::usb::REQUEST_GET_DESCRIPTOR,
+    0x00,
+    platf::usb::DESCRIPTOR_HID_REPORT,
+    0x00,
+    0x00,
+    0x85,
+    0x01,
+  });
+
+  ASSERT_EQ(request.size(), platf::usbip::SUBMIT_HEADER_SIZE);
+
+  const auto parsed = platf::usbip::parse_submit_request(request);
+  const auto setup = platf::usb::parse_setup_packet(parsed.setup);
+
+  EXPECT_EQ(parsed.header.command_code, platf::usbip::command::cmd_submit);
+  EXPECT_EQ(parsed.header.seqnum, 0x10203040);
+  EXPECT_EQ(parsed.header.devid, 0x50607080);
+  EXPECT_EQ(parsed.header.transfer_direction, platf::usbip::direction::in);
+  EXPECT_EQ(parsed.header.endpoint, 0);
+  EXPECT_EQ(parsed.transfer_buffer_length, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+  EXPECT_EQ(setup.request, platf::usb::REQUEST_GET_DESCRIPTOR);
+  EXPECT_EQ(platf::usb::descriptor_type(setup.value), platf::usb::DESCRIPTOR_HID_REPORT);
+  EXPECT_EQ(setup.length, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
 }
 
 TEST(UsbIpTests, BuildsUnlinkReplyWithSignedStatus) {

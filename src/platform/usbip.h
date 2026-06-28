@@ -6,6 +6,7 @@
 
 // standard includes
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -29,6 +30,8 @@ namespace platf::usbip {
   };
 
   enum class command : std::uint32_t {
+    cmd_submit = 0x0001,
+    cmd_unlink = 0x0002,
     ret_submit = 0x0003,
     ret_unlink = 0x0004,
   };
@@ -70,6 +73,24 @@ namespace platf::usbip {
     std::uint8_t interface_protocol;
   };
 
+  struct basic_header_t {
+    command command_code;
+    std::uint32_t seqnum;
+    std::uint32_t devid;
+    direction transfer_direction;
+    std::uint32_t endpoint;
+  };
+
+  struct submit_request_t {
+    basic_header_t header;
+    std::uint32_t transfer_flags;
+    std::uint32_t transfer_buffer_length;
+    std::uint32_t start_frame;
+    std::uint32_t number_of_packets;
+    std::uint32_t interval;
+    std::array<std::uint8_t, 8> setup;
+  };
+
   inline void append_u8(std::vector<std::uint8_t> &out, std::uint8_t value) {
     out.push_back(value);
   }
@@ -96,6 +117,32 @@ namespace platf::usbip {
            (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
            (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
            static_cast<std::uint32_t>(data[offset + 3]);
+  }
+
+  inline basic_header_t parse_basic_header(std::span<const std::uint8_t> data) {
+    return basic_header_t {
+      .command_code = static_cast<command>(read_be32(data, 0)),
+      .seqnum = read_be32(data, 4),
+      .devid = read_be32(data, 8),
+      .transfer_direction = static_cast<direction>(read_be32(data, 12)),
+      .endpoint = read_be32(data, 16),
+    };
+  }
+
+  inline submit_request_t parse_submit_request(std::span<const std::uint8_t> data) {
+    submit_request_t request {
+      .header = parse_basic_header(data),
+      .transfer_flags = read_be32(data, 20),
+      .transfer_buffer_length = read_be32(data, 24),
+      .start_frame = read_be32(data, 28),
+      .number_of_packets = read_be32(data, 32),
+      .interval = read_be32(data, 36),
+      .setup = {},
+    };
+
+    std::copy_n(data.begin() + 40, request.setup.size(), request.setup.begin());
+
+    return request;
   }
 
   inline void append_fixed_string(std::vector<std::uint8_t> &out, std::string_view text, std::size_t width) {
