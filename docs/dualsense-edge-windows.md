@@ -73,6 +73,11 @@ represent those bits.
   availability varies by device and connection type. That supports keeping audio,
   headset, haptics, and adaptive trigger behavior outside this first proof while
   still preserving the controller's independent button inputs.
+- Sony's PlayStation Accessories PC support page documents that Windows can
+  update DualSense Edge firmware and customize Edge profiles/settings through
+  Sony's app. That is useful product context, but profile editing is separate
+  from this streaming path; this branch only preserves live controller state that
+  Moonlight already sends over the existing protocol.
 - Steam Input reports show a real user-facing problem when Edge expanded buttons
   default to face-button behavior globally. The clean streaming fix should
   preserve distinct Edge inputs rather than remap them to A/B/X/Y, DS4, or X360
@@ -430,3 +435,5 @@ That follows SDL2's generated mapping order:
 - Do not require Windows test-signing mode or Secure Boot disablement.
 - Do not tunnel arbitrary USB devices as part of the first controller-specific
   implementation.
+- Do not implement Sony profile editing, firmware update, or PlayStation
+  Accessories app compatibility as part of this button-preservation proof.
