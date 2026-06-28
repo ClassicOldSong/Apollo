@@ -398,7 +398,7 @@ function Write-LogEvidenceSummary {
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge VID/PID'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*VID/PID: 0x054c/0x0df2' },
     @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = $edgeRawButtonCountPattern },
-    @{ Name = 'Moonlight raw-button count matches selected Edge binding variant'; Required = $true; Stop = $false; Pattern = $edgeMappingVariantPattern; AllLogs = $true },
+    @{ Name = 'Moonlight raw-button count matches selected Edge binding variant'; Required = $true; Stop = $false; Pattern = $edgeMappingVariantPattern; SameLog = $true },
     @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13)' },
@@ -429,15 +429,17 @@ function Write-LogEvidenceSummary {
 
   $hasFailure = $false
   $summary.Add("log_count=$($logs.Count)")
-  $allLogText = New-Object System.Text.StringBuilder
+  $logTexts = New-Object System.Collections.Generic.List[object]
   foreach ($log in $logs) {
     $summary.Add("log=$($log.FullName) last_write_utc=$($log.LastWriteTimeUtc.ToString('o')) size_bytes=$($log.Length)")
     try {
-      [void]$allLogText.AppendLine("==== $($log.Name) ====")
-      [void]$allLogText.AppendLine((Get-Content -LiteralPath $log.FullName -Raw -ErrorAction Stop))
+      $logTexts.Add([pscustomobject]@{
+        Name = $log.Name
+        Content = (Get-Content -LiteralPath $log.FullName -Raw -ErrorAction Stop)
+      })
     } catch {
       $hasFailure = $true
-      $summary.Add(("{0}: ERROR reading log for all-log checks: {1}" -f $log.Name, $_.Exception.Message))
+      $summary.Add(("{0}: ERROR reading log for same-log checks: {1}" -f $log.Name, $_.Exception.Message))
     }
   }
   $summary.Add('')
@@ -449,9 +451,11 @@ function Write-LogEvidenceSummary {
       $minimum = [int]$check['Minimum']
     }
 
-    if ($check.ContainsKey('AllLogs') -and $check['AllLogs']) {
-      if ([regex]::IsMatch($allLogText.ToString(), $check['Pattern'])) {
-        $matches.Add('all copied logs: mapping variant is internally consistent')
+    if ($check.ContainsKey('SameLog') -and $check['SameLog']) {
+      foreach ($logText in $logTexts) {
+        if ([regex]::IsMatch($logText.Content, $check['Pattern'])) {
+          $matches.Add("$($logText.Name): mapping variant is internally consistent")
+        }
       }
     } else {
       foreach ($log in $logs) {

@@ -6,9 +6,8 @@ Verifies the synthetic DualSense Edge evidence-summary cases.
 .DESCRIPTION
 Imports only function definitions from capture-dualsense-edge-evidence.ps1, then
 checks that representative native SDL2 and sdl2-compat/SDL3 logs pass while
-under-counted native SDL2 logs, mismatched raw-button/binding variants,
-duplicated one-at-a-time Edge paddle/Fn states, and host-input stop patterns
-fail.
+under-counted native SDL2 logs, mismatched or split raw-button/binding variants,
+duplicated one-at-a-time Edge paddle/Fn states, and host-input stop patterns fail.
 #>
 
 Set-StrictMode -Version Latest
@@ -178,11 +177,85 @@ function Test-LogSummaryReadError {
       Write-Host $summary
       throw "$Name expected overall=FAIL, got overall=$overall"
     }
-    Assert-Contains -Content $summary -Needle 'locked.log: ERROR reading log for all-log checks' -CaseName $Name
+    Assert-Contains -Content $summary -Needle 'locked.log: ERROR reading log for same-log checks' -CaseName $Name
   } finally {
     if ($null -ne $stream) {
       $stream.Dispose()
     }
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
+function Write-TestSplitVariantEvidenceLog {
+  param(
+    [Parameter(Mandatory = $true)][string] $OutputDir,
+    [Parameter(Mandatory = $true)][string] $DetectionLine,
+    [Parameter(Mandatory = $true)][string] $BindingsLine,
+    [Parameter(Mandatory = $true)][string] $MappingLine
+  )
+
+  $logDir = Join-Path $OutputDir 'logs'
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+  @(
+    $DetectionLine
+  ) | Set-Content -LiteralPath (Join-Path $logDir 'edge-detection.log') -Encoding utf8
+
+  @(
+    $MappingLine,
+    $BindingsLine,
+    'DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)',
+    'DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)',
+    'DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)',
+    'DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)',
+    'DualSense Edge PADDLE1 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE2 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE3 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE4 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge USB/IP backend is listening on 127.0.0.1:3240',
+    'Gamepad 0 will be DualSense Edge controller (experimental USB/IP)',
+    'Gamepad 0 reported DualSense Edge arrival type [02] and paddle/Fn buttons [000F0000]',
+    'DualSense Edge USB/IP: client imported virtual controller',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00010000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00020000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00040000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00080000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]'
+  ) | Set-Content -LiteralPath (Join-Path $logDir 'edge-arrival.log') -Encoding utf8
+}
+
+function Test-LogSummarySplitVariantEvidence {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [Parameter(Mandatory = $true)][string] $DetectionLine,
+    [Parameter(Mandatory = $true)][string] $BindingsLine,
+    [Parameter(Mandatory = $true)][string] $MappingLine
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  try {
+    Write-TestSplitVariantEvidenceLog `
+      -OutputDir $outputDir `
+      -DetectionLine $DetectionLine `
+      -BindingsLine $BindingsLine `
+      -MappingLine $MappingLine
+
+    Write-LogEvidenceSummary -OutputDir $outputDir
+
+    $summaryPath = Join-Path $outputDir 'log-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne 'FAIL') {
+      Write-Host $summary
+      throw "$Name expected overall=FAIL, got overall=$overall"
+    }
+    Assert-Contains -Content $summary -Needle 'MISSING: Moonlight raw-button count matches selected Edge binding variant' -CaseName $Name
+  } finally {
     if (Test-Path -LiteralPath $outputDir) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force
     }
@@ -548,6 +621,12 @@ Test-LogSummaryReadError `
   -DetectionLine $sdl3Detection `
   -BindingsLine $sdl3Bindings `
   -MappingLine $sdl3Mapping
+
+Test-LogSummarySplitVariantEvidence `
+  -Name 'split-variant-evidence-fail' `
+  -DetectionLine $sdl2Detection `
+  -BindingsLine $sdl2Bindings `
+  -MappingLine $sdl2Mapping
 
 Test-LogSummary `
   -Name 'sdl2-undercount-fail' `
