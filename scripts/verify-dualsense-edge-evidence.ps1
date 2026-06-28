@@ -6,8 +6,9 @@ Verifies the synthetic DualSense Edge evidence-summary cases.
 .DESCRIPTION
 Imports only function definitions from capture-dualsense-edge-evidence.ps1, then
 checks that representative native SDL2 and sdl2-compat/SDL3 logs pass while
-under-counted native SDL2 logs, duplicated one-at-a-time Edge paddle/Fn states,
-and host-input stop patterns fail.
+under-counted native SDL2 logs, mismatched raw-button/binding variants,
+duplicated one-at-a-time Edge paddle/Fn states, and host-input stop patterns
+fail.
 #>
 
 Set-StrictMode -Version Latest
@@ -524,6 +525,26 @@ Test-LogSummary `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
     'MISSING: Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'
+  )
+
+Test-LogSummary `
+  -Name 'sdl2-count-with-sdl3-bindings-fail' `
+  -DetectionLine $sdl2Detection `
+  -BindingsLine $sdl3Bindings `
+  -MappingLine $sdl3Mapping `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: Moonlight raw-button count matches selected Edge binding variant'
+  )
+
+Test-LogSummary `
+  -Name 'sdl3-count-with-sdl2-bindings-fail' `
+  -DetectionLine $sdl3Detection `
+  -BindingsLine $sdl2Bindings `
+  -MappingLine $sdl2Mapping `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: Moonlight raw-button count matches selected Edge binding variant'
   )
 
 Test-LogSummary `

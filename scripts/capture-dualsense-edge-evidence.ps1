@@ -391,10 +391,14 @@ function Write-LogEvidenceSummary {
   $edgeRawButtonCountPattern =
     'DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2|' +
     'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2'
+  $edgeMappingVariantPattern =
+    '(?s)(?:(?=.*DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17)|' +
+    '(?=.*DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13))'
 
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge VID/PID'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*VID/PID: 0x054c/0x0df2' },
     @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = $edgeRawButtonCountPattern },
+    @{ Name = 'Moonlight raw-button count matches selected Edge binding variant'; Required = $true; Stop = $false; Pattern = $edgeMappingVariantPattern; AllLogs = $true },
     @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13)' },
@@ -425,8 +429,15 @@ function Write-LogEvidenceSummary {
 
   $hasFailure = $false
   $summary.Add("log_count=$($logs.Count)")
+  $allLogText = New-Object System.Text.StringBuilder
   foreach ($log in $logs) {
     $summary.Add("log=$($log.FullName) last_write_utc=$($log.LastWriteTimeUtc.ToString('o')) size_bytes=$($log.Length)")
+    try {
+      [void]$allLogText.AppendLine("==== $($log.Name) ====")
+      [void]$allLogText.AppendLine((Get-Content -LiteralPath $log.FullName -Raw -ErrorAction Stop))
+    } catch {
+      $summary.Add(("{0}: ERROR reading log for all-log checks: {1}" -f $log.Name, $_.Exception.Message))
+    }
   }
   $summary.Add('')
 
@@ -437,15 +448,21 @@ function Write-LogEvidenceSummary {
       $minimum = [int]$check['Minimum']
     }
 
-    foreach ($log in $logs) {
-      try {
-        Select-String -LiteralPath $log.FullName -Pattern $check['Pattern'] -ErrorAction Stop |
-          Select-Object -First 20 |
-          ForEach-Object {
-            $matches.Add(("{0}:{1}: {2}" -f $log.Name, $_.LineNumber, $_.Line.Trim()))
-          }
-      } catch {
-        $summary.Add(("{0}: ERROR reading log for {1}: {2}" -f $log.Name, $check['Name'], $_.Exception.Message))
+    if ($check.ContainsKey('AllLogs') -and $check['AllLogs']) {
+      if ([regex]::IsMatch($allLogText.ToString(), $check['Pattern'])) {
+        $matches.Add('all copied logs: mapping variant is internally consistent')
+      }
+    } else {
+      foreach ($log in $logs) {
+        try {
+          Select-String -LiteralPath $log.FullName -Pattern $check['Pattern'] -ErrorAction Stop |
+            Select-Object -First 20 |
+            ForEach-Object {
+              $matches.Add(("{0}:{1}: {2}" -f $log.Name, $_.LineNumber, $_.Line.Trim()))
+            }
+        } catch {
+          $summary.Add(("{0}: ERROR reading log for {1}: {2}" -f $log.Name, $check['Name'], $_.Exception.Message))
+        }
       }
     }
 
