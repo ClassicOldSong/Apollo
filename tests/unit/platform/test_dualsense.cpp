@@ -147,6 +147,8 @@ TEST(DualSenseReportTests, BuildsUsbInputReportPayload) {
   EXPECT_EQ(report.buttons[1], platf::dualsense::BUTTONS1_L2 | platf::dualsense::BUTTONS1_R2);
   EXPECT_EQ(report.buttons[2], platf::dualsense::BUTTONS2_EDGE_RIGHT_PADDLE);
   EXPECT_EQ(report.buttons[3], 0);
+  EXPECT_EQ(report.touch_points[0], 0x80);
+  EXPECT_EQ(report.touch_points[4], 0x80);
 }
 
 TEST(DualSenseReportTests, BuildsUsbInputReportWithReportId) {

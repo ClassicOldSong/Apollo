@@ -337,6 +337,8 @@ namespace platf::dualsense {
     report.rz = gamepad_state.rt;
     report.sequence_number = sequence_number;
     report.buttons = {buttons.buttons0, buttons.buttons1, buttons.buttons2, 0};
+    report.touch_points[0] = 0x80;
+    report.touch_points[4] = 0x80;
 
     return report;
   }
