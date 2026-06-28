@@ -255,8 +255,9 @@ copy them into the same evidence bundle. When logs are provided, the helper also
 writes `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper always writes `system-evidence-summary.txt`
-with `MATCH`/`MISSING` lines for the USB/IP listener, `usbip.exe`, requested
-busid, attach result, and Windows PnP `VID_054C&PID_0DF2` / `MI_03` evidence.
+with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
+`usbip.exe`, requested busid, attach result, and Windows PnP
+`VID_054C&PID_0DF2` / `MI_03` evidence.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
 
@@ -276,8 +277,9 @@ evidence should be refreshed.
    Moonlight with `SDL_LOGGING=application=debug` so mapping and per-button
    diagnostics are captured.
 3. Confirm Moonlight logs:
-   - `DualSense Edge detected with ... SDL joystick buttons` where the count is
-     at least `21`.
+   - `DualSense Edge detected with ... SDL joystick buttons (SDL x.y.z)` where
+     the count is at least `21`. The SDL version matters because the branch
+     validates SDL2's Edge raw-button mapping.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
    - If the mapping was `added` rather than `updated`, also expect

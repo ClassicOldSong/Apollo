@@ -115,6 +115,7 @@ function Write-LogEvidenceSummary {
 
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with' },
+    @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised full Edge paddle/Fn arrival support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*paddle/Fn=0x000f0000.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17' },
     @{ Name = 'Moonlight PADDLE1 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge PADDLE1 pressed \(paddle/Fn flags: 0x00010000\)' },
@@ -211,13 +212,15 @@ function Write-SystemEvidenceSummary {
   )
 
   $summary = New-Object System.Collections.Generic.List[string]
+  $usbipPortPattern = 'Port|Imported|Remote|' + [regex]::Escape($HostAddress) + '|' + [regex]::Escape($BusId) + '|054c|0df2'
   $checks = @(
+    @{ Name = 'PowerShell is elevated'; Required = $true; Path = 'environment.txt'; Pattern = 'is_admin=True' },
     @{ Name = 'Apollo listener is visible on requested host/port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape([string]$Port) },
     @{ Name = 'usbip.exe command is resolvable'; Required = $true; Path = 'usbip-command.txt'; Pattern = 'usbip\.exe' },
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
-    @{ Name = 'usbip port output was captured'; Required = $true; Path = 'usbip-port.txt'; Pattern = 'Port|Imported|Remote|127\.0\.0\.1|1-1|054c|0df2' },
+    @{ Name = 'usbip port output was captured'; Required = $true; Path = 'usbip-port.txt'; Pattern = $usbipPortPattern },
     @{ Name = 'PnP shows DualSense Edge VID/PID'; Required = $true; Path = 'pnp-edge.txt'; Pattern = 'VID_054C&PID_0DF2' },
     @{ Name = 'PnP shows MI_03 HID child'; Required = $true; Path = 'pnp-edge-mi03.txt'; Pattern = 'MI_03' },
     @{ Name = 'HIDClass shows Edge HID node'; Required = $true; Path = 'pnp-edge-hidclass.txt'; Pattern = 'VID_054C&PID_0DF2|DualSense Edge' },
