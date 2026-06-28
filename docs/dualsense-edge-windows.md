@@ -143,6 +143,26 @@ descriptor and return zero-filled payloads with the requested report ID.
 
 ## Manual Windows Test Flow
 
+### USB/IP Client Setup
+
+Use the current WHLK-signed `vadimgrn/usbip-win2` release as the Windows
+USB/IP client. That project provides the signed UDE virtual host controller
+that this Apollo backend expects. Avoid validating with the older
+`cezanne/usbip-win` client first, because its driver model and behavior differ.
+
+Before installing or updating `usbip-win2`, create a Windows restore point as
+recommended by the project. The signed release should not require Windows test
+signing mode.
+
+The key evidence to capture during validation is:
+
+- Apollo log lines for the USB/IP listener, import, and Edge paddle/Fn state.
+- Moonlight log lines for Edge mapping, arrival support, and optionally each
+  per-button debug event.
+- `usbip.exe list` / `attach` output.
+- Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
+  path containing `MI_03`.
+
 1. Run this Apollo branch on Windows with:
 
    ```text
@@ -190,17 +210,54 @@ descriptor and return zero-filled payloads with the requested report ID.
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
    - `PADDLE4`: left Fn
-9. Optionally, with Moonlight debug logging enabled, confirm each control
-   changes Moonlight's Edge-state log:
+
+   A quick PowerShell check for the virtual Sony device is:
+
+   ```powershell
+   Get-PnpDevice -PresentOnly |
+     Where-Object { $_.InstanceId -match 'VID_054C&PID_0DF2' } |
+     Select-Object Class,FriendlyName,InstanceId
+   ```
+
+9. Optionally, with Moonlight's SDL application debug logging enabled, confirm
+   each control changes Moonlight's Edge-state log:
    - `PADDLE1`: `DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)`
    - `PADDLE2`: `DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)`
    - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
    - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
+
+   For SDL2 builds, set `SDL_LOGGING=application=debug` before launching
+   Moonlight. For example, on Windows PowerShell:
+
+   ```powershell
+   $env:SDL_LOGGING = 'application=debug'
+   .\Moonlight.exe
+   ```
+
+   On macOS from a shell:
+
+   ```sh
+   SDL_LOGGING=application=debug /Applications/Moonlight.app/Contents/MacOS/Moonlight
+   ```
+
 10. Confirm each control changes Apollo's Edge-state log:
    - `PADDLE1`: `Gamepad ... DualSense Edge paddle/Fn state changed [00010000]`
    - `PADDLE2`: `Gamepad ... DualSense Edge paddle/Fn state changed [00020000]`
    - `PADDLE3`: `Gamepad ... DualSense Edge paddle/Fn state changed [00040000]`
    - `PADDLE4`: `Gamepad ... DualSense Edge paddle/Fn state changed [00080000]`
+
+11. Detach the virtual controller after testing. Use the port number printed by
+    `usbip.exe attach`:
+
+    ```powershell
+    usbip.exe detach -p 1
+    ```
+
+    If multiple stale devices are attached from repeated experiments:
+
+    ```powershell
+    usbip.exe detach -all
+    ```
 
 If the USB/IP device enumerates but the four controls do not appear, capture
 Apollo logs and the HID inspector output first. If Apollo does not log the
@@ -208,7 +265,9 @@ advertised `[000F0000]` controller-arrival mask, debug the Moonlight/SDL
 mapping path before changing the Windows USB/IP backend. If Apollo logs the
 arrival mask but does not log the per-control state changes, enable Moonlight
 debug logging and debug the streamed input event path before changing the USB
-descriptor.
+descriptor. If `usbip.exe attach` succeeds but Windows does not show the
+`VID_054C&PID_0DF2` device, capture `usbip-win2` UDE/filter logs next; that
+points to USB enumeration or driver behavior rather than Moonlight's mapping.
 
 ## Preferred Architecture
 
