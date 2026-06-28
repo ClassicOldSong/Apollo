@@ -184,6 +184,70 @@ function Write-LogEvidenceSummary {
   Write-TextFile -Path (Join-Path $OutputDir 'log-evidence-summary.txt') -Lines $summary.ToArray()
 }
 
+function Test-CapturedFilePattern {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Pattern
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return $false
+  }
+
+  try {
+    return [bool](Select-String -LiteralPath $Path -Pattern $Pattern -Quiet -ErrorAction Stop)
+  } catch {
+    return $false
+  }
+}
+
+function Write-SystemEvidenceSummary {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][string]$HostAddress,
+    [Parameter(Mandatory = $true)][int]$Port,
+    [Parameter(Mandatory = $true)][string]$BusId,
+    [Parameter(Mandatory = $true)][bool]$SkipAttach
+  )
+
+  $summary = New-Object System.Collections.Generic.List[string]
+  $checks = @(
+    @{ Name = 'Apollo listener is visible on requested host/port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape([string]$Port) },
+    @{ Name = 'usbip.exe command is resolvable'; Required = $true; Path = 'usbip-command.txt'; Pattern = 'usbip\.exe' },
+    @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
+    @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
+    @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
+    @{ Name = 'usbip port output was captured'; Required = $true; Path = 'usbip-port.txt'; Pattern = 'Port|Imported|Remote|127\.0\.0\.1|1-1|054c|0df2' },
+    @{ Name = 'PnP shows DualSense Edge VID/PID'; Required = $true; Path = 'pnp-edge.txt'; Pattern = 'VID_054C&PID_0DF2' },
+    @{ Name = 'PnP shows MI_03 HID child'; Required = $true; Path = 'pnp-edge-mi03.txt'; Pattern = 'MI_03' },
+    @{ Name = 'HIDClass shows Edge HID node'; Required = $true; Path = 'pnp-edge-hidclass.txt'; Pattern = 'VID_054C&PID_0DF2|DualSense Edge' },
+    @{ Name = 'CIM shows Edge PnP entity'; Required = $true; Path = 'pnp-edge-cim.txt'; Pattern = 'VID_054C&PID_0DF2' }
+  )
+
+  $summary.Add("host=$HostAddress")
+  $summary.Add("port=$Port")
+  $summary.Add("busid=$BusId")
+  $summary.Add("skip_attach=$SkipAttach")
+  $summary.Add('')
+
+  foreach ($check in $checks) {
+    $path = Join-Path $OutputDir $check['Path']
+    $matched = Test-CapturedFilePattern -Path $path -Pattern $check['Pattern']
+
+    if ($matched) {
+      $summary.Add("MATCH: $($check['Name'])")
+    } elseif ($check['Required']) {
+      $summary.Add("MISSING: $($check['Name'])")
+    } else {
+      $summary.Add("SKIPPED_OR_MISSING: $($check['Name'])")
+    }
+
+    $summary.Add("  file=$path")
+  }
+
+  Write-TextFile -Path (Join-Path $OutputDir 'system-evidence-summary.txt') -Lines $summary.ToArray()
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $EdgeDevicePattern = 'VID_054C&PID_0DF2'
@@ -320,6 +384,8 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-cim.txt') -Script
     Select-Object Name,PNPClass,Status,Service,Manufacturer,PNPDeviceID |
     Format-List
 }
+
+Write-SystemEvidenceSummary -OutputDir $OutputDir -HostAddress $HostAddress -Port $Port -BusId $BusId -SkipAttach ([bool]$SkipAttach)
 
 Write-Host "Evidence written to $OutputDir"
 Write-Host "Attach skipped: $SkipAttach"

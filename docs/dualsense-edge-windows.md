@@ -254,8 +254,11 @@ selected PnP properties. Pass Apollo and Moonlight log files with `-LogPath` to
 copy them into the same evidence bundle. When logs are provided, the helper also
 writes `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
-allocation failures. Use `-SkipAttach` if the virtual controller is already
-attached and only the PnP evidence should be refreshed.
+allocation failures. The helper always writes `system-evidence-summary.txt`
+with `MATCH`/`MISSING` lines for the USB/IP listener, `usbip.exe`, requested
+busid, attach result, and Windows PnP `VID_054C&PID_0DF2` / `MI_03` evidence.
+Use `-SkipAttach` if the virtual controller is already attached and only the PnP
+evidence should be refreshed.
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
