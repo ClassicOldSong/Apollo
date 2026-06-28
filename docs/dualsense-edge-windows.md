@@ -126,6 +126,21 @@ and its generated controller mapping uses:
 - `paddle3:b18`
 - `paddle4:b17`
 
+This was rechecked against `libsdl-org/SDL` branch `SDL2` at
+`b8b3f5ef2001cbe7c11f62d41a9bf47d4a2d8b07`: `SDL_hidapi_ps5.c` sets
+`joystick->nbuttons = 21` for the DualSense Edge, and
+`SDL_gamecontroller.c` appends the mapping block above for Edge devices.
+Moonlight's bundled macOS SDL2 headers/library report version `2.32.70`,
+which has the SDL2 paddle button enum surface that the companion Moonlight
+branch targets.
+
+SDL3's current gamepad layer labels the same semantic controls as right rear,
+left rear, right Fn, and left Fn, but its generated mapping uses different raw
+button numbers (`paddle1:b16,paddle2:b15,paddle3:b14,paddle4:b13`). The
+companion Moonlight branch intentionally targets Moonlight's current SDL2
+`SDL_GameController` API and validates the SDL2 raw bindings before advertising
+or transmitting Edge paddle/Fn flags.
+
 Apollo should preserve that SDL/Sunshine paddle order unless hardware testing
 proves it produces the wrong physical labels.
 
