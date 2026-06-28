@@ -243,10 +243,10 @@ namespace platf::usbip {
     append_u8(out, device.interface_count);
   }
 
-  inline void append_interface_record(std::vector<std::uint8_t> &out, const interface_identity_t &interface) {
-    append_u8(out, interface.interface_class);
-    append_u8(out, interface.interface_subclass);
-    append_u8(out, interface.interface_protocol);
+  inline void append_interface_record(std::vector<std::uint8_t> &out, const interface_identity_t &identity) {
+    append_u8(out, identity.interface_class);
+    append_u8(out, identity.interface_subclass);
+    append_u8(out, identity.interface_protocol);
     append_u8(out, 0);
   }
 
@@ -276,8 +276,8 @@ namespace platf::usbip {
     append_op_common(out, op_code::rep_devlist, 0);
     append_be32(out, 1);
     append_device_record(out, device);
-    for (const auto &interface : interfaces) {
-      append_interface_record(out, interface);
+    for (const auto &identity : interfaces) {
+      append_interface_record(out, identity);
     }
 
     return out;
