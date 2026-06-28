@@ -614,10 +614,38 @@ TEST(DualSenseUsbIpTests, DeviceRejectsControlOutputSetReportWithInvalidSetupLen
   );
 }
 
-TEST(DualSenseUsbIpTests, DeviceIgnoresControlOutputSetReportForNonHidInterface) {
+TEST(DualSenseUsbIpTests, DeviceRejectsControlOutputSetReportWithMismatchedPayloadLength) {
   platf::dualsense_usbip::device_t device;
   const auto request = submit_request(
     28,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_COMMON_SIZE
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[3] = 0x10;
+  report[4] = 0x30;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_FALSE(result.has_output_report);
+  EXPECT_EQ(
+    platf::usbip::read_be32(result.reply, 20),
+    static_cast<std::uint32_t>(platf::dualsense_usbip::CONTROL_STALL_STATUS)
+  );
+}
+
+TEST(DualSenseUsbIpTests, DeviceIgnoresControlOutputSetReportForNonHidInterface) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    29,
     platf::usbip::direction::out,
     platf::dualsense_usbip::ENDPOINT_CONTROL,
     platf::dualsense::OUTPUT_REPORT_USB_SIZE,
