@@ -409,6 +409,12 @@ TEST(DualSenseReportTests, RejectsHidRequestsForNonHidInterfaces) {
     platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE,
     platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_IN
   )).empty());
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE,
+    0x0100 | platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  )).empty());
 }
 
 TEST(DualSenseReportTests, RejectsDescriptorsWithWrongRecipient) {
@@ -613,6 +619,15 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   ));
   EXPECT_FALSE(invalid_endpoint.handled);
   EXPECT_TRUE(invalid_endpoint.payload.empty());
+  const auto endpoint_with_high_byte = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_endpoint_in,
+    platf::usb::REQUEST_GET_STATUS,
+    0,
+    2,
+    0x0100 | platf::dualsense::USB_ENDPOINT_IN
+  ));
+  EXPECT_FALSE(endpoint_with_high_byte.handled);
+  EXPECT_TRUE(endpoint_with_high_byte.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_CONFIGURATION, 0, 1)),
     (std::vector<std::uint8_t> {1})
@@ -650,6 +665,15 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   ));
   EXPECT_FALSE(invalid_interface.handled);
   EXPECT_TRUE(invalid_interface.payload.empty());
+  const auto interface_with_high_byte = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_in,
+    platf::usb::REQUEST_GET_INTERFACE,
+    0,
+    1,
+    0x0100 | platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(interface_with_high_byte.handled);
+  EXPECT_TRUE(interface_with_high_byte.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       class_interface_in,

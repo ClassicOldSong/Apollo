@@ -398,18 +398,17 @@ namespace platf::dualsense {
   }
 
   constexpr bool dualsense_edge_targets_hid_interface(std::uint16_t interface_index) {
-    return static_cast<std::uint8_t>(interface_index & 0xFF) == DUALSENSE_EDGE_INTERFACE_HID;
+    return interface_index == DUALSENSE_EDGE_INTERFACE_HID;
   }
 
   constexpr bool dualsense_edge_has_interface(std::uint16_t interface_index) {
-    return static_cast<std::uint8_t>(interface_index & 0xFF) <= DUALSENSE_EDGE_INTERFACE_HID;
+    return interface_index <= DUALSENSE_EDGE_INTERFACE_HID;
   }
 
   constexpr bool dualsense_edge_has_endpoint(std::uint16_t endpoint_index) {
-    const auto endpoint = static_cast<std::uint8_t>(endpoint_index & 0xFF);
-    return endpoint == 0 ||
-           endpoint == USB_ENDPOINT_IN ||
-           endpoint == USB_ENDPOINT_OUT;
+    return endpoint_index == 0 ||
+           endpoint_index == USB_ENDPOINT_IN ||
+           endpoint_index == USB_ENDPOINT_OUT;
   }
 
   constexpr bool dualsense_edge_descriptor_is_interface_scoped(std::uint8_t descriptor_type) {
