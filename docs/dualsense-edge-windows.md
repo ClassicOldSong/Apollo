@@ -298,7 +298,8 @@ evidence should be refreshed.
      controller bindings`; that means SDL still is not reporting the
      Edge-specific controls at the expected controller-button layer bindings.
      Capture the warning's `actual:` binding summary with the Moonlight log.
-   - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...
+   - `DualSense Edge arrival support: ... arrivalType=0x02 ...
+     paddle/Fn=0x000f0000 ...
      bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17`
    - Do not continue if Moonlight logs `DualSense Edge controller button ... is
      bound to raw paddle...; not advertising it as a normal button`; that means
@@ -405,7 +406,8 @@ same end-to-end run:
 - The evidence helper exits successfully with `-RequirePass`; equivalently,
   `log-evidence-summary.txt` and `system-evidence-summary.txt` both end with
   `overall=PASS`.
-- Moonlight advertises the Edge paddle/Fn capability mask as `0x000f0000`.
+- Moonlight advertises PlayStation arrival type `0x02` and the Edge paddle/Fn
+  capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
   arrival mask, and logs a distinct state change for each `PADDLE1..4` bit.
 - `usbip-win2` imports the loopback busid and Windows enumerates

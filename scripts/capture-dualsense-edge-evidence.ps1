@@ -142,7 +142,7 @@ function Write-LogEvidenceSummary {
     @{ Name = 'Moonlight detected DualSense Edge'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with' },
     @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
-    @{ Name = 'Moonlight advertised full Edge paddle/Fn arrival support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*paddle/Fn=0x000f0000.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17' },
+    @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17' },
     @{ Name = 'Moonlight PADDLE1 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge PADDLE1 pressed \(paddle/Fn flags: 0x00010000\)' },
     @{ Name = 'Moonlight PADDLE2 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge PADDLE2 pressed \(paddle/Fn flags: 0x00020000\)' },
     @{ Name = 'Moonlight PADDLE3 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge PADDLE3 pressed \(paddle/Fn flags: 0x00040000\)' },
