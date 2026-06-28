@@ -205,6 +205,111 @@ function Test-MissingHostInputSummary {
   }
 }
 
+function Write-TestSystemEvidenceFiles {
+  param(
+    [Parameter(Mandatory = $true)][string] $OutputDir,
+    [bool] $IncludeMi03 = $true,
+    [bool] $IncludeAttachSuccess = $true
+  )
+
+  New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+
+  Set-Content -LiteralPath (Join-Path $OutputDir 'environment.txt') -Encoding utf8 -Value @(
+    'is_admin=True'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'apollo-listener.txt') -Encoding utf8 -Value @(
+    'LocalAddress : 127.0.0.1',
+    'LocalPort    : 3240'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-command.txt') -Encoding utf8 -Value @(
+    'Name   : usbip.exe',
+    'Source : C:\Program Files\usbip-win2\usbip.exe'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
+    '1-1: Sony Corp. : DualSense Edge Wireless Controller (054c:0df2)'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
+    'Port 00: Imported from 127.0.0.1 busid 1-1 remote 054c:0df2'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge.txt') -Encoding utf8 -Value @(
+    'InstanceId : USB\VID_054C&PID_0DF2\EDGE',
+    'Status     : OK'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-hidclass.txt') -Encoding utf8 -Value @(
+    'InstanceId : HID\VID_054C&PID_0DF2&MI_03\EDGE',
+    'Status     : OK'
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-health.txt') -Encoding utf8 -Value @(
+    'device_count=2',
+    'edge_ok_count=2',
+    $(if ($IncludeMi03) { 'mi03_ok_count=1' } else { 'mi03_ok_count=0' })
+  )
+  Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-cim.txt') -Encoding utf8 -Value @(
+    'PNPDeviceID : USB\VID_054C&PID_0DF2\EDGE',
+    'Status      : OK'
+  )
+
+  if ($IncludeMi03) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-mi03.txt') -Encoding utf8 -Value @(
+      'InstanceId : HID\VID_054C&PID_0DF2&MI_03\EDGE',
+      'Status     : OK'
+    )
+  } else {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-mi03.txt') -Encoding utf8 -Value @(
+      'InstanceId : HID\VID_054C&PID_0DF2\EDGE',
+      'Status     : OK'
+    )
+  }
+
+  if ($IncludeAttachSuccess) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-attach.txt') -Encoding utf8 -Value @(
+      'exit_code=0'
+    )
+  }
+}
+
+function Test-SystemSummary {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [Parameter(Mandatory = $true)][string] $ExpectedOverall,
+    [bool] $SkipAttach = $false,
+    [bool] $IncludeMi03 = $true,
+    [bool] $IncludeAttachSuccess = $true,
+    [string[]] $ExpectedSummaryLines = @()
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  try {
+    Write-TestSystemEvidenceFiles `
+      -OutputDir $outputDir `
+      -IncludeMi03 $IncludeMi03 `
+      -IncludeAttachSuccess $IncludeAttachSuccess
+
+    Write-SystemEvidenceSummary `
+      -OutputDir $outputDir `
+      -HostAddress '127.0.0.1' `
+      -Port 3240 `
+      -BusId '1-1' `
+      -SkipAttach $SkipAttach
+
+    $summaryPath = Join-Path $outputDir 'system-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne $ExpectedOverall) {
+      Write-Host $summary
+      throw "$Name expected overall=$ExpectedOverall, got overall=$overall"
+    }
+
+    foreach ($line in $ExpectedSummaryLines) {
+      Assert-Contains -Content $summary -Needle $line -CaseName $Name
+    }
+  } finally {
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 $sdl2Detection = 'DualSense Edge detected with 21 SDL joystick buttons (need 21 for SDL2 Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL 2.32.10)'
 $sdl2Bindings = 'DualSense Edge arrival support: buttons=21 sdlType=3 arrivalType=0x02 supportedButtonFlags=0x000f0000 paddle/Fn=0x000f0000 capabilities=0x00000000 bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17'
 $sdl2Mapping = 'Applied DualSense Edge paddle mappings (updated): paddle1:b20,paddle2:b19,paddle3:b18,paddle4:b17'
@@ -354,6 +459,32 @@ Test-MissingHostInputSummary `
   -ExpectedOverall 'SKIPPED' `
   -ExpectedSummaryLines @(
     'No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.'
+  )
+
+Test-SystemSummary `
+  -Name 'system-pass' `
+  -ExpectedOverall 'PASS' `
+  -ExpectedSummaryLines @(
+    'MATCH: PnP shows MI_03 HID child',
+    'MATCH: PnP shows healthy MI_03 HID child'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-mi03-fail' `
+  -IncludeMi03 $false `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: PnP shows MI_03 HID child',
+    'MISSING: PnP shows healthy MI_03 HID child'
+  )
+
+Test-SystemSummary `
+  -Name 'system-skip-attach-pass' `
+  -SkipAttach $true `
+  -IncludeAttachSuccess $false `
+  -ExpectedOverall 'PASS' `
+  -ExpectedSummaryLines @(
+    'SKIPPED_OR_MISSING: usbip attach command succeeded'
   )
 
 Write-Host 'DualSense Edge evidence verification passed.'
