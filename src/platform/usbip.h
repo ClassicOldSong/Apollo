@@ -1,0 +1,213 @@
+/**
+ * @file src/platform/usbip.h
+ * @brief Shared helpers for packing USB/IP protocol frames.
+ */
+#pragma once
+
+// standard includes
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <span>
+#include <string_view>
+#include <vector>
+
+namespace platf::usbip {
+  constexpr std::uint16_t VERSION = 0x0111;
+
+  constexpr std::size_t OP_COMMON_SIZE = 8;
+  constexpr std::size_t BASIC_HEADER_SIZE = 20;
+  constexpr std::size_t SUBMIT_HEADER_SIZE = 48;
+  constexpr std::size_t USB_DEVICE_PATH_SIZE = 256;
+  constexpr std::size_t USB_DEVICE_BUSID_SIZE = 32;
+  constexpr std::size_t USB_DEVICE_RECORD_SIZE = 312;
+  constexpr std::size_t USB_INTERFACE_RECORD_SIZE = 4;
+
+  enum class op_code : std::uint16_t {
+    rep_import = 0x0003,
+    rep_devlist = 0x0005,
+  };
+
+  enum class command : std::uint32_t {
+    ret_submit = 0x0003,
+    ret_unlink = 0x0004,
+  };
+
+  enum class direction : std::uint32_t {
+    out = 0,
+    in = 1,
+  };
+
+  enum class device_speed : std::uint32_t {
+    unknown = 0,
+    low = 1,
+    full = 2,
+    high = 3,
+    wireless = 4,
+    super = 5,
+  };
+
+  struct device_identity_t {
+    std::string_view path;
+    std::string_view busid;
+    std::uint32_t busnum;
+    std::uint32_t devnum;
+    device_speed speed;
+    std::uint16_t vendor_id;
+    std::uint16_t product_id;
+    std::uint16_t bcd_device;
+    std::uint8_t device_class;
+    std::uint8_t device_subclass;
+    std::uint8_t device_protocol;
+    std::uint8_t configuration_value;
+    std::uint8_t configuration_count;
+    std::uint8_t interface_count;
+  };
+
+  struct interface_identity_t {
+    std::uint8_t interface_class;
+    std::uint8_t interface_subclass;
+    std::uint8_t interface_protocol;
+  };
+
+  inline void append_u8(std::vector<std::uint8_t> &out, std::uint8_t value) {
+    out.push_back(value);
+  }
+
+  inline void append_be16(std::vector<std::uint8_t> &out, std::uint16_t value) {
+    out.push_back(static_cast<std::uint8_t>((value >> 8) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>(value & 0xFF));
+  }
+
+  inline void append_be32(std::vector<std::uint8_t> &out, std::uint32_t value) {
+    out.push_back(static_cast<std::uint8_t>((value >> 24) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((value >> 16) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>((value >> 8) & 0xFF));
+    out.push_back(static_cast<std::uint8_t>(value & 0xFF));
+  }
+
+  inline std::uint16_t read_be16(std::span<const std::uint8_t> data, std::size_t offset) {
+    return static_cast<std::uint16_t>((static_cast<std::uint16_t>(data[offset]) << 8) |
+                                      static_cast<std::uint16_t>(data[offset + 1]));
+  }
+
+  inline std::uint32_t read_be32(std::span<const std::uint8_t> data, std::size_t offset) {
+    return (static_cast<std::uint32_t>(data[offset]) << 24) |
+           (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
+           (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
+           static_cast<std::uint32_t>(data[offset + 3]);
+  }
+
+  inline void append_fixed_string(std::vector<std::uint8_t> &out, std::string_view text, std::size_t width) {
+    const auto copy_len = width == 0 ? 0 : std::min(text.size(), width - 1);
+    out.insert(out.end(), text.begin(), text.begin() + copy_len);
+    out.resize(out.size() + width - copy_len, 0);
+  }
+
+  inline void append_op_common(std::vector<std::uint8_t> &out, op_code code, std::uint32_t status) {
+    append_be16(out, VERSION);
+    append_be16(out, static_cast<std::uint16_t>(code));
+    append_be32(out, status);
+  }
+
+  inline void append_device_record(std::vector<std::uint8_t> &out, const device_identity_t &device) {
+    append_fixed_string(out, device.path, USB_DEVICE_PATH_SIZE);
+    append_fixed_string(out, device.busid, USB_DEVICE_BUSID_SIZE);
+    append_be32(out, device.busnum);
+    append_be32(out, device.devnum);
+    append_be32(out, static_cast<std::uint32_t>(device.speed));
+    append_be16(out, device.vendor_id);
+    append_be16(out, device.product_id);
+    append_be16(out, device.bcd_device);
+    append_u8(out, device.device_class);
+    append_u8(out, device.device_subclass);
+    append_u8(out, device.device_protocol);
+    append_u8(out, device.configuration_value);
+    append_u8(out, device.configuration_count);
+    append_u8(out, device.interface_count);
+  }
+
+  inline void append_interface_record(std::vector<std::uint8_t> &out, const interface_identity_t &interface) {
+    append_u8(out, interface.interface_class);
+    append_u8(out, interface.interface_subclass);
+    append_u8(out, interface.interface_protocol);
+    append_u8(out, 0);
+  }
+
+  inline std::vector<std::uint8_t> make_import_reply(const device_identity_t &device) {
+    std::vector<std::uint8_t> out;
+    out.reserve(OP_COMMON_SIZE + USB_DEVICE_RECORD_SIZE);
+
+    append_op_common(out, op_code::rep_import, 0);
+    append_device_record(out, device);
+
+    return out;
+  }
+
+  inline std::vector<std::uint8_t> make_devlist_reply(const device_identity_t &device, std::span<const interface_identity_t> interfaces) {
+    std::vector<std::uint8_t> out;
+    out.reserve(OP_COMMON_SIZE + sizeof(std::uint32_t) + USB_DEVICE_RECORD_SIZE + interfaces.size() * USB_INTERFACE_RECORD_SIZE);
+
+    append_op_common(out, op_code::rep_devlist, 0);
+    append_be32(out, 1);
+    append_device_record(out, device);
+    for (const auto &interface : interfaces) {
+      append_interface_record(out, interface);
+    }
+
+    return out;
+  }
+
+  inline void append_basic_header(
+    std::vector<std::uint8_t> &out,
+    command command,
+    std::uint32_t seqnum,
+    std::uint32_t devid,
+    direction direction,
+    std::uint32_t endpoint
+  ) {
+    append_be32(out, static_cast<std::uint32_t>(command));
+    append_be32(out, seqnum);
+    append_be32(out, devid);
+    append_be32(out, static_cast<std::uint32_t>(direction));
+    append_be32(out, endpoint);
+  }
+
+  inline std::vector<std::uint8_t> make_ret_submit(
+    std::uint32_t seqnum,
+    std::uint32_t devid,
+    direction direction,
+    std::uint32_t endpoint,
+    std::int32_t status,
+    std::span<const std::uint8_t> payload = {}
+  ) {
+    std::vector<std::uint8_t> out;
+    out.reserve(SUBMIT_HEADER_SIZE + payload.size());
+
+    append_basic_header(out, command::ret_submit, seqnum, devid, direction, endpoint);
+    append_be32(out, static_cast<std::uint32_t>(status));
+    append_be32(out, static_cast<std::uint32_t>(payload.size()));
+    append_be32(out, 0);  // start_frame
+    append_be32(out, 0);  // number_of_packets
+    append_be32(out, 0);  // error_count
+    for (std::size_t i = 0; i < 8; ++i) {
+      append_u8(out, 0);
+    }
+    out.insert(out.end(), payload.begin(), payload.end());
+
+    return out;
+  }
+
+  inline std::vector<std::uint8_t> make_ret_unlink(std::uint32_t seqnum, std::uint32_t devid, std::int32_t status) {
+    std::vector<std::uint8_t> out;
+    out.reserve(SUBMIT_HEADER_SIZE);
+
+    append_basic_header(out, command::ret_unlink, seqnum, devid, direction::out, 0);
+    append_be32(out, static_cast<std::uint32_t>(status));
+    for (std::size_t i = 0; i < 24; ++i) {
+      append_u8(out, 0);
+    }
+
+    return out;
+  }
+}  // namespace platf::usbip
