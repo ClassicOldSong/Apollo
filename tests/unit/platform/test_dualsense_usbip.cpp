@@ -880,6 +880,36 @@ TEST(DualSenseUsbIpTests, SessionRejectsSubmitsAndUnlinksForDifferentDevid) {
   EXPECT_EQ(platf::usbip::read_be32(unlink_result.reply, 20), static_cast<std::uint32_t>(-1));
 }
 
+TEST(DualSenseUsbIpTests, SessionRejectsMismatchedInterruptDirections) {
+  platf::dualsense_usbip::session_t session;
+
+  const auto out_to_in = session.handle_submit(submit_request(
+    38,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    0
+  ));
+
+  EXPECT_FALSE(out_to_in.reply.empty());
+  EXPECT_FALSE(out_to_in.has_output_report);
+  EXPECT_FALSE(session.has_pending_interrupt_in());
+  EXPECT_EQ(platf::usbip::read_be32(out_to_in.reply, 4), 38);
+  EXPECT_EQ(platf::usbip::read_be32(out_to_in.reply, 20), static_cast<std::uint32_t>(-1));
+
+  const auto in_to_out = session.handle_submit(submit_request(
+    39,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_OUT,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE
+  ));
+
+  EXPECT_FALSE(in_to_out.reply.empty());
+  EXPECT_FALSE(in_to_out.has_output_report);
+  EXPECT_FALSE(session.has_pending_interrupt_in());
+  EXPECT_EQ(platf::usbip::read_be32(in_to_out.reply, 4), 39);
+  EXPECT_EQ(platf::usbip::read_be32(in_to_out.reply, 20), static_cast<std::uint32_t>(-1));
+}
+
 TEST(DualSenseUsbIpTests, SessionPassesThroughImmediateControlAndOutputSubmits) {
   platf::dualsense_usbip::session_t session;
 
