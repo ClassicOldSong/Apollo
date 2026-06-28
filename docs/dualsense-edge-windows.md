@@ -251,8 +251,11 @@ matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
 `MI_03` child, present HIDClass nodes, matching CIM `Win32_PnPEntity` rows, and
 selected PnP properties. Pass Apollo and Moonlight log files with `-LogPath` to
-copy them into the same evidence bundle. Use `-SkipAttach` if the virtual
-controller is already attached and only the PnP evidence should be refreshed.
+copy them into the same evidence bundle. When logs are provided, the helper also
+writes `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
+Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
+allocation failures. Use `-SkipAttach` if the virtual controller is already
+attached and only the PnP evidence should be refreshed.
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
