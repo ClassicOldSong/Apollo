@@ -187,7 +187,11 @@ unchanged.
 
 The first implementation forwards standard buttons, sticks, triggers, and the
 four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive
-trigger state are intentionally left for follow-up hardware testing. Host
+trigger state are intentionally left for follow-up hardware testing. The
+Windows backend refuses to allocate the virtual Edge unless the client arrival
+packet advertises all four `PADDLE1..4` bits, because an Edge-shaped virtual
+device without proven Edge button transport would not solve the original input
+loss. Host
 output reports are parsed from both interrupt OUT packets and HID control
 `SET_REPORT` requests for rumble and lightbar feedback, then forwarded through
 Apollo's existing feedback queue. The virtual device also responds to standard
@@ -274,6 +278,9 @@ refreshed.
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
    - `Gamepad ... reported DualSense Edge paddle/Fn buttons [000F0000]`
+   - Do not continue if Apollo logs `refusing to allocate virtual Edge
+     controller`; that means the client did not advertise all four
+     Edge-specific buttons.
 5. In an elevated Windows shell with `usbip-win2`, list and attach the virtual
    controller:
 

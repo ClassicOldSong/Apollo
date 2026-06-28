@@ -94,8 +94,13 @@ namespace platf {
   constexpr std::uint32_t PADDLE2 = 0x020000;
   constexpr std::uint32_t PADDLE3 = 0x040000;
   constexpr std::uint32_t PADDLE4 = 0x080000;
+  constexpr std::uint32_t EDGE_PADDLE_BUTTONS = PADDLE1 | PADDLE2 | PADDLE3 | PADDLE4;
   constexpr std::uint32_t TOUCHPAD_BUTTON = 0x100000;
   constexpr std::uint32_t MISC_BUTTON = 0x200000;
+
+  constexpr bool has_all_edge_paddle_buttons(std::uint32_t buttons) {
+    return (buttons & EDGE_PADDLE_BUTTONS) == EDGE_PADDLE_BUTTONS;
+  }
 
   struct supported_gamepad_t {
     std::string name;

@@ -16,6 +16,10 @@ TEST(GamepadProtocolTests, PaddleFlagsMatchMoonlightSunshineProtocol) {
   EXPECT_EQ(static_cast<std::uint32_t>(PADDLE2_FLAG), platf::PADDLE2);
   EXPECT_EQ(static_cast<std::uint32_t>(PADDLE3_FLAG), platf::PADDLE3);
   EXPECT_EQ(static_cast<std::uint32_t>(PADDLE4_FLAG), platf::PADDLE4);
+  EXPECT_EQ(
+    static_cast<std::uint32_t>(PADDLE1_FLAG | PADDLE2_FLAG | PADDLE3_FLAG | PADDLE4_FLAG),
+    platf::EDGE_PADDLE_BUTTONS
+  );
 }
 
 TEST(GamepadProtocolTests, PaddleFlagsTravelInMultiControllerButtonFlags2) {
@@ -43,4 +47,14 @@ TEST(GamepadProtocolTests, ControllerArrivalCanAdvertiseAllPaddleFlags) {
   packet.supportedButtonFlags = paddles | TOUCHPAD_FLAG | MISC_FLAG;
 
   EXPECT_EQ(packet.supportedButtonFlags & paddles, paddles);
+}
+
+TEST(GamepadProtocolTests, EdgeModeRequiresCompletePaddleArrivalMask) {
+  EXPECT_TRUE(platf::has_all_edge_paddle_buttons(platf::EDGE_PADDLE_BUTTONS));
+  EXPECT_TRUE(platf::has_all_edge_paddle_buttons(
+    platf::EDGE_PADDLE_BUTTONS | platf::TOUCHPAD_BUTTON | platf::MISC_BUTTON
+  ));
+
+  EXPECT_FALSE(platf::has_all_edge_paddle_buttons(0));
+  EXPECT_FALSE(platf::has_all_edge_paddle_buttons(platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3));
 }

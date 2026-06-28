@@ -160,10 +160,8 @@ namespace platf {
       .sPreviousTouch = {ds4_touch_unused, ds4_touch_unused}}}
   };
 
-  constexpr std::uint32_t PADDLE_BUTTONS = PADDLE1 | PADDLE2 | PADDLE3 | PADDLE4;
-
   static void warn_unsupported_paddles(int gamepad_index, const char *emulated_type, std::uint32_t supported_buttons) {
-    auto paddle_buttons = supported_buttons & PADDLE_BUTTONS;
+    auto paddle_buttons = supported_buttons & EDGE_PADDLE_BUTTONS;
     if (!paddle_buttons) {
       return;
     }
@@ -1334,12 +1332,14 @@ namespace platf {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualSense Edge controller (experimental USB/IP)"sv;
       BOOST_LOG(info)
         << "Gamepad " << id.globalIndex << " reported DualSense Edge paddle/Fn buttons ["sv
-        << util::hex(metadata.supportedButtons & PADDLE_BUTTONS).to_string_view() << ']';
-      if ((metadata.supportedButtons & PADDLE_BUTTONS) != PADDLE_BUTTONS) {
-        BOOST_LOG(warning)
+        << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view() << ']';
+      if (!has_all_edge_paddle_buttons(metadata.supportedButtons)) {
+        BOOST_LOG(error)
           << "Gamepad " << id.globalIndex
           << " is using DualSense Edge mode, but the client did not report all Edge paddle/Fn buttons ["sv
-          << util::hex(metadata.supportedButtons & PADDLE_BUTTONS).to_string_view() << ']';
+          << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view()
+          << "]; refusing to allocate virtual Edge controller"sv;
+        return -1;
       }
       return alloc_edge_gamepad(raw, id, std::move(feedback_queue));
     }
@@ -1666,7 +1666,7 @@ namespace platf {
     auto raw = (input_raw_t *) input.get();
     auto &edge = raw->edge_gamepads[nr];
     if (edge.server) {
-      const auto edge_buttons = gamepad_state.buttonFlags & PADDLE_BUTTONS;
+      const auto edge_buttons = gamepad_state.buttonFlags & EDGE_PADDLE_BUTTONS;
       if (!edge.has_last_edge_buttons || edge.last_edge_buttons != edge_buttons) {
         BOOST_LOG(info)
           << "Gamepad " << nr << " DualSense Edge paddle/Fn state changed ["sv
