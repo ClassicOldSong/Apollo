@@ -54,6 +54,13 @@ represent those bits.
   make SDL consumers see a scrambled virtual DualSense, which is why this branch
   requires host-side HID/gamepad inspector evidence instead of trusting Apollo
   logs alone.
+- `LizardByte/Sunshine#3404`: persistent virtual DualSense identity is a
+  separate protocol issue. Sunshine contributors noted that the clean solution
+  requires Moonlight to send a stable controller identifier, while a host-only
+  fixed identity is a workaround with controller-swap tradeoffs. This branch
+  should not claim to solve Steam profile persistence, but validation should
+  record whether Windows/Steam treats repeated virtual Edge imports as the same
+  device or a new one.
 - `LizardByte/Sunshine#3527` and `LizardByte/Sunshine#4948`: a WinUHid-based
   Windows DualSense backend is an attractive long-term direction, but the PR was
   closed while driver distribution/signing remained unresolved. Maintainers noted
@@ -80,6 +87,15 @@ represent those bits.
   before JoyShockMapper v3.5.1. Treat third-party labels such as `LSL`, `LSR`,
   `RSL`, and `RSR` as tool-specific evidence only; draft-ready validation still
   needs the physical one-at-a-time press order and the Edge byte masks below.
+- `sezanzeb/input-remapper#1237`: another remapping stack reports that Edge
+  paddles/Fn may be absent from generic remapper input views. That reinforces
+  collecting DS5/Edge-aware HID evidence when possible and treating generic
+  testers as supporting evidence, not the only proof.
+- `ahungry/vader3#2`: community experiments around spoofing controller identity
+  show that changing VID/PID or evdev mappings can confuse SDL, hidraw, Steam,
+  and kernel/userspace fixups. Apollo should translate the streamed state into a
+  coherent Edge-shaped HID device instead of pretending the Edge extras are
+  Xbox/DS4 buttons or relying on host-side identity spoofing.
 - `libsdl-org/SDL#14581`: Edge motion support can depend on low-level HID access
   on Linux. That does not block the paddle/Fn transport path, but it explains why
   motion remains a follow-up validation item rather than part of the first
@@ -443,6 +459,10 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
    - Confirm the HID instance path includes `MI_03`. If paddle/Fn buttons are
      present in generic HID/game-controller tools but missing only from
      DS5-specific filter tools, capture the HID path and filter-driver logs.
+   - If Steam Input is part of the host validation, detach and reattach once and
+     record whether Steam treats the virtual Edge as the same controller profile
+     or a new one. That persistence result is useful follow-up evidence but does
+     not replace the one-at-a-time paddle/Fn button proof.
 8. Press and release each Edge-specific control one at a time, then verify four
    distinct host-visible inputs:
    - `PADDLE1`: right rear paddle
