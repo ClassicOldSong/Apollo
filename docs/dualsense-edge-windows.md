@@ -325,6 +325,8 @@ The key evidence to capture during validation is:
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
+- Recent Windows device/input events for USB/IP, PnP, HIDClass,
+  DriverFrameworks, and GameInput troubleshooting.
 - GameInput/Gaming Services service, package, and registry context when
   validating games that use Windows.Gaming.Input or GameInput.
 - Host-side HID/gamepad inspector evidence showing the four Edge paddle/Fn
@@ -343,10 +345,12 @@ The helper writes a timestamped directory under `%TEMP%` containing
 matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 USB/IP-related driver package and signed-driver details, GameInput/Gaming
 Services service/package context, filtered GameInput registry context for Sony
-Edge VID/PID entries, environment details, all present `VID_054C&PID_0DF2` PnP
-devices, the expected `MI_03` child, PnP health/status details, present HIDClass
-nodes, matching CIM `Win32_PnPEntity` rows, and selected PnP properties. Pass
-one complete Apollo log and one complete Moonlight
+Edge VID/PID entries, recent Windows device/input events from relevant System,
+Application, DriverFrameworks, and GameInput logs, environment details, all
+present `VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP
+health/status details, present HIDClass nodes, matching CIM `Win32_PnPEntity`
+rows, and selected PnP properties. Pass one complete Apollo log and one complete
+Moonlight
 log from the same end-to-end run with `-LogPath` to copy them into the same
 evidence bundle; the log manifest records each copied
 path's source path, destination path, type, last write time, file size, and
@@ -394,8 +398,9 @@ allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener's
 requested host and port, `usbip.exe`, requested busid, attach result, optional
 USB/IP service/driver package evidence, optional GameInput/Gaming Services and
-registry context, `usbip port` entries for both the requested busid and the
-virtual Edge VID/PID on the same imported-device line, and Windows PnP
+registry context, optional recent Windows device/input events, `usbip port`
+entries for both the requested busid and the virtual Edge VID/PID on the same
+imported-device line, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence,
 including healthy PnP status checks and the first matching lines from the
 captured files. It also writes
@@ -433,6 +438,10 @@ Reboot, start `usbip2_filter` and `usbip2_ude` WPP tracing with WDK
 `tracefmt.exe`. Then pass the generated `usbip-*.etl` or `usbip-*.txt` files
 with `-UsbipDriverLogPath` so reviewers can tell whether the failure is in
 Apollo's USB/IP device responses or the Windows virtual host controller stack.
+Also include `windows-device-events.txt`; it captures bounded recent Event
+Viewer context for System, Application, DriverFrameworks-UserMode, and GameInput
+logs so reviewers can correlate attach, PnP, HIDClass, and GameInput symptoms
+with Apollo and usbip-win2 logs.
 When finished, remove the verbose logging flag:
 
 ```cmd
@@ -653,6 +662,8 @@ same end-to-end run:
   include `gameinput-service.txt` and `gameinput-registry.txt` with the raw HID
   evidence so duplicate enumeration can be triaged separately from button
   transport.
+- If `usbip.exe attach`, enumeration, or reboot behavior is unstable, include
+  `windows-device-events.txt` plus any copied `usbip-driver-logs` files.
 - If `-ArchivePath` was supplied, `archive-summary.txt` ends with
   `overall=PASS` and records the zip file SHA-256 hash. The archive itself
   contains `evidence-artifacts-manifest.txt` for the captured bundle contents,

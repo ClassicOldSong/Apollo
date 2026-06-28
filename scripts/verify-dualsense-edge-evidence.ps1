@@ -636,6 +636,7 @@ function Write-TestSystemEvidenceFiles {
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeGameInputEvidence = $true,
+    [bool] $IncludeWindowsDeviceEvents = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -686,6 +687,16 @@ function Write-TestSystemEvidenceFiles {
       '### reg.exe query HKLM\SYSTEM\CurrentControlSet\Control\GameInput\Devices /s /f 0DF2',
       'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\GameInput\Devices\VID_054C&PID_0DF2',
       '    DisplayName    REG_SZ    Sony DualSense Edge Wireless Controller'
+    )
+  }
+  if ($IncludeWindowsDeviceEvents) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'windows-device-events.txt') -Encoding utf8 -Value @(
+      '### Recent Windows device/input events since 2026-06-28T00:00:00.0000000Z',
+      '### System',
+      '---',
+      'ProviderName=Microsoft-Windows-Kernel-PnP',
+      'Id=410',
+      'Message=Device USB\VID_054C&PID_0DF2\EDGE was configured for HidClass.'
     )
   }
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
@@ -754,6 +765,7 @@ function Test-SystemSummary {
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeGameInputEvidence = $true,
+    [bool] $IncludeWindowsDeviceEvents = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -769,6 +781,7 @@ function Test-SystemSummary {
       -IncludeAttachSuccess $IncludeAttachSuccess `
       -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence `
       -IncludeGameInputEvidence $IncludeGameInputEvidence `
+      -IncludeWindowsDeviceEvents $IncludeWindowsDeviceEvents `
       -IncludeUsbIpPortImport $IncludeUsbIpPortImport `
       -IncludeUsbIpPortEdgeVidPid $IncludeUsbIpPortEdgeVidPid `
       -SplitUsbIpPortEvidence $SplitUsbIpPortEvidence `
@@ -1054,6 +1067,7 @@ Test-SystemSummary `
     'MATCH: USB/IP signed driver evidence was captured',
     'MATCH: GameInput/Gaming Services context was captured',
     'MATCH: GameInput registry context was captured',
+    'MATCH: Recent Windows device events were captured',
     'MATCH: usbip port shows requested busid',
     'MATCH: usbip port shows virtual Edge VID/PID',
     'MATCH: usbip port shows requested virtual Edge import on one line',
@@ -1125,6 +1139,14 @@ Test-SystemSummary `
   -ExpectedSummaryLines @(
     'SKIPPED_OR_MISSING: GameInput/Gaming Services context was captured',
     'SKIPPED_OR_MISSING: GameInput registry context was captured'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-windows-device-events-pass' `
+  -IncludeWindowsDeviceEvents $false `
+  -ExpectedOverall 'PASS' `
+  -ExpectedSummaryLines @(
+    'SKIPPED_OR_MISSING: Recent Windows device events were captured'
   )
 
 Test-SystemSummary `

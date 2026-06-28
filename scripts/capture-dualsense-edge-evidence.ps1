@@ -675,6 +675,7 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'USB/IP signed driver evidence was captured'; Required = $false; Path = 'usbip-signed-drivers.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'GameInput/Gaming Services context was captured'; Required = $false; Path = 'gameinput-service.txt'; Pattern = 'GameInput|GamingServices|Gaming Services' },
     @{ Name = 'GameInput registry context was captured'; Required = $false; Path = 'gameinput-registry.txt'; Pattern = 'GameInput|054C|0DF2|DualSense|Sony|HKLM\\SYSTEM\\CurrentControlSet\\Control\\GameInput' },
+    @{ Name = 'Recent Windows device events were captured'; Required = $false; Path = 'windows-device-events.txt'; Pattern = 'Kernel-PnP|DriverFrameworks|HidClass|USBHUB|GameInput|054C|0DF2|DualSense|usbip|USB/IP' },
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
@@ -867,6 +868,51 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'gameinput-registry.txt') -
   foreach ($root in $gameInputRoots) {
     foreach ($term in $terms) {
       Invoke-RegistryQuery -QueryArgs @($root, '/s', '/f', $term) -MaxLines 150
+    }
+  }
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'windows-device-events.txt') -Script {
+  $startTime = (Get-Date).AddHours(-2)
+  $patterns = @('054C', '0DF2', 'DualSense', 'Sony', 'usbip', 'USB/IP', 'HidClass', 'GameInput', 'USBHUB', 'Kernel-PnP')
+  $logs = @(
+    'System',
+    'Application',
+    'Microsoft-Windows-DriverFrameworks-UserMode/Operational',
+    'Microsoft-Windows-GameInput/Operational'
+  )
+
+  "### Recent Windows device/input events since $($startTime.ToString('o'))"
+  foreach ($logName in $logs) {
+    ""
+    "### $logName"
+    try {
+      $events = @(Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $startTime } -ErrorAction Stop |
+        Where-Object {
+          $provider = [string]$_.ProviderName
+          $message = [string]$_.Message
+          $messageMatches = $null -ne ($patterns | Where-Object { $message -match [regex]::Escape($_) } | Select-Object -First 1)
+          ($provider -match 'Kernel-PnP|DriverFrameworks|HidClass|USBHUB|GameInput|usbip|USB/IP') -or
+            $messageMatches
+        } |
+        Sort-Object TimeCreated -Descending |
+        Select-Object -First 80)
+
+      if ($events.Count -eq 0) {
+        "No matching recent events found."
+        continue
+      }
+
+      foreach ($event in $events) {
+        "---"
+        "TimeCreated=$($event.TimeCreated.ToString('o'))"
+        "ProviderName=$($event.ProviderName)"
+        "Id=$($event.Id)"
+        "LevelDisplayName=$($event.LevelDisplayName)"
+        "Message=$(([string]$event.Message).Replace("`r", ' ').Replace("`n", ' '))"
+      }
+    } catch {
+      "ERROR reading ${logName}: $($_.Exception.Message)"
     }
   }
 }
