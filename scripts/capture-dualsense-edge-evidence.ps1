@@ -506,6 +506,7 @@ function Write-LogEvidenceSummary {
     @{ Name = 'STOP: Moonlight combined Edge paddle/Fn state during one-at-a-time validation'; Required = $false; Stop = $true; Pattern = 'DualSense Edge PADDLE[1-4] (pressed|released) \(paddle/Fn flags: 0x000[35679a-fA-F]0000\)' },
     @{ Name = 'STOP: Apollo combined Edge paddle/Fn state during one-at-a-time validation'; Required = $false; Stop = $true; Pattern = 'DualSense Edge paddle/Fn state changed \[000[35679a-fA-F]0000\]' },
     @{ Name = 'STOP: Moonlight mapping did not expose expected paddle controller bindings'; Required = $false; Stop = $true; Pattern = 'DualSense Edge paddle mappings are present, but SDL did not expose|DualSense Edge paddle mapping update did not expose|DualSense Edge paddle mapping add did not expose' },
+    @{ Name = 'STOP: Moonlight unverified Edge paddle event ignored'; Required = $false; Stop = $true; Pattern = 'Ignoring DualSense Edge PADDLE[1-4] event without verified paddle bindings' },
     @{ Name = 'STOP: Moonlight stale Edge raw alias suppressed'; Required = $false; Stop = $true; Pattern = 'as stale Edge raw alias' },
     @{ Name = 'STOP: Moonlight capability alias filtered'; Required = $false; Stop = $true; Pattern = 'not advertising it as a normal button' },
     @{ Name = 'STOP: Apollo refused Edge allocation'; Required = $false; Stop = $true; Pattern = 'refusing to allocate virtual Edge controller' }

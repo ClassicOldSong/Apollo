@@ -394,6 +394,10 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
      bound to raw paddle...; not advertising it as a normal button`; that means
      a stale SDL mapping would have advertised an Edge-only control as a normal
      controller button, and Moonlight is suppressing that capability alias.
+   - Do not continue if Moonlight logs `Ignoring DualSense Edge PADDLE... event
+     without verified paddle bindings`; that means Moonlight saw an Edge-specific
+     control event before it could prove the controller-button binding maps to
+     the expected raw Edge input.
 4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
@@ -457,6 +461,10 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
      raw alias`; that means a stale SDL mapping is still binding an Edge-only
      raw button to a normal controller button, and Moonlight is suppressing that
      alias instead of transmitting it as a native Edge input.
+   - Do not continue if pressing an Edge-specific control logs `Ignoring
+     DualSense Edge PADDLE... event without verified paddle bindings`; that
+     means Moonlight is dropping the Edge-specific event because the active SDL
+     controller mapping is not verified.
 
    For SDL2 builds, set `SDL_LOGGING=application=debug` before launching
    Moonlight. For example, on Windows PowerShell:
