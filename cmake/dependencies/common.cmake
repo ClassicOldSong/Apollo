@@ -21,6 +21,12 @@ find_package(OpenSSL REQUIRED)
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 pkg_check_modules(CURL REQUIRED libcurl)
+pkg_check_modules(OPUS opus)
+if(OPUS_FOUND AND OPUS_INCLUDEDIR)
+    set(OPUS_INCLUDE_DIR "${OPUS_INCLUDEDIR}")
+else()
+    find_path(OPUS_INCLUDE_DIR NAMES opus/opus_multistream.h)
+endif()
 
 # miniupnp
 pkg_check_modules(MINIUPNP miniupnpc REQUIRED)
