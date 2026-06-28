@@ -118,7 +118,7 @@ namespace platf::dualsense_usbip {
   }
 
   inline bool is_output_report(std::span<const std::uint8_t> payload) {
-    return payload.size() == dualsense::OUTPUT_REPORT_USB_SIZE &&
+    return payload.size() >= dualsense::OUTPUT_REPORT_USB_MIN_SIZE &&
            payload.front() == dualsense::OUTPUT_REPORT_USB;
   }
 

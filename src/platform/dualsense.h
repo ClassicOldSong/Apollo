@@ -28,6 +28,8 @@ namespace platf::dualsense {
   constexpr std::size_t INPUT_REPORT_BODY_SIZE = INPUT_REPORT_USB_SIZE - 1;
   constexpr std::size_t OUTPUT_REPORT_USB_SIZE = 64;
   constexpr std::size_t OUTPUT_REPORT_BODY_SIZE = OUTPUT_REPORT_USB_SIZE - 1;
+  constexpr std::size_t OUTPUT_REPORT_COMMON_SIZE = 47;
+  constexpr std::size_t OUTPUT_REPORT_USB_MIN_SIZE = 1 + OUTPUT_REPORT_COMMON_SIZE;
   constexpr std::size_t DUALSENSE_HID_REPORT_DESCRIPTOR_SIZE = 273;
   constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
   constexpr std::uint8_t USB_ENDPOINT_IN = 0x84;
@@ -153,6 +155,11 @@ namespace platf::dualsense {
   constexpr std::uint8_t BUTTONS2_EDGE_LEFT_PADDLE = 0x40;
   constexpr std::uint8_t BUTTONS2_EDGE_RIGHT_PADDLE = 0x80;
 
+  constexpr std::uint8_t OUTPUT_VALID_FLAG0_COMPATIBLE_VIBRATION = 0x01;
+  constexpr std::uint8_t OUTPUT_VALID_FLAG0_HAPTICS_SELECT = 0x02;
+  constexpr std::uint8_t OUTPUT_VALID_FLAG1_LIGHTBAR_CONTROL_ENABLE = 0x04;
+  constexpr std::uint8_t OUTPUT_VALID_FLAG2_COMPATIBLE_VIBRATION2 = 0x04;
+
   struct button_report_t {
     std::uint8_t buttons0;
     std::uint8_t buttons1;
@@ -182,6 +189,17 @@ namespace platf::dualsense {
   struct usb_input_report_t {
     std::uint8_t report_id;
     input_report_t body;
+  };
+
+  struct output_report_state_t {
+    bool valid;
+    bool has_rumble;
+    std::uint8_t motor_left;
+    std::uint8_t motor_right;
+    bool has_lightbar;
+    std::uint8_t lightbar_red;
+    std::uint8_t lightbar_green;
+    std::uint8_t lightbar_blue;
   };
 
   static_assert(sizeof(input_report_t) == INPUT_REPORT_BODY_SIZE);
@@ -327,6 +345,25 @@ namespace platf::dualsense {
     return usb_input_report_t {
       .report_id = INPUT_REPORT_USB,
       .body = make_input_report(gamepad_state, sequence_number, dualsense_edge),
+    };
+  }
+
+  inline output_report_state_t parse_output_report(std::span<const std::uint8_t> report) {
+    if (report.size() < OUTPUT_REPORT_USB_MIN_SIZE || report.front() != OUTPUT_REPORT_USB) {
+      return {};
+    }
+
+    const auto common = report.subspan(1, OUTPUT_REPORT_COMMON_SIZE);
+    return output_report_state_t {
+      .valid = true,
+      .has_rumble = static_cast<bool>((common[0] & (OUTPUT_VALID_FLAG0_COMPATIBLE_VIBRATION | OUTPUT_VALID_FLAG0_HAPTICS_SELECT)) ||
+                                      (common[38] & OUTPUT_VALID_FLAG2_COMPATIBLE_VIBRATION2)),
+      .motor_left = common[3],
+      .motor_right = common[2],
+      .has_lightbar = static_cast<bool>(common[1] & OUTPUT_VALID_FLAG1_LIGHTBAR_CONTROL_ENABLE),
+      .lightbar_red = common[44],
+      .lightbar_green = common[45],
+      .lightbar_blue = common[46],
     };
   }
 

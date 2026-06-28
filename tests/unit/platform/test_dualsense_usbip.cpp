@@ -161,3 +161,14 @@ TEST(DualSenseUsbIpTests, RecognizesAndAcknowledgesInterruptOutReports) {
   EXPECT_EQ(platf::usbip::read_be32(ack, 24), 0);
   EXPECT_EQ(ack.size(), platf::usbip::SUBMIT_HEADER_SIZE);
 }
+
+TEST(DualSenseUsbIpTests, RecognizesMinimumCommonOutputReport) {
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+
+  EXPECT_TRUE(platf::dualsense_usbip::is_output_report(report));
+  EXPECT_EQ(
+    platf::dualsense_usbip::output_report_payload(report).size(),
+    platf::dualsense::OUTPUT_REPORT_COMMON_SIZE
+  );
+}

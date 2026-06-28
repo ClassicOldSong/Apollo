@@ -149,6 +149,54 @@ TEST(DualSenseReportTests, BuildsUsbInputReportWithReportId) {
   EXPECT_EQ(report.body.buttons[2], platf::dualsense::BUTTONS2_EDGE_FN_LEFT);
 }
 
+TEST(DualSenseReportTests, ParsesUsbOutputRumbleAndLightbarReport) {
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[2] = platf::dualsense::OUTPUT_VALID_FLAG1_LIGHTBAR_CONTROL_ENABLE;
+  report[3] = 0x22;  // right motor
+  report[4] = 0x44;  // left motor
+  report[45] = 0x10;
+  report[46] = 0x20;
+  report[47] = 0x30;
+
+  const auto state = platf::dualsense::parse_output_report(report);
+
+  EXPECT_TRUE(state.valid);
+  EXPECT_TRUE(state.has_rumble);
+  EXPECT_EQ(state.motor_left, 0x44);
+  EXPECT_EQ(state.motor_right, 0x22);
+  EXPECT_TRUE(state.has_lightbar);
+  EXPECT_EQ(state.lightbar_red, 0x10);
+  EXPECT_EQ(state.lightbar_green, 0x20);
+  EXPECT_EQ(state.lightbar_blue, 0x30);
+}
+
+TEST(DualSenseReportTests, ParsesUsbOutputRumbleV2Flag) {
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[39] = platf::dualsense::OUTPUT_VALID_FLAG2_COMPATIBLE_VIBRATION2;
+  report[3] = 0x11;
+  report[4] = 0x33;
+
+  const auto state = platf::dualsense::parse_output_report(report);
+
+  EXPECT_TRUE(state.valid);
+  EXPECT_TRUE(state.has_rumble);
+  EXPECT_EQ(state.motor_left, 0x33);
+  EXPECT_EQ(state.motor_right, 0x11);
+  EXPECT_FALSE(state.has_lightbar);
+}
+
+TEST(DualSenseReportTests, RejectsInvalidUsbOutputReport) {
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE> report {};
+  report[0] = platf::dualsense::INPUT_REPORT_USB;
+
+  const auto state = platf::dualsense::parse_output_report(report);
+
+  EXPECT_FALSE(state.valid);
+}
+
 TEST(DualSenseReportTests, DefinesDualSenseEdgeUsbIdentity) {
   const auto &device = platf::dualsense::DUALSENSE_EDGE_DEVICE_DESCRIPTOR;
 
