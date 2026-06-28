@@ -39,6 +39,34 @@ TEST(GamepadProtocolTests, PaddleFlagsTravelInMultiControllerButtonFlags2) {
   EXPECT_EQ(low_buttons | (high_buttons << 16), paddles);
 }
 
+TEST(GamepadProtocolTests, IndividualPaddleFlagsUseStableButtonFlags2Bits) {
+  struct Case {
+    std::uint32_t flag;
+    std::uint16_t button_flags_2;
+  };
+
+  constexpr Case cases[] {
+    { PADDLE1_FLAG, 0x0001 },
+    { PADDLE2_FLAG, 0x0002 },
+    { PADDLE3_FLAG, 0x0004 },
+    { PADDLE4_FLAG, 0x0008 },
+  };
+
+  for (const auto &test_case : cases) {
+    EXPECT_EQ(static_cast<std::uint16_t>(test_case.flag), 0);
+    EXPECT_EQ(static_cast<std::uint16_t>(test_case.flag >> 16), test_case.button_flags_2);
+
+    NV_MULTI_CONTROLLER_PACKET packet {};
+    packet.buttonFlags = 0;
+    packet.buttonFlags2 = static_cast<short>(test_case.button_flags_2);
+
+    const std::uint16_t low_buttons = packet.buttonFlags;
+    const std::uint32_t high_buttons = static_cast<std::uint16_t>(packet.buttonFlags2);
+
+    EXPECT_EQ(low_buttons | (high_buttons << 16), test_case.flag);
+  }
+}
+
 TEST(GamepadProtocolTests, ControllerArrivalCanAdvertiseAllPaddleFlags) {
   constexpr std::uint32_t paddles =
     PADDLE1_FLAG | PADDLE2_FLAG | PADDLE3_FLAG | PADDLE4_FLAG;
