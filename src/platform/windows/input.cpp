@@ -1331,7 +1331,9 @@ namespace platf {
     if (config::input.gamepad == "ds5-edge"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualSense Edge controller (experimental USB/IP)"sv;
       BOOST_LOG(info)
-        << "Gamepad " << id.globalIndex << " reported DualSense Edge paddle/Fn buttons ["sv
+        << "Gamepad " << id.globalIndex << " reported DualSense Edge arrival type ["sv
+        << util::hex(metadata.type).to_string_view()
+        << "] and paddle/Fn buttons ["sv
         << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view() << ']';
       if (!has_dualsense_edge_arrival_support(metadata.type, metadata.supportedButtons)) {
         BOOST_LOG(error)
