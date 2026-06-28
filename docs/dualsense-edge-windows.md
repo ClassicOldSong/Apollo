@@ -200,38 +200,19 @@ The key evidence to capture during validation is:
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
 
-The following PowerShell snippet captures the USB/IP and Windows PnP side of
-that evidence. Run it from an elevated shell after Apollo has logged that the
-USB/IP backend is listening:
+The `scripts/capture-dualsense-edge-evidence.ps1` helper captures the USB/IP
+and Windows PnP side of that evidence. Run it from an elevated shell after
+Apollo has logged that the USB/IP backend is listening:
 
 ```powershell
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$dir = Join-Path $env:TEMP "apollo-edge-$stamp"
-New-Item -ItemType Directory -Force -Path $dir | Out-Null
-
-$usbipList = Join-Path $dir 'usbip-list.txt'
-$usbipAttach = Join-Path $dir 'usbip-attach.txt'
-$pnpEdge = Join-Path $dir 'pnp-edge.txt'
-$pnpEdgeMi03 = Join-Path $dir 'pnp-edge-mi03.txt'
-
-usbip.exe list -r 127.0.0.1 *> $usbipList
-usbip.exe attach -r 127.0.0.1 -b 1-1 *> $usbipAttach
-
-Get-PnpDevice -PresentOnly |
-  Where-Object { $_.InstanceId -match 'VID_054C&PID_0DF2' } |
-  Format-List Class,FriendlyName,InstanceId,Status |
-  Out-File -FilePath $pnpEdge -Encoding utf8
-
-Get-PnpDevice -PresentOnly |
-  Where-Object {
-    $_.InstanceId -match 'VID_054C&PID_0DF2' -and
-    $_.InstanceId -match 'MI_03'
-  } |
-  Format-List Class,FriendlyName,InstanceId,Status |
-  Out-File -FilePath $pnpEdgeMi03 -Encoding utf8
-
-Write-Host "Evidence written to $dir"
+.\scripts\capture-dualsense-edge-evidence.ps1
 ```
+
+The helper writes a timestamped directory under `%TEMP%` containing
+`usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
+environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
+`MI_03` child, and selected PnP properties. Use `-SkipAttach` if the virtual
+controller is already attached and only the PnP evidence should be refreshed.
 
 1. Run this Apollo branch on Windows with:
 
