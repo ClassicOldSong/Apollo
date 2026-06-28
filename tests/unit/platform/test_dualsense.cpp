@@ -4,6 +4,7 @@
  */
 #include "../../tests_common.h"
 
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -212,6 +213,31 @@ TEST(DualSenseReportTests, PreservesSdlDualSenseEdgePaddleOrder) {
     platf::dualsense::pack_buttons(platf::PADDLE4, 0, 0, true).buttons2,
     platf::dualsense::BUTTONS2_EDGE_FN_LEFT
   );
+}
+
+TEST(DualSenseReportTests, PacksEachEdgeButtonIntoUsbInputReportByte) {
+  const std::array<std::pair<std::uint32_t, std::uint8_t>, 4> cases {{
+    {platf::PADDLE1, 0x80},
+    {platf::PADDLE2, 0x40},
+    {platf::PADDLE3, 0x20},
+    {platf::PADDLE4, 0x10},
+  }};
+
+  for (const auto &[flag, expected_edge_button_byte] : cases) {
+    SCOPED_TRACE(flag);
+
+    const auto edge_report = platf::dualsense::report_bytes(
+      platf::dualsense::make_usb_input_report(state_with_buttons(flag), 0, true)
+    );
+    const auto standard_report = platf::dualsense::report_bytes(
+      platf::dualsense::make_usb_input_report(state_with_buttons(flag), 0, false)
+    );
+
+    ASSERT_EQ(edge_report.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+    ASSERT_EQ(standard_report.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+    EXPECT_EQ(edge_report[10], expected_edge_button_byte);
+    EXPECT_EQ(standard_report[10], 0);
+  }
 }
 
 TEST(DualSenseReportTests, BuildsUsbInputReportPayload) {
