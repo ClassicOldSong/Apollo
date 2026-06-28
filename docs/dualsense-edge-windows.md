@@ -136,7 +136,8 @@ descriptor and return zero-filled payloads with the requested report ID.
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
    - `PADDLE4`: left Fn
-9. Confirm each control changes Moonlight's Edge-state log:
+9. Optionally, with Moonlight debug logging enabled, confirm each control
+   changes Moonlight's Edge-state log:
    - `PADDLE1`: `DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)`
    - `PADDLE2`: `DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)`
    - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
@@ -151,8 +152,9 @@ If the USB/IP device enumerates but the four controls do not appear, capture
 Apollo logs and the HID inspector output first. If Apollo does not log the
 advertised `[000F0000]` controller-arrival mask, debug the Moonlight/SDL
 mapping path before changing the Windows USB/IP backend. If Apollo logs the
-arrival mask but does not log the per-control state changes, debug the streamed
-input event path before changing the USB descriptor.
+arrival mask but does not log the per-control state changes, enable Moonlight
+debug logging and debug the streamed input event path before changing the USB
+descriptor.
 
 ## Preferred Architecture
 
