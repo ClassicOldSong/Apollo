@@ -237,6 +237,8 @@ The key evidence to capture during validation is:
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
+- Host-side HID/gamepad inspector evidence showing the four Edge paddle/Fn
+  controls as separate inputs, not face-button remaps.
 
 The `scripts/capture-dualsense-edge-evidence.ps1` helper captures the USB/IP
 and Windows PnP side of that evidence. Run it from an elevated shell after
@@ -256,28 +258,41 @@ log files with `-LogPath` to copy them into the same evidence bundle; the log
 manifest records each copied path's source path, destination path, type, last
 write time, and file size when available. If an existing `-OutputDir` is reused,
 the helper clears the previous copied `logs` directory before summarizing logs,
-so stale logs cannot satisfy `-RequirePass`. For draft-ready validation, include
-both logs because the helper requires Moonlight Edge VID/PID, at least `21`
-SDL joystick buttons, mapping, arrival, press, and release evidence plus Apollo
-arrival, import, and state-change evidence. The helper writes
+so stale logs cannot satisfy `-RequirePass`. Pass HID/gamepad inspector exports,
+logs, or screenshots with `-HostInputEvidencePath` to keep the host-visible
+button proof in the same evidence bundle. If the inspector can export text,
+`-HostInputEvidencePattern` can be repeated to require specific regex matches in
+those files; screenshots still require manual review. For draft-ready
+validation, include both logs because the helper requires Moonlight Edge VID/PID,
+at least `21` SDL joystick buttons, mapping, arrival, press, and release
+evidence plus Apollo arrival, import, and state-change evidence. The helper writes
 `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
 `usbip.exe`, requested busid, attach result, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence, including healthy PnP status checks and
-the first matching lines from the captured files. Both summaries end with
+the first matching lines from the captured files. It also writes
+`host-input-evidence-summary.txt`, which lists copied host-input evidence files
+and any optional text-pattern matches. The log and system summaries end with
 `overall=PASS` only when all required checks matched and no stop-condition
 matched. Add `-RequirePass` when collecting draft-ready evidence to make the
 helper exit with a failure if either summary is missing or does not end with
-`overall=PASS`.
+`overall=PASS`. Add `-RequireHostInputEvidence` to also fail when no host-input
+evidence was copied or when a supplied host-input regex pattern did not match.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
   -LogPath 'C:\path\to\apollo.log','C:\path\to\Moonlight.log' `
-  -RequirePass
+  -HostInputEvidencePath 'C:\path\to\hid-inspector-output.txt','C:\path\to\joy-cpl-screenshot.png' `
+  -HostInputEvidencePattern 'PADDLE1|right rear|Button 20' `
+  -HostInputEvidencePattern 'PADDLE2|left rear|Button 19' `
+  -HostInputEvidencePattern 'PADDLE3|right Fn|Button 18' `
+  -HostInputEvidencePattern 'PADDLE4|left Fn|Button 17' `
+  -RequirePass `
+  -RequireHostInputEvidence
 ```
 
 1. Run this Apollo branch on Windows with:
@@ -422,6 +437,9 @@ same end-to-end run:
 - The evidence helper exits successfully with `-RequirePass`; equivalently,
   `log-evidence-summary.txt` and `system-evidence-summary.txt` both end with
   `overall=PASS`.
+- `host-input-evidence-summary.txt` ends with `overall=PASS`, and a reviewer can
+  inspect the copied host-input evidence files to confirm each Edge paddle/Fn
+  control is separate.
 - Moonlight advertises PlayStation arrival type `0x02` and the Edge paddle/Fn
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`

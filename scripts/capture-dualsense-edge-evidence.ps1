@@ -17,9 +17,12 @@ param(
   [string]$BusId = '1-1',
   [string]$OutputDir = (Join-Path $env:TEMP ("apollo-edge-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))),
   [string[]]$LogPath = @(),
+  [string[]]$HostInputEvidencePath = @(),
+  [string[]]$HostInputEvidencePattern = @(),
   [switch]$SkipAttach,
   [int]$PostAttachDelaySeconds = 3,
-  [switch]$RequirePass
+  [switch]$RequirePass,
+  [switch]$RequireHostInputEvidence
 )
 
 $ErrorActionPreference = 'Continue'
@@ -127,14 +130,132 @@ function Get-EvidenceSummaryOverall {
   }
 
   $line = Get-Content -LiteralPath $Path -Tail 20 -ErrorAction SilentlyContinue |
-    Where-Object { $_ -match '^overall=(PASS|FAIL)$' } |
+    Where-Object { $_ -match '^overall=(PASS|FAIL|SKIPPED)$' } |
     Select-Object -Last 1
 
-  if ($line -match '^overall=(PASS|FAIL)$') {
+  if ($line -match '^overall=(PASS|FAIL|SKIPPED)$') {
     return $Matches[1]
   }
 
   return 'MISSING'
+}
+
+function Copy-RequestedHostInputEvidence {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][string[]]$Paths
+  )
+
+  $manifest = New-Object System.Collections.Generic.List[string]
+  $evidenceDir = Join-Path $OutputDir 'host-input'
+  if (Test-Path -LiteralPath $evidenceDir) {
+    Remove-Item -LiteralPath $evidenceDir -Recurse -Force -ErrorAction Stop
+    $manifest.Add("cleared_existing_host_input_dir=$evidenceDir")
+  }
+
+  if ($Paths.Count -eq 0) {
+    $manifest.Add('No host input evidence paths provided. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.')
+    Write-TextFile -Path (Join-Path $OutputDir 'host-input-manifest.txt') -Lines $manifest.ToArray()
+    return
+  }
+
+  New-Item -ItemType Directory -Force -Path $evidenceDir | Out-Null
+
+  for ($i = 0; $i -lt $Paths.Count; $i++) {
+    $source = $Paths[$i]
+    try {
+      $item = Get-Item -LiteralPath $source -ErrorAction Stop
+      $destination = Join-Path $evidenceDir ("{0:D2}-{1}" -f $i, $item.Name)
+      Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force -ErrorAction Stop
+      $manifest.Add("copied[$i]=$($item.FullName) -> $destination")
+      $manifest.Add("copied[$i].type=$(if ($item.PSIsContainer) { 'directory' } else { 'file' })")
+      $manifest.Add("copied[$i].last_write_utc=$($item.LastWriteTimeUtc.ToString('o'))")
+      if (-not $item.PSIsContainer) {
+        $manifest.Add("copied[$i].size_bytes=$($item.Length)")
+      }
+    } catch {
+      $manifest.Add("failed[$i]=$source")
+      $manifest.Add("error[$i]=$($_.Exception.Message)")
+    }
+  }
+
+  Write-TextFile -Path (Join-Path $OutputDir 'host-input-manifest.txt') -Lines $manifest.ToArray()
+}
+
+function Write-HostInputEvidenceSummary {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][string[]]$Patterns,
+    [Parameter(Mandatory = $true)][bool]$Required
+  )
+
+  $summary = New-Object System.Collections.Generic.List[string]
+  $evidenceDir = Join-Path $OutputDir 'host-input'
+
+  if (-not (Test-Path -LiteralPath $evidenceDir)) {
+    $summary.Add('No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.')
+    $summary.Add('')
+    $summary.Add($(if ($Required) { 'overall=FAIL' } else { 'overall=SKIPPED' }))
+    Write-TextFile -Path (Join-Path $OutputDir 'host-input-evidence-summary.txt') -Lines $summary.ToArray()
+    return
+  }
+
+  $files = @(Get-ChildItem -LiteralPath $evidenceDir -Recurse -File -ErrorAction SilentlyContinue)
+  if ($files.Count -eq 0) {
+    $summary.Add('No copied host input evidence files found under the host-input directory.')
+    $summary.Add('')
+    $summary.Add($(if ($Required) { 'overall=FAIL' } else { 'overall=SKIPPED' }))
+    Write-TextFile -Path (Join-Path $OutputDir 'host-input-evidence-summary.txt') -Lines $summary.ToArray()
+    return
+  }
+
+  $hasFailure = $false
+  $summary.Add("host_input_file_count=$($files.Count)")
+  foreach ($file in $files) {
+    $summary.Add("host_input_file=$($file.FullName) last_write_utc=$($file.LastWriteTimeUtc.ToString('o')) size_bytes=$($file.Length)")
+  }
+  $summary.Add('')
+
+  if ($Patterns.Count -eq 0) {
+    $summary.Add('No -HostInputEvidencePattern values provided. A reviewer must manually inspect the copied host-input evidence for four distinct Edge paddle/Fn inputs.')
+  } else {
+    for ($i = 0; $i -lt $Patterns.Count; $i++) {
+      $pattern = $Patterns[$i]
+      $matches = New-Object System.Collections.Generic.List[string]
+
+      foreach ($file in $files) {
+        try {
+          Select-String -LiteralPath $file.FullName -Pattern $pattern -ErrorAction Stop |
+            Select-Object -First 20 |
+            ForEach-Object {
+              $matches.Add(("{0}:{1}: {2}" -f $file.Name, $_.LineNumber, $_.Line.Trim()))
+            }
+        } catch {
+          $summary.Add(("{0}: ERROR reading host input evidence for pattern[{1}]: {2}" -f $file.Name, $i, $_.Exception.Message))
+        }
+      }
+
+      if ($matches.Count -gt 0) {
+        $summary.Add("MATCH: host input pattern[$i] $pattern")
+      } else {
+        $hasFailure = $true
+        $summary.Add("MISSING: host input pattern[$i] $pattern")
+      }
+
+      foreach ($match in $matches) {
+        $summary.Add("  $match")
+      }
+    }
+  }
+
+  $summary.Add('')
+  if ($hasFailure) {
+    $summary.Add('overall=FAIL')
+  } else {
+    $summary.Add('overall=PASS')
+  }
+
+  Write-TextFile -Path (Join-Path $OutputDir 'host-input-evidence-summary.txt') -Lines $summary.ToArray()
 }
 
 function Write-LogEvidenceSummary {
@@ -346,13 +467,18 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "port=$Port",
   "busid=$BusId",
   "log_path_count=$($LogPath.Count)",
+  "host_input_evidence_path_count=$($HostInputEvidencePath.Count)",
+  "host_input_evidence_pattern_count=$($HostInputEvidencePattern.Count)",
   "skip_attach=$SkipAttach",
   "require_pass=$RequirePass",
+  "require_host_input_evidence=$RequireHostInputEvidence",
   "powershell=$($PSVersionTable.PSVersion)"
 )
 
 Copy-RequestedLogs -OutputDir $OutputDir -Paths $LogPath
+Copy-RequestedHostInputEvidence -OutputDir $OutputDir -Paths $HostInputEvidencePath
 Write-LogEvidenceSummary -OutputDir $OutputDir
+Write-HostInputEvidenceSummary -OutputDir $OutputDir -Patterns $HostInputEvidencePattern -Required ([bool]$RequireHostInputEvidence)
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-command.txt') -Script {
   Get-Command usbip.exe -ErrorAction Stop | Format-List Name,Source,Version
@@ -518,13 +644,20 @@ Write-SystemEvidenceSummary -OutputDir $OutputDir -HostAddress $HostAddress -Por
 
 $logEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'log-evidence-summary.txt')
 $systemEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'system-evidence-summary.txt')
+$hostInputEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'host-input-evidence-summary.txt')
 
 Write-Host "Evidence written to $OutputDir"
 Write-Host "Attach skipped: $SkipAttach"
 Write-Host "Log evidence overall: $logEvidenceOverall"
 Write-Host "System evidence overall: $systemEvidenceOverall"
+Write-Host "Host input evidence overall: $hostInputEvidenceOverall"
 
 if ($RequirePass -and ($logEvidenceOverall -ne 'PASS' -or $systemEvidenceOverall -ne 'PASS')) {
   Write-Error "DualSense Edge evidence validation failed. Expected log and system summaries to end with overall=PASS."
+  exit 1
+}
+
+if ($RequireHostInputEvidence -and $hostInputEvidenceOverall -ne 'PASS') {
+  Write-Error "DualSense Edge host input evidence validation failed. Expected host-input evidence summary to end with overall=PASS."
   exit 1
 }
