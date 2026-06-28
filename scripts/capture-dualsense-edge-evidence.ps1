@@ -394,11 +394,35 @@ function Write-LogEvidenceSummary {
   $edgeMappingVariantPattern =
     '(?s)(?:(?=.*DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17)|' +
     '(?=.*DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13))'
+  $moonlightCompleteLogPattern =
+    $edgeMappingVariantPattern +
+    '(?=.*DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\))' +
+    '(?=.*DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13))' +
+    '(?=.*(Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present))' +
+    '(?=.*DualSense Edge PADDLE1 pressed \(paddle/Fn flags: 0x00010000\))' +
+    '(?=.*DualSense Edge PADDLE2 pressed \(paddle/Fn flags: 0x00020000\))' +
+    '(?=.*DualSense Edge PADDLE3 pressed \(paddle/Fn flags: 0x00040000\))' +
+    '(?=.*DualSense Edge PADDLE4 pressed \(paddle/Fn flags: 0x00080000\))' +
+    '(?=.*DualSense Edge PADDLE1 released \(paddle/Fn flags: 0x00000000\))' +
+    '(?=.*DualSense Edge PADDLE2 released \(paddle/Fn flags: 0x00000000\))' +
+    '(?=.*DualSense Edge PADDLE3 released \(paddle/Fn flags: 0x00000000\))' +
+    '(?=.*DualSense Edge PADDLE4 released \(paddle/Fn flags: 0x00000000\))'
+  $apolloCompleteLogPattern =
+    '(?s)(?=.*DualSense Edge USB/IP backend is listening on 127\.0\.0\.1:3240)' +
+    '(?=.*will be DualSense Edge controller \(experimental USB/IP\))' +
+    '(?=.*reported DualSense Edge arrival type \[02\] and paddle/Fn buttons \[000F0000\])' +
+    '(?=.*DualSense Edge USB/IP: client imported virtual controller)' +
+    '(?=.*DualSense Edge paddle/Fn state changed \[00010000\])' +
+    '(?=.*DualSense Edge paddle/Fn state changed \[00020000\])' +
+    '(?=.*DualSense Edge paddle/Fn state changed \[00040000\])' +
+    '(?=.*DualSense Edge paddle/Fn state changed \[00080000\])' +
+    '(?=(.*DualSense Edge paddle/Fn state changed \[00000000\]){4})'
 
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge VID/PID'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*VID/PID: 0x054c/0x0df2' },
     @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = $edgeRawButtonCountPattern },
-    @{ Name = 'Moonlight raw-button count matches selected Edge binding variant'; Required = $true; Stop = $false; Pattern = $edgeMappingVariantPattern; SameLog = $true },
+    @{ Name = 'Moonlight raw-button count matches selected Edge binding variant'; Required = $true; Stop = $false; Pattern = $edgeMappingVariantPattern; SameLog = $true; MatchMessage = 'mapping variant is internally consistent' },
+    @{ Name = 'Moonlight complete Edge software evidence comes from one copied log'; Required = $true; Stop = $false; Pattern = $moonlightCompleteLogPattern; SameLog = $true; MatchMessage = 'complete Moonlight Edge evidence found in one log' },
     @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13)' },
@@ -414,6 +438,7 @@ function Write-LogEvidenceSummary {
     @{ Name = 'Apollo accepted Edge allocation'; Required = $true; Stop = $false; Pattern = 'will be DualSense Edge controller \(experimental USB/IP\)' },
     @{ Name = 'Apollo received PlayStation Edge arrival and full paddle/Fn mask'; Required = $true; Stop = $false; Pattern = 'reported DualSense Edge arrival type \[02\] and paddle/Fn buttons \[000F0000\]' },
     @{ Name = 'Apollo USB/IP import observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge USB/IP: client imported virtual controller' },
+    @{ Name = 'Apollo complete Edge host evidence comes from one copied log'; Required = $true; Stop = $false; Pattern = $apolloCompleteLogPattern; SameLog = $true; MatchMessage = 'complete Apollo Edge evidence found in one log' },
     @{ Name = 'Apollo PADDLE1 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00010000\]' },
     @{ Name = 'Apollo PADDLE2 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00020000\]' },
     @{ Name = 'Apollo PADDLE3 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00040000\]' },
@@ -454,7 +479,11 @@ function Write-LogEvidenceSummary {
     if ($check.ContainsKey('SameLog') -and $check['SameLog']) {
       foreach ($logText in $logTexts) {
         if ([regex]::IsMatch($logText.Content, $check['Pattern'])) {
-          $matches.Add("$($logText.Name): mapping variant is internally consistent")
+          $message = 'same-log evidence matched'
+          if ($check.ContainsKey('MatchMessage')) {
+            $message = $check['MatchMessage']
+          }
+          $matches.Add("$($logText.Name): $message")
         }
       }
     } else {

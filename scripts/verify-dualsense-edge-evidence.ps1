@@ -262,6 +262,83 @@ function Test-LogSummarySplitVariantEvidence {
   }
 }
 
+function Write-TestSplitApolloEvidenceLog {
+  param(
+    [Parameter(Mandatory = $true)][string] $OutputDir,
+    [Parameter(Mandatory = $true)][string] $DetectionLine,
+    [Parameter(Mandatory = $true)][string] $BindingsLine,
+    [Parameter(Mandatory = $true)][string] $MappingLine
+  )
+
+  $logDir = Join-Path $OutputDir 'logs'
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+  @(
+    $DetectionLine,
+    $MappingLine,
+    $BindingsLine,
+    'DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)',
+    'DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)',
+    'DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)',
+    'DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)',
+    'DualSense Edge PADDLE1 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE2 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE3 released (paddle/Fn flags: 0x00000000)',
+    'DualSense Edge PADDLE4 released (paddle/Fn flags: 0x00000000)'
+  ) | Set-Content -LiteralPath (Join-Path $logDir 'moonlight.log') -Encoding utf8
+
+  @(
+    'DualSense Edge USB/IP backend is listening on 127.0.0.1:3240',
+    'Gamepad 0 will be DualSense Edge controller (experimental USB/IP)',
+    'Gamepad 0 reported DualSense Edge arrival type [02] and paddle/Fn buttons [000F0000]',
+    'DualSense Edge USB/IP: client imported virtual controller'
+  ) | Set-Content -LiteralPath (Join-Path $logDir 'apollo-setup.log') -Encoding utf8
+
+  @(
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00010000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00020000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00040000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00080000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]',
+    'Gamepad 0 DualSense Edge paddle/Fn state changed [00000000]'
+  ) | Set-Content -LiteralPath (Join-Path $logDir 'apollo-states.log') -Encoding utf8
+}
+
+function Test-LogSummarySplitApolloEvidence {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [Parameter(Mandatory = $true)][string] $DetectionLine,
+    [Parameter(Mandatory = $true)][string] $BindingsLine,
+    [Parameter(Mandatory = $true)][string] $MappingLine
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  try {
+    Write-TestSplitApolloEvidenceLog `
+      -OutputDir $outputDir `
+      -DetectionLine $DetectionLine `
+      -BindingsLine $BindingsLine `
+      -MappingLine $MappingLine
+
+    Write-LogEvidenceSummary -OutputDir $outputDir
+
+    $summaryPath = Join-Path $outputDir 'log-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne 'FAIL') {
+      Write-Host $summary
+      throw "$Name expected overall=FAIL, got overall=$overall"
+    }
+    Assert-Contains -Content $summary -Needle 'MISSING: Apollo complete Edge host evidence comes from one copied log' -CaseName $Name
+  } finally {
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 function Test-HostInputSummary {
   param(
     [Parameter(Mandatory = $true)][string] $Name,
@@ -627,6 +704,12 @@ Test-LogSummarySplitVariantEvidence `
   -DetectionLine $sdl2Detection `
   -BindingsLine $sdl2Bindings `
   -MappingLine $sdl2Mapping
+
+Test-LogSummarySplitApolloEvidence `
+  -Name 'split-apollo-evidence-fail' `
+  -DetectionLine $sdl3Detection `
+  -BindingsLine $sdl3Bindings `
+  -MappingLine $sdl3Mapping
 
 Test-LogSummary `
   -Name 'sdl2-undercount-fail' `
