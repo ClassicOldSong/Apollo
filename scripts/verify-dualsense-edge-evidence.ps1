@@ -178,6 +178,8 @@ $sdl2UndercountDetection = 'DualSense Edge detected with 20 SDL joystick buttons
 $sdl3Detection = 'DualSense Edge detected with 17 SDL joystick buttons (need 17 for SDL3/sdl2-compat Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL 2.32.70, SDL3 3.4.11)'
 $sdl3Bindings = 'DualSense Edge arrival support: buttons=17 sdlType=3 arrivalType=0x02 supportedButtonFlags=0x000f0000 paddle/Fn=0x000f0000 capabilities=0x00000000 bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13'
 $sdl3Mapping = 'Applied DualSense Edge paddle mappings (updated): paddle1:b16,paddle2:b15,paddle3:b14,paddle4:b13'
+$sdl3UndercountDetection = 'DualSense Edge detected with 16 SDL joystick buttons (need 17 for SDL3/sdl2-compat Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL 2.32.70, SDL3 3.4.11)'
+$sdl3WrongBindings = 'DualSense Edge arrival support: buttons=17 sdlType=3 arrivalType=0x02 supportedButtonFlags=0x000f0000 paddle/Fn=0x000f0000 capabilities=0x00000000 bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b12'
 
 Test-LogSummary `
   -Name 'sdl2-pass' `
@@ -201,6 +203,26 @@ Test-LogSummary `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
     'MISSING: Moonlight exposed enough Edge raw buttons'
+  )
+
+Test-LogSummary `
+  -Name 'sdl3compat-undercount-fail' `
+  -DetectionLine $sdl3UndercountDetection `
+  -BindingsLine $sdl3Bindings `
+  -MappingLine $sdl3Mapping `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: Moonlight exposed enough Edge raw buttons'
+  )
+
+Test-LogSummary `
+  -Name 'sdl3compat-wrong-bindings-fail' `
+  -DetectionLine $sdl3Detection `
+  -BindingsLine $sdl3WrongBindings `
+  -MappingLine $sdl3Mapping `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'
   )
 
 Test-LogSummary `
