@@ -79,6 +79,16 @@ TEST(UsbIpTests, ParsesUsbIpOpCommonHeader) {
   EXPECT_EQ(common.status, 0);
 }
 
+TEST(UsbIpTests, ReadHelpersHandleShortBuffers) {
+  const std::array<std::uint8_t, 3> bytes {0x01, 0x02, 0x03};
+
+  EXPECT_TRUE(platf::usbip::has_bytes(bytes, 1, 2));
+  EXPECT_FALSE(platf::usbip::has_bytes(bytes, 2, 2));
+  EXPECT_EQ(platf::usbip::read_be16(bytes, 2), 0);
+  EXPECT_EQ(platf::usbip::read_be32(bytes, 0), 0);
+  EXPECT_EQ(platf::usbip::read_fixed_string(bytes, 4, 2), "");
+}
+
 TEST(UsbIpTests, ParsesUsbIpImportRequestBusId) {
   std::vector<std::uint8_t> request;
   platf::usbip::append_be16(request, platf::usbip::VERSION);
@@ -194,6 +204,28 @@ TEST(UsbIpTests, ParsesSubmitRequestWithControlSetupPacket) {
   EXPECT_EQ(setup.request, platf::usb::REQUEST_GET_DESCRIPTOR);
   EXPECT_EQ(platf::usb::descriptor_type(setup.value), platf::usb::DESCRIPTOR_HID_REPORT);
   EXPECT_EQ(setup.length, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+}
+
+TEST(UsbIpTests, ParsesShortSubmitRequestWithoutReadingSetup) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_basic_header(
+    request,
+    platf::usbip::command::cmd_submit,
+    0x10203040,
+    0x50607080,
+    platf::usbip::direction::in,
+    0
+  );
+
+  ASSERT_EQ(request.size(), platf::usbip::BASIC_HEADER_SIZE);
+
+  const auto parsed = platf::usbip::parse_submit_request(request);
+
+  EXPECT_EQ(parsed.header.command_code, platf::usbip::command::cmd_submit);
+  EXPECT_EQ(parsed.header.seqnum, 0x10203040);
+  EXPECT_EQ(parsed.header.devid, 0x50607080);
+  EXPECT_EQ(parsed.transfer_buffer_length, 0);
+  EXPECT_EQ(parsed.setup, (std::array<std::uint8_t, 8> {}));
 }
 
 TEST(UsbIpTests, ParsesUnlinkRequest) {

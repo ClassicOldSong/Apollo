@@ -126,12 +126,24 @@ namespace platf::usbip {
     out.push_back(static_cast<std::uint8_t>(value & 0xFF));
   }
 
+  inline bool has_bytes(std::span<const std::uint8_t> data, std::size_t offset, std::size_t size) {
+    return offset <= data.size() && size <= data.size() - offset;
+  }
+
   inline std::uint16_t read_be16(std::span<const std::uint8_t> data, std::size_t offset) {
+    if (!has_bytes(data, offset, 2)) {
+      return 0;
+    }
+
     return static_cast<std::uint16_t>((static_cast<std::uint16_t>(data[offset]) << 8) |
                                       static_cast<std::uint16_t>(data[offset + 1]));
   }
 
   inline std::uint32_t read_be32(std::span<const std::uint8_t> data, std::size_t offset) {
+    if (!has_bytes(data, offset, 4)) {
+      return 0;
+    }
+
     return (static_cast<std::uint32_t>(data[offset]) << 24) |
            (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
            (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
@@ -139,6 +151,11 @@ namespace platf::usbip {
   }
 
   inline std::string read_fixed_string(std::span<const std::uint8_t> data, std::size_t offset, std::size_t width) {
+    if (offset >= data.size() || width == 0) {
+      return {};
+    }
+
+    width = std::min(width, data.size() - offset);
     std::size_t end = offset;
     while (end < offset + width && data[end] != 0) {
       ++end;
@@ -183,7 +200,9 @@ namespace platf::usbip {
       .setup = {},
     };
 
-    std::copy_n(data.begin() + 40, request.setup.size(), request.setup.begin());
+    if (has_bytes(data, 40, request.setup.size())) {
+      std::copy_n(data.begin() + 40, request.setup.size(), request.setup.begin());
+    }
 
     return request;
   }

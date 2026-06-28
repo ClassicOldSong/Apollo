@@ -73,6 +73,10 @@ namespace platf::dualsense_usbip {
   }
 
   inline std::vector<std::uint8_t> handle_op_request(std::span<const std::uint8_t> request) {
+    if (!usbip::has_bytes(request, 0, usbip::OP_COMMON_SIZE)) {
+      return {};
+    }
+
     const auto common = usbip::parse_op_common(request);
 
     if (common.version != usbip::VERSION) {
@@ -84,6 +88,10 @@ namespace platf::dualsense_usbip {
         return make_devlist_reply();
 
       case usbip::op_code::req_import:
+        if (!usbip::has_bytes(request, 0, usbip::OP_COMMON_SIZE + usbip::USB_DEVICE_BUSID_SIZE)) {
+          return {};
+        }
+
         if (usbip::parse_import_request(request).busid == BUSID) {
           return make_import_reply();
         }

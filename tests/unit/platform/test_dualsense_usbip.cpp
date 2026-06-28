@@ -138,6 +138,21 @@ TEST(DualSenseUsbIpTests, RejectsUsbIpImportRequestForDifferentBusId) {
   EXPECT_EQ(platf::usbip::read_be32(reply, 4), 1);
 }
 
+TEST(DualSenseUsbIpTests, RejectsShortOpRequests) {
+  std::vector<std::uint8_t> short_common {
+    0x01,
+    0x11,
+    0x80,
+  };
+  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(short_common).empty());
+
+  std::vector<std::uint8_t> short_import;
+  platf::usbip::append_be16(short_import, platf::usbip::VERSION);
+  platf::usbip::append_be16(short_import, static_cast<std::uint16_t>(platf::usbip::op_code::req_import));
+  platf::usbip::append_be32(short_import, 0);
+  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(short_import).empty());
+}
+
 TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
   const auto request = submit_request(
     11,
