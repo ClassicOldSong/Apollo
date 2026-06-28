@@ -609,10 +609,12 @@ namespace platf {
     input_t result {new input_raw_t {}};
     auto &raw = *(input_raw_t *) result.get();
 
-    raw.vigem = new vigem_t {};
-    if (raw.vigem->init(config::input.gamepad != "ds5-edge"sv)) {
-      delete raw.vigem;
-      raw.vigem = nullptr;
+    if (config::input.gamepad != "ds5-edge"sv) {
+      raw.vigem = new vigem_t {};
+      if (raw.vigem->init()) {
+        delete raw.vigem;
+        raw.vigem = nullptr;
+      }
     }
 
     // Get pointers to virtual touch/pen input functions (Win10 1809+)

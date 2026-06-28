@@ -177,6 +177,8 @@ reports are sized according to the Edge HID descriptor and return zero-filled
 payloads with the requested report ID. HID control `SET_REPORT` is only accepted
 for the Edge output report (`type=output`, report ID `0x02`); unsupported HID
 input/feature writes still stall instead of being acknowledged as handled.
+When this mode is selected, Apollo does not initialize or probe ViGEmBus at
+startup because the Edge backend does not use the X360/DS4 ViGEm targets.
 
 ## Manual Windows Test Flow
 
