@@ -257,7 +257,8 @@ Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper always writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
 `usbip.exe`, requested busid, attach result, and Windows PnP
-`VID_054C&PID_0DF2` / `MI_03` evidence.
+`VID_054C&PID_0DF2` / `MI_03` evidence, including the first matching lines from
+the captured files.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
 

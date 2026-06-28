@@ -185,23 +185,6 @@ function Write-LogEvidenceSummary {
   Write-TextFile -Path (Join-Path $OutputDir 'log-evidence-summary.txt') -Lines $summary.ToArray()
 }
 
-function Test-CapturedFilePattern {
-  param(
-    [Parameter(Mandatory = $true)][string]$Path,
-    [Parameter(Mandatory = $true)][string]$Pattern
-  )
-
-  if (-not (Test-Path -LiteralPath $Path)) {
-    return $false
-  }
-
-  try {
-    return [bool](Select-String -LiteralPath $Path -Pattern $Pattern -Quiet -ErrorAction Stop)
-  } catch {
-    return $false
-  }
-}
-
 function Write-SystemEvidenceSummary {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
@@ -235,9 +218,21 @@ function Write-SystemEvidenceSummary {
 
   foreach ($check in $checks) {
     $path = Join-Path $OutputDir $check['Path']
-    $matched = Test-CapturedFilePattern -Path $path -Pattern $check['Pattern']
+    $matches = New-Object System.Collections.Generic.List[string]
 
-    if ($matched) {
+    if (Test-Path -LiteralPath $path) {
+      try {
+        Select-String -LiteralPath $path -Pattern $check['Pattern'] -ErrorAction Stop |
+          Select-Object -First 10 |
+          ForEach-Object {
+            $matches.Add(("{0}:{1}: {2}" -f $check['Path'], $_.LineNumber, $_.Line.Trim()))
+          }
+      } catch {
+        $summary.Add(("{0}: ERROR reading capture for {1}: {2}" -f $check['Path'], $check['Name'], $_.Exception.Message))
+      }
+    }
+
+    if ($matches.Count -gt 0) {
       $summary.Add("MATCH: $($check['Name'])")
     } elseif ($check['Required']) {
       $summary.Add("MISSING: $($check['Name'])")
@@ -246,6 +241,9 @@ function Write-SystemEvidenceSummary {
     }
 
     $summary.Add("  file=$path")
+    foreach ($match in $matches) {
+      $summary.Add("  $match")
+    }
   }
 
   Write-TextFile -Path (Join-Path $OutputDir 'system-evidence-summary.txt') -Lines $summary.ToArray()
