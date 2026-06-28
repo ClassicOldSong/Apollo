@@ -189,6 +189,20 @@ TEST(DualSenseUsbIpTests, RejectsShortOpRequests) {
   EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(short_import).empty());
 }
 
+TEST(DualSenseUsbIpTests, RejectsUnsupportedUsbIpOpRequests) {
+  std::vector<std::uint8_t> wrong_version;
+  platf::usbip::append_be16(wrong_version, 0x0110);
+  platf::usbip::append_be16(wrong_version, static_cast<std::uint16_t>(platf::usbip::op_code::req_devlist));
+  platf::usbip::append_be32(wrong_version, 0);
+  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(wrong_version).empty());
+
+  std::vector<std::uint8_t> unknown_op;
+  platf::usbip::append_be16(unknown_op, platf::usbip::VERSION);
+  platf::usbip::append_be16(unknown_op, 0x8000);
+  platf::usbip::append_be32(unknown_op, 0);
+  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(unknown_op).empty());
+}
+
 TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
   const auto request = submit_request(
     11,
