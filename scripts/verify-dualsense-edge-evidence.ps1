@@ -240,6 +240,25 @@ Test-LogSummary `
     'STOP_MATCH: STOP: Apollo combined Edge paddle/Fn state during one-at-a-time validation'
   )
 
+Test-LogSummary `
+  -Name 'stop-condition-fail' `
+  -DetectionLine $sdl3Detection `
+  -BindingsLine $sdl3Bindings `
+  -MappingLine $sdl3Mapping `
+  -ExpectedOverall 'FAIL' `
+  -ExtraLines @(
+    'DualSense Edge paddle mapping update did not expose the expected paddle controller bindings (actual: paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b12)',
+    'Ignoring DualSense Edge controller button a bound to raw paddle1:b16 as stale Edge raw alias',
+    'DualSense Edge controller button b is bound to raw paddle2:b15; not advertising it as a normal button',
+    'Gamepad 0 is using DualSense Edge mode, but the client did not report a PlayStation controller with all Edge paddle/Fn buttons (type [02], paddle/Fn [00070000]); refusing to allocate virtual Edge controller.'
+  ) `
+  -ExpectedSummaryLines @(
+    'STOP_MATCH: STOP: Moonlight mapping did not expose expected paddle controller bindings',
+    'STOP_MATCH: STOP: Moonlight stale Edge raw alias suppressed',
+    'STOP_MATCH: STOP: Moonlight capability alias filtered',
+    'STOP_MATCH: STOP: Apollo refused Edge allocation'
+  )
+
 Test-HostInputSummary `
   -Name 'host-input-stop-pass' `
   -Lines @(
