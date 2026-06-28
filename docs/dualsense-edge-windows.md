@@ -282,7 +282,9 @@ controller is already attached and only the PnP evidence should be refreshed.
      `DualSense Edge paddle mapping add did not expose the expected paddle
      controller bindings`; that means SDL still is not reporting the
      Edge-specific controls at the expected controller-button layer bindings.
-   - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...`
+     Capture the warning's `actual:` binding summary with the Moonlight log.
+   - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...
+     bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17`
 4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
