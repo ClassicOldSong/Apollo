@@ -339,6 +339,78 @@ TEST(DualSenseReportTests, DefinesCapturedDualSenseEdgeCompositeConfiguration) {
   EXPECT_EQ(platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_INTERVAL_MS, 1);
 }
 
+TEST(DualSenseReportTests, CapturedDualSenseEdgeConfigurationDescriptorWalksCleanly) {
+  const auto &config = platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
+  const auto total_length = config[2] | (config[3] << 8);
+  std::size_t offset = 0;
+  int interface_descriptors = 0;
+  int endpoint_descriptors = 0;
+  int hid_descriptors = 0;
+  bool found_hid_interface = false;
+  bool found_hid_interrupt_in = false;
+  bool found_hid_interrupt_out = false;
+
+  ASSERT_EQ(config.size(), total_length);
+
+  while (offset < config.size()) {
+    ASSERT_LE(offset + 2, config.size());
+    const auto length = config[offset];
+    const auto descriptor_type = config[offset + 1];
+
+    ASSERT_GE(length, 2);
+    ASSERT_LE(offset + length, config.size());
+
+    if (descriptor_type == 0x04) {
+      ASSERT_GE(length, 9);
+      interface_descriptors++;
+
+      if (config[offset + 2] == platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID) {
+        EXPECT_EQ(config[offset + 3], 0);
+        EXPECT_EQ(config[offset + 4], 2);
+        EXPECT_EQ(config[offset + 5], 0x03);
+        found_hid_interface = true;
+      }
+    }
+    else if (descriptor_type == platf::usb::DESCRIPTOR_HID) {
+      ASSERT_GE(length, 9);
+      hid_descriptors++;
+      EXPECT_EQ(offset, platf::dualsense::DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET);
+      EXPECT_EQ(config[offset + 6], platf::usb::DESCRIPTOR_HID_REPORT);
+      EXPECT_EQ(
+        config[offset + 7] | (config[offset + 8] << 8),
+        platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE
+      );
+    }
+    else if (descriptor_type == 0x05) {
+      ASSERT_GE(length, 7);
+      endpoint_descriptors++;
+
+      if (config[offset + 2] == platf::dualsense::USB_ENDPOINT_IN) {
+        EXPECT_EQ(config[offset + 3], 0x03);
+        EXPECT_EQ(config[offset + 4] | (config[offset + 5] << 8), platf::dualsense::INPUT_REPORT_USB_SIZE);
+        EXPECT_EQ(config[offset + 6], platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_INTERVAL);
+        found_hid_interrupt_in = true;
+      }
+      else if (config[offset + 2] == platf::dualsense::USB_ENDPOINT_OUT) {
+        EXPECT_EQ(config[offset + 3], 0x03);
+        EXPECT_EQ(config[offset + 4] | (config[offset + 5] << 8), platf::dualsense::OUTPUT_REPORT_USB_SIZE);
+        EXPECT_EQ(config[offset + 6], platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_OUT_INTERVAL);
+        found_hid_interrupt_out = true;
+      }
+    }
+
+    offset += length;
+  }
+
+  EXPECT_EQ(offset, config.size());
+  EXPECT_EQ(interface_descriptors, 6);
+  EXPECT_EQ(endpoint_descriptors, 4);
+  EXPECT_EQ(hid_descriptors, 1);
+  EXPECT_TRUE(found_hid_interface);
+  EXPECT_TRUE(found_hid_interrupt_in);
+  EXPECT_TRUE(found_hid_interrupt_out);
+}
+
 TEST(DualSenseReportTests, DefinesDualSenseEdgeHidReportDescriptor) {
   const auto &descriptor = platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
 
