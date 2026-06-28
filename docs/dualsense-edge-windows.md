@@ -123,7 +123,9 @@ captured composite USB configuration so the gamepad HID interface appears as
 `MI_03`, while unsupported audio interfaces are descriptor-only. Unsupported
 non-HID endpoint submissions are bounded and rejected without tearing down the
 HID controller session, and HID descriptors/reports are only served for
-interface 3. A Windows host still needs `usbip-win2` attached to that busid so
+interface 3. Unsupported control requests return a USB/IP stall status instead
+of being acknowledged as successful zero-length transfers. A Windows host still
+needs `usbip-win2` attached to that busid so
 the signed virtual USB host controller enumerates the device. The backend is
 separate from ViGEm, so the existing `auto`, `x360`, and `ds4` paths remain
 unchanged.

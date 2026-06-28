@@ -554,6 +554,16 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     (std::vector<std::uint8_t> {1, 0})
   );
   EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      standard_interface_in,
+      platf::usb::REQUEST_GET_STATUS,
+      0,
+      2,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )),
+    (std::vector<std::uint8_t> {0, 0})
+  );
+  EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_CONFIGURATION, 0, 1)),
     (std::vector<std::uint8_t> {1})
   );

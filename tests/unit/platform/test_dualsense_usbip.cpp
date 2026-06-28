@@ -206,6 +206,7 @@ TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
   EXPECT_EQ(platf::usbip::read_be32(reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
   EXPECT_EQ(platf::usbip::read_be32(reply, 4), 11);
   EXPECT_EQ(platf::usbip::read_be32(reply, 8), 7);
+  EXPECT_EQ(platf::usbip::read_be32(reply, 20), 0);
   EXPECT_EQ(platf::usbip::read_be32(reply, 24), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   ASSERT_EQ(payload.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   EXPECT_EQ(payload.front(), 0x05);
@@ -265,6 +266,40 @@ TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeInputReport) {
   EXPECT_EQ(payload[8], platf::dualsense::HAT_NONE);
   EXPECT_EQ(payload[33], 0x80);
   EXPECT_EQ(payload[37], 0x80);
+}
+
+TEST(DualSenseUsbIpTests, ReturnsControlStallForUnsupportedEdgeControlRequests) {
+  const auto wrong_interface = platf::dualsense_usbip::make_control_submit_reply(submit_request(
+    14,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    9,
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID,
+      9,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_CONTROL
+    )
+  ));
+
+  EXPECT_EQ(platf::usbip::read_be32(wrong_interface, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(wrong_interface, 4), 14);
+  EXPECT_EQ(platf::usbip::read_be32(wrong_interface, 20), static_cast<std::uint32_t>(platf::dualsense_usbip::CONTROL_STALL_STATUS));
+  EXPECT_EQ(platf::usbip::read_be32(wrong_interface, 24), 0);
+  EXPECT_TRUE(submit_payload(wrong_interface).empty());
+
+  const auto unknown_feature = platf::dualsense_usbip::make_control_submit_reply(submit_request(
+    15,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    64,
+    get_report_setup(platf::usb::HID_REPORT_TYPE_FEATURE, 0x99, 64)
+  ));
+
+  EXPECT_EQ(platf::usbip::read_be32(unknown_feature, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(unknown_feature, 4), 15);
+  EXPECT_EQ(platf::usbip::read_be32(unknown_feature, 20), static_cast<std::uint32_t>(platf::dualsense_usbip::CONTROL_STALL_STATUS));
+  EXPECT_EQ(platf::usbip::read_be32(unknown_feature, 24), 0);
+  EXPECT_TRUE(submit_payload(unknown_feature).empty());
 }
 
 TEST(DualSenseUsbIpTests, BuildsInterruptInSubmitReplyWithEdgeButtons) {

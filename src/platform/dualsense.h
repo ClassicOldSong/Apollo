@@ -220,6 +220,11 @@ namespace platf::dualsense {
     std::uint8_t lightbar_blue;
   };
 
+  struct control_response_t {
+    bool handled;
+    std::vector<std::uint8_t> payload;
+  };
+
   static_assert(sizeof(input_report_t) == INPUT_REPORT_BODY_SIZE);
   static_assert(sizeof(usb_input_report_t) == INPUT_REPORT_USB_SIZE);
 
@@ -545,8 +550,30 @@ namespace platf::dualsense {
     return report;
   }
 
-  inline std::vector<std::uint8_t> dualsense_edge_control_response(const usb::setup_packet_t &setup) {
+  inline control_response_t handled_control_response(std::span<const std::uint8_t> payload, std::uint16_t requested_length) {
+    return control_response_t {
+      .handled = true,
+      .payload = usb::limited_response(payload, requested_length),
+    };
+  }
+
+  inline control_response_t handled_empty_control_response() {
+    return control_response_t {
+      .handled = true,
+      .payload = {},
+    };
+  }
+
+  inline control_response_t unsupported_control_response() {
+    return control_response_t {
+      .handled = false,
+      .payload = {},
+    };
+  }
+
+  inline control_response_t dualsense_edge_control_transfer_response(const usb::setup_packet_t &setup) {
     static constexpr std::array<std::uint8_t, 2> STATUS_SELF_POWERED {1, 0};
+    static constexpr std::array<std::uint8_t, 2> STATUS_INTERFACE {0, 0};
     static constexpr std::array<std::uint8_t, 1> CONFIGURATION_ACTIVE {1};
     static constexpr std::array<std::uint8_t, 1> INTERFACE_ALTERNATE_SETTING {0};
     static constexpr std::array<std::uint8_t, 1> HID_IDLE_RATE {0};
@@ -555,60 +582,84 @@ namespace platf::dualsense {
     if (usb::setup_type(setup.request_type) == usb::REQUEST_TYPE_STANDARD) {
       switch (setup.request) {
         case usb::REQUEST_GET_STATUS:
-          if (usb::setup_is_in(setup.request_type)) {
-            return usb::limited_response(STATUS_SELF_POWERED, setup.length);
+          if (!usb::setup_is_in(setup.request_type)) {
+            return unsupported_control_response();
           }
-          return {};
+          if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
+            return handled_control_response(STATUS_SELF_POWERED, setup.length);
+          }
+          if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+            return handled_control_response(STATUS_INTERFACE, setup.length);
+          }
+          return unsupported_control_response();
 
         case usb::REQUEST_GET_DESCRIPTOR: {
           if (!usb::setup_is_in(setup.request_type)) {
-            return {};
+            return unsupported_control_response();
           }
 
           const auto type = usb::descriptor_type(setup.value);
           if (type == usb::DESCRIPTOR_STRING) {
-            return usb::limited_response(dualsense_edge_string_descriptor(usb::descriptor_index(setup.value)), setup.length);
+            const auto descriptor = dualsense_edge_string_descriptor(usb::descriptor_index(setup.value));
+            if (descriptor.empty()) {
+              return unsupported_control_response();
+            }
+
+            return handled_control_response(descriptor, setup.length);
           }
 
           if (dualsense_edge_descriptor_is_interface_scoped(type)) {
             if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_INTERFACE ||
                 !dualsense_edge_targets_hid_interface(setup.index)) {
-              return {};
+              return unsupported_control_response();
             }
           }
 
-          return usb::limited_response(dualsense_edge_descriptor(type), setup.length);
+          const auto descriptor = dualsense_edge_descriptor(type);
+          if (descriptor.empty()) {
+            return unsupported_control_response();
+          }
+
+          return handled_control_response(descriptor, setup.length);
         }
 
         case usb::REQUEST_GET_CONFIGURATION:
           if (usb::setup_is_in(setup.request_type) &&
               usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
-            return usb::limited_response(CONFIGURATION_ACTIVE, setup.length);
+            return handled_control_response(CONFIGURATION_ACTIVE, setup.length);
           }
-          return {};
+          return unsupported_control_response();
 
         case usb::REQUEST_SET_CONFIGURATION:
-          return {};
+          if (!usb::setup_is_in(setup.request_type) &&
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
+            return handled_empty_control_response();
+          }
+          return unsupported_control_response();
 
         case usb::REQUEST_GET_INTERFACE:
           if (usb::setup_is_in(setup.request_type) &&
               usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
-            return usb::limited_response(INTERFACE_ALTERNATE_SETTING, setup.length);
+            return handled_control_response(INTERFACE_ALTERNATE_SETTING, setup.length);
           }
-          return {};
+          return unsupported_control_response();
 
         case usb::REQUEST_SET_INTERFACE:
-          return {};
+          if (!usb::setup_is_in(setup.request_type) &&
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+            return handled_empty_control_response();
+          }
+          return unsupported_control_response();
 
         default:
-          return {};
+          return unsupported_control_response();
       }
     }
 
     if (usb::setup_type(setup.request_type) == usb::REQUEST_TYPE_CLASS) {
       if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_INTERFACE ||
           !dualsense_edge_targets_hid_interface(setup.index)) {
-        return {};
+        return unsupported_control_response();
       }
 
       switch (setup.request) {
@@ -617,38 +668,47 @@ namespace platf::dualsense {
             if (usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_INPUT &&
                 usb::hid_report_id(setup.value) == INPUT_REPORT_USB) {
               const auto report = report_bytes(make_usb_input_report({}, 0, true));
-              return usb::limited_response(report, setup.length);
+              return handled_control_response(report, setup.length);
             }
 
             if (usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_FEATURE) {
               const auto report = dualsense_edge_feature_report(usb::hid_report_id(setup.value));
-              return usb::limited_response(report, setup.length);
+              if (!report.empty()) {
+                return handled_control_response(report, setup.length);
+              }
             }
           }
-          return {};
+          return unsupported_control_response();
 
         case usb::HID_REQUEST_GET_IDLE:
           if (usb::setup_is_in(setup.request_type)) {
-            return usb::limited_response(HID_IDLE_RATE, setup.length);
+            return handled_control_response(HID_IDLE_RATE, setup.length);
           }
-          return {};
+          return unsupported_control_response();
 
         case usb::HID_REQUEST_GET_PROTOCOL:
           if (usb::setup_is_in(setup.request_type)) {
-            return usb::limited_response(HID_REPORT_PROTOCOL, setup.length);
+            return handled_control_response(HID_REPORT_PROTOCOL, setup.length);
           }
-          return {};
+          return unsupported_control_response();
 
         case usb::HID_REQUEST_SET_REPORT:
         case usb::HID_REQUEST_SET_IDLE:
         case usb::HID_REQUEST_SET_PROTOCOL:
-          return {};
+          if (!usb::setup_is_in(setup.request_type)) {
+            return handled_empty_control_response();
+          }
+          return unsupported_control_response();
 
         default:
-          return {};
+          return unsupported_control_response();
       }
     }
 
-    return {};
+    return unsupported_control_response();
+  }
+
+  inline std::vector<std::uint8_t> dualsense_edge_control_response(const usb::setup_packet_t &setup) {
+    return dualsense_edge_control_transfer_response(setup).payload;
   }
 }  // namespace platf::dualsense
