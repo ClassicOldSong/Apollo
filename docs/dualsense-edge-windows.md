@@ -49,7 +49,11 @@ represent those bits.
   support moved from a uinput-only shape toward UHID because native DS5 games can
   reject or mis-map virtual devices that do not look enough like a real HID
   DualSense. That reinforces exposing a real Edge-shaped HID device for Windows
-  rather than presenting another generic gamepad.
+  rather than presenting another generic gamepad. Later troubleshooting in
+  `LizardByte/Sunshine#3468` also shows that missing `hidraw` visibility can
+  make SDL consumers see a scrambled virtual DualSense, which is why this branch
+  requires host-side HID/gamepad inspector evidence instead of trusting Apollo
+  logs alone.
 - `LizardByte/Sunshine#3527` and `LizardByte/Sunshine#4948`: a WinUHid-based
   Windows DualSense backend is an attractive long-term direction, but the PR was
   closed while driver distribution/signing remained unresolved. Maintainers noted
@@ -93,10 +97,17 @@ represent those bits.
   Sony's app. That is useful product context, but profile editing is separate
   from this streaming path; this branch only preserves live controller state that
   Moonlight already sends over the existing protocol.
-- Steam Input reports show a real user-facing problem when Edge expanded buttons
-  default to face-button behavior globally. The clean streaming fix should
-  preserve distinct Edge inputs rather than remap them to A/B/X/Y, DS4, or X360
-  buttons.
+- `ValveSoftware/steam-for-linux#9256`, `ValveSoftware/steam-for-linux#12489`,
+  and `ValveSoftware/steam-devices#48`: Steam's Edge feature path depends on
+  `054c:0df2` HID access and the correct udev/hidraw rules; when those rules are
+  present, users report Steam can see the Edge back/Fn buttons. That reinforces
+  preserving the Edge VID/PID and distinct expanded controls instead of remapping
+  them to A/B/X/Y, DS4, or X360 buttons.
+- `ValveSoftware/steam-for-linux#10362` and `ValveSoftware/Proton#9901`: Steam
+  and games can treat DualSense Edge as distinct from the base DualSense, even
+  when both are Sony PS5-class controllers. Apollo should therefore expose a
+  real Edge-shaped device for this mode, not a base DualSense identity with
+  hidden extra bits.
 - Community experiments exist, especially `CTM-Bridge/CTM-USBIP` and
   `sh00bx/Apollo`, but they should be treated as research inputs rather than a
   ready-to-merge Apollo patch. CTM-USBIP is useful confirmation that
