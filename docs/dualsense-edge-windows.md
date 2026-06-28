@@ -15,8 +15,9 @@ The existing protocol path already preserves the bits:
 - `PADDLE3 = 0x040000`
 - `PADDLE4 = 0x080000`
 
-`src/input.cpp` combines `buttonFlags | (buttonFlags2 << 16)` before calling
-the platform backend. The missing piece is a Windows virtual device that can
+`src/input.cpp` reconstructs those flags with `make_gamepad_button_flags()`,
+treating `buttonFlags2` as an unsigned 16-bit transport word before calling the
+platform backend. The missing piece is a Windows virtual device that can
 represent those bits.
 
 ## Relevant Upstream Context
