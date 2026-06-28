@@ -29,12 +29,15 @@ namespace platf::dualsense_usbip {
   constexpr std::int32_t CONTROL_STALL_STATUS = -32;
   constexpr std::string_view DEVICE_PATH = "/sys/devices/platform/apollo-dualsense-edge";
   constexpr std::string_view BUSID = "1-1";
+  constexpr std::uint32_t BUSNUM = 1;
+  constexpr std::uint32_t DEVNUM = 2;
+  constexpr std::uint32_t DEVID = (BUSNUM << 16) | DEVNUM;
 
   inline constexpr usbip::device_identity_t DEVICE {
     .path = DEVICE_PATH,
     .busid = BUSID,
-    .busnum = 1,
-    .devnum = 2,
+    .busnum = BUSNUM,
+    .devnum = DEVNUM,
     .speed = usbip::device_speed::high,
     .vendor_id = dualsense::VENDOR_ID_SONY,
     .product_id = dualsense::PRODUCT_ID_DUALSENSE_EDGE,
@@ -87,6 +90,10 @@ namespace platf::dualsense_usbip {
 
   inline std::vector<std::uint8_t> make_import_reply() {
     return usbip::make_import_reply(DEVICE);
+  }
+
+  inline bool targets_device(const usbip::basic_header_t &header) {
+    return header.devid == DEVID;
   }
 
   inline std::vector<std::uint8_t> handle_op_request(std::span<const std::uint8_t> request) {
@@ -310,6 +317,20 @@ namespace platf::dualsense_usbip {
     }
 
     submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
+      if (!targets_device(request.header)) {
+        return {
+          .reply = usbip::make_ret_submit(
+            request.header.seqnum,
+            request.header.devid,
+            request.header.transfer_direction,
+            request.header.endpoint,
+            -1
+          ),
+          .has_output_report = false,
+          .output_report = {},
+        };
+      }
+
       if (is_control_submit(request)) {
         if (!control_direction_matches_setup(request)) {
           return {
@@ -386,6 +407,10 @@ namespace platf::dualsense_usbip {
     }
 
     submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
+      if (!targets_device(request.header)) {
+        return device_.handle_submit(request, out_payload);
+      }
+
       if (is_interrupt_in_submit(request)) {
         if (pending_interrupt_in_.size() >= MAX_PENDING_INTERRUPT_IN) {
           return device_.handle_submit(request);
@@ -399,6 +424,17 @@ namespace platf::dualsense_usbip {
     }
 
     unlink_result_t handle_unlink(const usbip::unlink_request_t &request) {
+      if (!targets_device(request.header)) {
+        return {
+          .reply = usbip::make_ret_unlink(
+            request.header.seqnum,
+            request.header.devid,
+            -1
+          ),
+          .removed = false,
+        };
+      }
+
       bool removed = false;
       for (auto it = pending_interrupt_in_.begin(); it != pending_interrupt_in_.end();) {
         if (it->header.seqnum == request.unlink_seqnum) {

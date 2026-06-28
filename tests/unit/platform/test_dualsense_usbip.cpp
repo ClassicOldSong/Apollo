@@ -22,7 +22,7 @@ namespace {
       .header = {
         .command_code = platf::usbip::command::cmd_submit,
         .seqnum = seqnum,
-        .devid = 7,
+        .devid = platf::dualsense_usbip::DEVID,
         .transfer_direction = direction,
         .endpoint = endpoint,
       },
@@ -40,7 +40,7 @@ namespace {
       .header = {
         .command_code = platf::usbip::command::cmd_unlink,
         .seqnum = seqnum,
-        .devid = 7,
+        .devid = platf::dualsense_usbip::DEVID,
         .transfer_direction = platf::usbip::direction::out,
         .endpoint = 0,
       },
@@ -219,7 +219,7 @@ TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
 
   EXPECT_EQ(platf::usbip::read_be32(reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
   EXPECT_EQ(platf::usbip::read_be32(reply, 4), 11);
-  EXPECT_EQ(platf::usbip::read_be32(reply, 8), 7);
+  EXPECT_EQ(platf::usbip::read_be32(reply, 8), platf::dualsense_usbip::DEVID);
   EXPECT_EQ(platf::usbip::read_be32(reply, 20), 0);
   EXPECT_EQ(platf::usbip::read_be32(reply, 24), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   ASSERT_EQ(payload.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
@@ -739,6 +739,24 @@ TEST(DualSenseUsbIpTests, DeviceRejectsUnsupportedOutEndpointAfterPayloadIsRead)
   EXPECT_FALSE(result.has_output_report);
 }
 
+TEST(DualSenseUsbIpTests, DeviceRejectsSubmitsForDifferentDevid) {
+  platf::dualsense_usbip::device_t device;
+  auto request = submit_request(
+    25,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  );
+  request.header.devid = platf::dualsense_usbip::DEVID + 1;
+
+  const auto result = device.handle_submit(request);
+
+  EXPECT_FALSE(result.has_output_report);
+  EXPECT_TRUE(submit_payload(result.reply).empty());
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 8), platf::dualsense_usbip::DEVID + 1);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
+}
+
 TEST(DualSenseUsbIpTests, SessionQueuesInterruptInSubmitsUntilTaken) {
   platf::dualsense_usbip::session_t session;
   session.update_input(platf::gamepad_state_t {
@@ -830,6 +848,34 @@ TEST(DualSenseUsbIpTests, SessionReportsFailedUnlinkForUnknownSequence) {
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_unlink));
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 33);
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
+}
+
+TEST(DualSenseUsbIpTests, SessionRejectsSubmitsAndUnlinksForDifferentDevid) {
+  platf::dualsense_usbip::session_t session;
+  auto submit = submit_request(
+    36,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  );
+  submit.header.devid = platf::dualsense_usbip::DEVID + 1;
+
+  const auto submit_result = session.handle_submit(submit);
+
+  EXPECT_FALSE(submit_result.reply.empty());
+  EXPECT_FALSE(submit_result.has_output_report);
+  EXPECT_FALSE(session.has_pending_interrupt_in());
+  EXPECT_EQ(platf::usbip::read_be32(submit_result.reply, 8), platf::dualsense_usbip::DEVID + 1);
+  EXPECT_EQ(platf::usbip::read_be32(submit_result.reply, 20), static_cast<std::uint32_t>(-1));
+
+  auto unlink = unlink_request(37, 36);
+  unlink.header.devid = platf::dualsense_usbip::DEVID + 1;
+
+  const auto unlink_result = session.handle_unlink(unlink);
+
+  EXPECT_FALSE(unlink_result.removed);
+  EXPECT_EQ(platf::usbip::read_be32(unlink_result.reply, 8), platf::dualsense_usbip::DEVID + 1);
+  EXPECT_EQ(platf::usbip::read_be32(unlink_result.reply, 20), static_cast<std::uint32_t>(-1));
 }
 
 TEST(DualSenseUsbIpTests, SessionPassesThroughImmediateControlAndOutputSubmits) {
