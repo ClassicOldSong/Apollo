@@ -33,10 +33,7 @@ TEST(GamepadProtocolTests, PaddleFlagsTravelInMultiControllerButtonFlags2) {
   packet.buttonFlags = 0;
   packet.buttonFlags2 = static_cast<short>(paddles >> 16);
 
-  const std::uint16_t low_buttons = packet.buttonFlags;
-  const std::uint32_t high_buttons = static_cast<std::uint16_t>(packet.buttonFlags2);
-
-  EXPECT_EQ(low_buttons | (high_buttons << 16), paddles);
+  EXPECT_EQ(platf::make_gamepad_button_flags(packet.buttonFlags, packet.buttonFlags2), paddles);
 }
 
 TEST(GamepadProtocolTests, IndividualPaddleFlagsUseStableButtonFlags2Bits) {
@@ -60,11 +57,16 @@ TEST(GamepadProtocolTests, IndividualPaddleFlagsUseStableButtonFlags2Bits) {
     packet.buttonFlags = 0;
     packet.buttonFlags2 = static_cast<short>(test_case.button_flags_2);
 
-    const std::uint16_t low_buttons = packet.buttonFlags;
-    const std::uint32_t high_buttons = static_cast<std::uint16_t>(packet.buttonFlags2);
-
-    EXPECT_EQ(low_buttons | (high_buttons << 16), test_case.flag);
+    EXPECT_EQ(platf::make_gamepad_button_flags(packet.buttonFlags, packet.buttonFlags2), test_case.flag);
   }
+}
+
+TEST(GamepadProtocolTests, ButtonFlags2IsTreatedAsUnsignedTransportWord) {
+  NV_MULTI_CONTROLLER_PACKET packet {};
+  packet.buttonFlags = static_cast<short>(0x8001);
+  packet.buttonFlags2 = static_cast<short>(0x8001);
+
+  EXPECT_EQ(platf::make_gamepad_button_flags(packet.buttonFlags, packet.buttonFlags2), 0x80018001u);
 }
 
 TEST(GamepadProtocolTests, ControllerArrivalCanAdvertiseAllPaddleFlags) {

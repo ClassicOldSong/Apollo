@@ -284,7 +284,7 @@ namespace input {
       << "--begin controller packet--"sv << std::endl
       << "controllerNumber ["sv << packet->controllerNumber << ']' << std::endl
       << "activeGamepadMask ["sv << util::hex(packet->activeGamepadMask).to_string_view() << ']' << std::endl
-      << "buttonFlags ["sv << util::hex((uint32_t) packet->buttonFlags | (packet->buttonFlags2 << 16)).to_string_view() << ']' << std::endl
+      << "buttonFlags ["sv << util::hex(platf::make_gamepad_button_flags(packet->buttonFlags, packet->buttonFlags2)).to_string_view() << ']' << std::endl
       << "leftTrigger ["sv << util::hex(packet->leftTrigger).to_string_view() << ']' << std::endl
       << "rightTrigger ["sv << util::hex(packet->rightTrigger).to_string_view() << ']' << std::endl
       << "leftStickX ["sv << packet->leftStickX << ']' << std::endl
@@ -1119,10 +1119,8 @@ namespace input {
       return;
     }
 
-    std::uint16_t bf = packet->buttonFlags;
-    std::uint32_t bf2 = packet->buttonFlags2;
     platf::gamepad_state_t gamepad_state {
-      bf | (bf2 << 16),
+      platf::make_gamepad_button_flags(packet->buttonFlags, packet->buttonFlags2),
       packet->leftTrigger,
       packet->rightTrigger,
       packet->leftStickX,
@@ -1149,7 +1147,7 @@ namespace input {
         break;
     }
 
-    bf = gamepad_state.buttonFlags ^ gamepad.gamepad_state.buttonFlags;
+    auto bf = gamepad_state.buttonFlags ^ gamepad.gamepad_state.buttonFlags;
     bf_new = gamepad_state.buttonFlags;
 
     if (platf::BACK & bf) {

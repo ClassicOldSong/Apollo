@@ -6,6 +6,7 @@
 
 // standard includes
 #include <bitset>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <mutex>
@@ -104,6 +105,11 @@ namespace platf {
 
   constexpr bool has_dualsense_edge_arrival_support(std::uint8_t type, std::uint32_t buttons) {
     return type == LI_CTYPE_PS && has_all_edge_paddle_buttons(buttons);
+  }
+
+  constexpr std::uint32_t make_gamepad_button_flags(std::uint16_t button_flags, std::int16_t button_flags_2) {
+    return static_cast<std::uint32_t>(button_flags) |
+           (static_cast<std::uint32_t>(static_cast<std::uint16_t>(button_flags_2)) << 16);
   }
 
   struct supported_gamepad_t {
