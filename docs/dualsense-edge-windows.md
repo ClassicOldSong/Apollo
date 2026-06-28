@@ -287,6 +287,10 @@ controller is already attached and only the PnP evidence should be refreshed.
      Capture the warning's `actual:` binding summary with the Moonlight log.
    - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...
      bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17`
+   - Do not continue if Moonlight logs `DualSense Edge controller button ... is
+     bound to raw paddle...; not advertising it as a normal button`; that means
+     a stale SDL mapping would have advertised an Edge-only control as a normal
+     controller button, and Moonlight is suppressing that capability alias.
 4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
