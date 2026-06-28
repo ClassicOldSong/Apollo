@@ -44,6 +44,11 @@ namespace platf {
   using client_t = util::safe_ptr<_VIGEM_CLIENT_T, vigem_free>;
   using target_t = util::safe_ptr<_VIGEM_TARGET_T, vigem_target_free>;
 
+  enum class emulated_gamepad_t {
+    x360,
+    ds4,
+  };
+
   void CALLBACK x360_notify(
     client_t::pointer client,
     target_t::pointer target,
@@ -71,6 +76,7 @@ namespace platf {
   struct gamepad_context_t {
     target_t gp;
     feedback_queue_t feedback_queue;
+    emulated_gamepad_t type;
 
     union {
       XUSB_REPORT x360;
@@ -236,12 +242,13 @@ namespace platf {
      * @param gp_type The type of gamepad.
      * @return 0 on success.
      */
-    int alloc_gamepad_internal(const gamepad_id_t &id, feedback_queue_t &feedback_queue, VIGEM_TARGET_TYPE gp_type) {
+    int alloc_gamepad_internal(const gamepad_id_t &id, feedback_queue_t &feedback_queue, emulated_gamepad_t gp_type) {
       auto &gamepad = gamepads[id.globalIndex];
       assert(!gamepad.gp);
 
       gamepad.client_relative_index = id.clientRelativeIndex;
       gamepad.last_report_ts = std::chrono::steady_clock::now();
+      gamepad.type = gp_type;
 
       // Establish a connect to the ViGEm driver if we don't have one yet
       if (!client) {
@@ -256,7 +263,7 @@ namespace platf {
         }
       }
 
-      if (gp_type == Xbox360Wired) {
+      if (gp_type == emulated_gamepad_t::x360) {
         gamepad.gp.reset(vigem_target_x360_alloc());
         XUSB_REPORT_INIT(&gamepad.report.x360);
       } else {
@@ -286,7 +293,7 @@ namespace platf {
 
       gamepad.feedback_queue = std::move(feedback_queue);
 
-      if (gp_type == Xbox360Wired) {
+      if (gp_type == emulated_gamepad_t::x360) {
         status = vigem_target_x360_register_notification(client.get(), gamepad.gp.get(), x360_notify, this);
       } else {
         status = vigem_target_ds4_register_notification(client.get(), gamepad.gp.get(), ds4_notify, this);
@@ -1194,32 +1201,32 @@ namespace platf {
       return 0;
     }
 
-    VIGEM_TARGET_TYPE selectedGamepadType;
+    emulated_gamepad_t selectedGamepadType;
 
     if (config::input.gamepad == "x360"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox 360 controller (manual selection)"sv;
-      selectedGamepadType = Xbox360Wired;
+      selectedGamepadType = emulated_gamepad_t::x360;
     } else if (config::input.gamepad == "ds4"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (manual selection)"sv;
-      selectedGamepadType = DualShock4Wired;
+      selectedGamepadType = emulated_gamepad_t::ds4;
     } else if (metadata.type == LI_CTYPE_PS) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (auto-selected by client-reported type)"sv;
-      selectedGamepadType = DualShock4Wired;
+      selectedGamepadType = emulated_gamepad_t::ds4;
     } else if (metadata.type == LI_CTYPE_XBOX) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox 360 controller (auto-selected by client-reported type)"sv;
-      selectedGamepadType = Xbox360Wired;
+      selectedGamepadType = emulated_gamepad_t::x360;
     } else if (config::input.motion_as_ds4 && (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (auto-selected by motion sensor presence)"sv;
-      selectedGamepadType = DualShock4Wired;
+      selectedGamepadType = emulated_gamepad_t::ds4;
     } else if (config::input.touchpad_as_ds4 && (metadata.capabilities & LI_CCAP_TOUCHPAD)) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (auto-selected by touchpad presence)"sv;
-      selectedGamepadType = DualShock4Wired;
+      selectedGamepadType = emulated_gamepad_t::ds4;
     } else {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be Xbox 360 controller (default)"sv;
-      selectedGamepadType = Xbox360Wired;
+      selectedGamepadType = emulated_gamepad_t::x360;
     }
 
-    if (selectedGamepadType == Xbox360Wired) {
+    if (selectedGamepadType == emulated_gamepad_t::x360) {
       warn_unsupported_paddles(id.globalIndex, "Xbox 360", metadata.supportedButtons);
       if (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO)) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " has motion sensors, but they are not usable when emulating an Xbox 360 controller"sv;
@@ -1230,7 +1237,7 @@ namespace platf {
       if (metadata.capabilities & LI_CCAP_RGB_LED) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " has an RGB LED, but it is not usable when emulating an Xbox 360 controller"sv;
       }
-    } else if (selectedGamepadType == DualShock4Wired) {
+    } else if (selectedGamepadType == emulated_gamepad_t::ds4) {
       warn_unsupported_paddles(id.globalIndex, "DualShock 4", metadata.supportedButtons);
       if (!(metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualShock 4 controller, but the client gamepad doesn't have motion sensors active"sv;
@@ -1518,7 +1525,7 @@ namespace platf {
 
     VIGEM_ERROR status;
 
-    if (vigem_target_get_type(gamepad.gp.get()) == Xbox360Wired) {
+    if (gamepad.type == emulated_gamepad_t::x360) {
       x360_update_state(gamepad, gamepad_state);
       status = vigem_target_x360_update(vigem->client.get(), gamepad.gp.get(), gamepad.report.x360);
       if (!VIGEM_SUCCESS(status)) {
@@ -1549,7 +1556,7 @@ namespace platf {
     }
 
     // Touch is only supported on DualShock 4 controllers
-    if (vigem_target_get_type(gamepad.gp.get()) != DualShock4Wired) {
+    if (gamepad.type != emulated_gamepad_t::ds4) {
       return;
     }
 
@@ -1655,7 +1662,7 @@ namespace platf {
     }
 
     // Motion is only supported on DualShock 4 controllers
-    if (vigem_target_get_type(gamepad.gp.get()) != DualShock4Wired) {
+    if (gamepad.type != emulated_gamepad_t::ds4) {
       return;
     }
 
@@ -1682,7 +1689,7 @@ namespace platf {
     }
 
     // Battery is only supported on DualShock 4 controllers
-    if (vigem_target_get_type(gamepad.gp.get()) != DualShock4Wired) {
+    if (gamepad.type != emulated_gamepad_t::ds4) {
       return;
     }
 
