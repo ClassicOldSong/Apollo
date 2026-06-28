@@ -180,6 +180,8 @@ TEST(UsbIpTests, BuildsSubmitReplyWithPayload) {
   EXPECT_EQ(platf::usbip::read_be32(reply, 16), 4);
   EXPECT_EQ(platf::usbip::read_be32(reply, 20), 0);
   EXPECT_EQ(platf::usbip::read_be32(reply, 24), static_cast<std::uint32_t>(payload.size()));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 32), static_cast<std::uint32_t>(platf::usbip::NUMBER_OF_PACKETS_NON_ISOCHRONOUS));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 36), 0);
   EXPECT_EQ(std::vector<std::uint8_t>(reply.begin() + platf::usbip::SUBMIT_HEADER_SIZE, reply.end()),
             std::vector<std::uint8_t>(payload.begin(), payload.end()));
 }

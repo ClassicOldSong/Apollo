@@ -24,6 +24,7 @@ namespace platf::usbip {
   constexpr std::size_t USB_DEVICE_BUSID_SIZE = 32;
   constexpr std::size_t USB_DEVICE_RECORD_SIZE = 312;
   constexpr std::size_t USB_INTERFACE_RECORD_SIZE = 4;
+  constexpr std::int32_t NUMBER_OF_PACKETS_NON_ISOCHRONOUS = -1;
 
   enum class op_code : std::uint16_t {
     req_import = 0x8003,
@@ -313,7 +314,7 @@ namespace platf::usbip {
     append_be32(out, static_cast<std::uint32_t>(status));
     append_be32(out, static_cast<std::uint32_t>(payload.size()));
     append_be32(out, 0);  // start_frame
-    append_be32(out, 0);  // number_of_packets
+    append_be32(out, static_cast<std::uint32_t>(NUMBER_OF_PACKETS_NON_ISOCHRONOUS));
     append_be32(out, 0);  // error_count
     for (std::size_t i = 0; i < 8; ++i) {
       append_u8(out, 0);
