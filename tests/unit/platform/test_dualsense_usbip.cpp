@@ -117,6 +117,8 @@ TEST(DualSenseUsbIpTests, BuildsDualSenseEdgeDeviceListAndImportReplies) {
   const auto devlist = platf::dualsense_usbip::make_devlist_reply();
   const auto import = platf::dualsense_usbip::make_import_reply();
 
+  EXPECT_EQ(platf::dualsense_usbip::DEFAULT_PORT, 3240);
+  EXPECT_EQ(platf::dualsense_usbip::BUSID, "1-1");
   EXPECT_EQ(platf::usbip::read_be16(devlist, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_devlist));
   EXPECT_EQ(platf::usbip::read_be32(devlist, 8), 1);
   EXPECT_EQ(platf::usbip::read_be32(devlist, 308), static_cast<std::uint32_t>(platf::usbip::device_speed::high));

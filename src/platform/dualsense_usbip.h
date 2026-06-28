@@ -29,6 +29,7 @@ namespace platf::dualsense_usbip {
   constexpr std::int32_t CONTROL_STALL_STATUS = -32;
   constexpr std::string_view DEVICE_PATH = "/sys/devices/platform/apollo-dualsense-edge";
   constexpr std::string_view BUSID = "1-1";
+  constexpr std::uint16_t DEFAULT_PORT = 3240;
   constexpr std::uint32_t BUSNUM = 1;
   constexpr std::uint32_t DEVNUM = 2;
   constexpr std::uint32_t DEVID = (BUSNUM << 16) | DEVNUM;

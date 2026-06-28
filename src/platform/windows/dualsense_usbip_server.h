@@ -11,7 +11,7 @@
 
 // local includes
 #include "src/platform/common.h"
-#include "src/platform/dualsense.h"
+#include "src/platform/dualsense_usbip.h"
 
 namespace platf::dualsense_usbip {
   class server_t {
@@ -24,7 +24,7 @@ namespace platf::dualsense_usbip {
     server_t(const server_t &) = delete;
     server_t &operator=(const server_t &) = delete;
 
-    bool start(output_cb_t output_cb, std::uint16_t port = 3240);
+    bool start(output_cb_t output_cb, std::uint16_t port = DEFAULT_PORT);
     void stop();
 
     bool is_running() const;

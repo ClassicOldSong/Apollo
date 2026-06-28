@@ -598,8 +598,8 @@ namespace platf {
     }
 
     BOOST_LOG(info)
-      << "DualSense Edge USB/IP backend is listening on 127.0.0.1:3240. "
-      << "Attach usbip-win2 to busid 1-1 to expose the virtual controller."sv;
+      << "DualSense Edge USB/IP backend is listening on 127.0.0.1:"sv << dualsense_usbip::DEFAULT_PORT
+      << ". Attach usbip-win2 to busid "sv << dualsense_usbip::BUSID << " to expose the virtual controller."sv;
     return 0;
   }
 
