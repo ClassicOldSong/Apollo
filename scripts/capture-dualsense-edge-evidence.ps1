@@ -61,6 +61,20 @@ function Invoke-PowerShellCapture {
   }
 }
 
+function Get-PnpDevicePropertyData {
+  param(
+    [Parameter(Mandatory = $true)][string]$InstanceId,
+    [Parameter(Mandatory = $true)][string]$KeyName
+  )
+
+  try {
+    $property = Get-PnpDeviceProperty -InstanceId $InstanceId -KeyName $KeyName -ErrorAction Stop
+    return $property.Data
+  } catch {
+    return $null
+  }
+}
+
 function Copy-RequestedLogs {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
@@ -242,6 +256,8 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'usbip port output was captured'; Required = $true; Path = 'usbip-port.txt'; Pattern = $usbipPortPattern },
     @{ Name = 'PnP shows DualSense Edge VID/PID'; Required = $true; Path = 'pnp-edge.txt'; Pattern = 'VID_054C&PID_0DF2' },
     @{ Name = 'PnP shows MI_03 HID child'; Required = $true; Path = 'pnp-edge-mi03.txt'; Pattern = 'MI_03' },
+    @{ Name = 'PnP shows at least one healthy Edge device'; Required = $true; Path = 'pnp-edge-health.txt'; Pattern = 'edge_ok_count=[1-9][0-9]*' },
+    @{ Name = 'PnP shows healthy MI_03 HID child'; Required = $true; Path = 'pnp-edge-health.txt'; Pattern = 'mi03_ok_count=[1-9][0-9]*' },
     @{ Name = 'HIDClass shows Edge HID node'; Required = $true; Path = 'pnp-edge-hidclass.txt'; Pattern = 'VID_054C&PID_0DF2|DualSense Edge' },
     @{ Name = 'CIM shows Edge PnP entity'; Required = $true; Path = 'pnp-edge-cim.txt'; Pattern = 'VID_054C&PID_0DF2' }
   )
@@ -407,6 +423,53 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-hidclass.txt') -S
     } |
     Sort-Object Class,FriendlyName,InstanceId |
     Format-List Class,FriendlyName,InstanceId,Status
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-health.txt') -Script {
+  $records = New-Object System.Collections.Generic.List[object]
+
+  Get-PnpDevice -PresentOnly -ErrorAction Stop |
+    Where-Object { $_.InstanceId -match $EdgeDevicePattern } |
+    ForEach-Object {
+      $problemCode = Get-PnpDevicePropertyData -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_ProblemCode'
+      $service = Get-PnpDevicePropertyData -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_Service'
+      $driver = Get-PnpDevicePropertyData -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_Driver'
+      $parent = Get-PnpDevicePropertyData -InstanceId $_.InstanceId -KeyName 'DEVPKEY_Device_Parent'
+
+      $problemCodeOk = $true
+      if ($null -ne $problemCode) {
+        try {
+          $problemCodeOk = ([int]$problemCode -eq 0)
+        } catch {
+          $problemCodeOk = $false
+        }
+      }
+      $isOk = ($_.Status -eq 'OK') -and $problemCodeOk
+
+      $records.Add([PSCustomObject]@{
+        Class = $_.Class
+        FriendlyName = $_.FriendlyName
+        InstanceId = $_.InstanceId
+        Status = $_.Status
+        ProblemCode = $problemCode
+        Service = $service
+        Driver = $driver
+        Parent = $parent
+        IsMi03 = ($_.InstanceId -match $EdgeHidInterfacePattern)
+        IsOk = $isOk
+      }) | Out-Null
+    }
+
+  $edgeOkCount = @($records | Where-Object { $_.IsOk }).Count
+  $mi03OkCount = @($records | Where-Object { $_.IsMi03 -and $_.IsOk }).Count
+
+  "device_count=$($records.Count)"
+  "edge_ok_count=$edgeOkCount"
+  "mi03_ok_count=$mi03OkCount"
+  ''
+  $records |
+    Sort-Object Class,FriendlyName,InstanceId |
+    Format-List Class,FriendlyName,InstanceId,Status,ProblemCode,Service,Driver,Parent,IsMi03,IsOk
 }
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-properties.txt') -Script {

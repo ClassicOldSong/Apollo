@@ -249,19 +249,21 @@ The helper writes a timestamped directory under `%TEMP%` containing
 `usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
 matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
-`MI_03` child, present HIDClass nodes, matching CIM `Win32_PnPEntity` rows, and
-selected PnP properties. Pass Apollo and Moonlight log files with `-LogPath` to
+`MI_03` child, PnP health/status details, present HIDClass nodes, matching CIM
+`Win32_PnPEntity` rows, and selected PnP properties. Pass Apollo and Moonlight
+log files with `-LogPath` to
 copy them into the same evidence bundle. When logs are provided, the helper also
 writes `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper always writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
 `usbip.exe`, requested busid, attach result, and Windows PnP
-`VID_054C&PID_0DF2` / `MI_03` evidence, including the first matching lines from
-the captured files. Both summaries end with `overall=PASS` only when all
-required checks matched and no stop-condition matched. Add `-RequirePass` when
-collecting draft-ready evidence to make the helper exit with a failure if
-either summary is missing or does not end with `overall=PASS`.
+`VID_054C&PID_0DF2` / `MI_03` evidence, including healthy PnP status checks and
+the first matching lines from the captured files. Both summaries end with
+`overall=PASS` only when all required checks matched and no stop-condition
+matched. Add `-RequirePass` when collecting draft-ready evidence to make the
+helper exit with a failure if either summary is missing or does not end with
+`overall=PASS`.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
 
@@ -411,7 +413,7 @@ same end-to-end run:
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
   arrival mask, and logs a distinct state change for each `PADDLE1..4` bit.
 - `usbip-win2` imports the loopback busid and Windows enumerates
-  `VID_054C&PID_0DF2` with an `MI_03` HID child.
+  `VID_054C&PID_0DF2` with a healthy `MI_03` HID child.
 - A host-side gamepad or HID inspection tool observes four separate Edge
   paddle/Fn inputs rather than face-button remaps.
 - Standard buttons, sticks, and triggers still work through the virtual Edge
