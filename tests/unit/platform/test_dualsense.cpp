@@ -88,34 +88,54 @@ namespace {
     return sizes;
   }
 
-  platf::usb::setup_packet_t get_descriptor_setup(std::uint8_t descriptor_type, std::uint8_t descriptor_index, std::uint16_t length) {
+  platf::usb::setup_packet_t get_descriptor_setup(
+    std::uint8_t descriptor_type,
+    std::uint8_t descriptor_index,
+    std::uint16_t length,
+    std::uint16_t interface_index = 0
+  ) {
+    const auto request_type = platf::dualsense::dualsense_edge_descriptor_is_interface_scoped(descriptor_type) ?
+                                static_cast<std::uint8_t>(platf::usb::REQUEST_DIRECTION_IN | platf::usb::RECIPIENT_INTERFACE) :
+                                platf::usb::REQUEST_DIRECTION_IN;
+
     return platf::usb::setup_packet_t {
-      .request_type = 0x80,
+      .request_type = request_type,
       .request = platf::usb::REQUEST_GET_DESCRIPTOR,
       .value = static_cast<std::uint16_t>((descriptor_type << 8) | descriptor_index),
-      .index = 0,
+      .index = interface_index,
       .length = length,
     };
   }
 
-  platf::usb::setup_packet_t control_setup(std::uint8_t request_type, std::uint8_t request, std::uint16_t value, std::uint16_t length) {
+  platf::usb::setup_packet_t control_setup(
+    std::uint8_t request_type,
+    std::uint8_t request,
+    std::uint16_t value,
+    std::uint16_t length,
+    std::uint16_t interface_index = 0
+  ) {
     return platf::usb::setup_packet_t {
       .request_type = request_type,
       .request = request,
       .value = value,
-      .index = 0,
+      .index = interface_index,
       .length = length,
     };
   }
 
-  platf::usb::setup_packet_t get_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+  platf::usb::setup_packet_t get_report_setup(
+    std::uint8_t report_type,
+    std::uint8_t report_id,
+    std::uint16_t length,
+    std::uint16_t interface_index = platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ) {
     return platf::usb::setup_packet_t {
       .request_type = platf::usb::REQUEST_DIRECTION_IN |
                       (platf::usb::REQUEST_TYPE_CLASS << 5) |
                       platf::usb::RECIPIENT_INTERFACE,
       .request = platf::usb::HID_REQUEST_GET_REPORT,
       .value = static_cast<std::uint16_t>((report_type << 8) | report_id),
-      .index = 0,
+      .index = interface_index,
       .length = length,
     };
   }
@@ -331,7 +351,12 @@ TEST(DualSenseReportTests, ProvidesDualSenseEdgeDescriptorsForUsbEnumeration) {
   EXPECT_EQ(device[10] | (device[11] << 8), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
 
   const auto hid = platf::dualsense::dualsense_edge_control_response(
-    get_descriptor_setup(platf::usb::DESCRIPTOR_HID, 0, 9)
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID,
+      0,
+      9,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )
   );
   ASSERT_EQ(hid.size(), 9);
   EXPECT_EQ(hid[0], 0x09);
@@ -339,11 +364,51 @@ TEST(DualSenseReportTests, ProvidesDualSenseEdgeDescriptorsForUsbEnumeration) {
   EXPECT_EQ(hid[7] | (hid[8] << 8), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
 
   const auto report = platf::dualsense::dualsense_edge_control_response(
-    get_descriptor_setup(platf::usb::DESCRIPTOR_HID_REPORT, 0, 1024)
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID_REPORT,
+      0,
+      1024,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )
   );
   EXPECT_EQ(report.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   EXPECT_EQ(report.front(), 0x05);
   EXPECT_EQ(report.back(), 0xC0);
+}
+
+TEST(DualSenseReportTests, RejectsHidRequestsForNonHidInterfaces) {
+  auto device_recipient_hid_descriptor = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_HID,
+    0,
+    9,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  );
+  device_recipient_hid_descriptor.request_type = platf::usb::REQUEST_DIRECTION_IN |
+                                                 platf::usb::RECIPIENT_DEVICE;
+
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(device_recipient_hid_descriptor).empty());
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID,
+      0,
+      9,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_CONTROL
+    )
+  ).empty());
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID_REPORT,
+      0,
+      1024,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_OUT
+    )
+  ).empty());
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_IN
+  )).empty());
 }
 
 TEST(DualSenseReportTests, ProvidesDualSenseEdgeStringDescriptorsForUsbEnumeration) {
@@ -500,17 +565,41 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     (std::vector<std::uint8_t> {0})
   );
   EXPECT_EQ(
-    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_in, platf::usb::HID_REQUEST_GET_IDLE, 0, 1)),
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_in,
+      platf::usb::HID_REQUEST_GET_IDLE,
+      0,
+      1,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )),
     (std::vector<std::uint8_t> {0})
   );
   EXPECT_EQ(
-    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_in, platf::usb::HID_REQUEST_GET_PROTOCOL, 0, 1)),
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_in,
+      platf::usb::HID_REQUEST_GET_PROTOCOL,
+      0,
+      1,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )),
     (std::vector<std::uint8_t> {1})
   );
   EXPECT_TRUE(
-    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_out, platf::usb::HID_REQUEST_SET_IDLE, 0, 0)).empty()
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_out,
+      platf::usb::HID_REQUEST_SET_IDLE,
+      0,
+      0,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )).empty()
   );
   EXPECT_TRUE(
-    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_out, platf::usb::HID_REQUEST_SET_REPORT, 0x0202, 0)).empty()
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_out,
+      platf::usb::HID_REQUEST_SET_REPORT,
+      0x0202,
+      0,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )).empty()
   );
 }

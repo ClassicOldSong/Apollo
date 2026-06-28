@@ -48,20 +48,33 @@ namespace {
     };
   }
 
-  std::array<std::uint8_t, 8> get_descriptor_setup(std::uint8_t descriptor_type, std::uint16_t length) {
+  std::array<std::uint8_t, 8> get_descriptor_setup(
+    std::uint8_t descriptor_type,
+    std::uint16_t length,
+    std::uint16_t interface_index = platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ) {
+    const auto request_type = platf::dualsense::dualsense_edge_descriptor_is_interface_scoped(descriptor_type) ?
+                                static_cast<std::uint8_t>(platf::usb::REQUEST_DIRECTION_IN | platf::usb::RECIPIENT_INTERFACE) :
+                                platf::usb::REQUEST_DIRECTION_IN;
+
     return {
-      0x80,
+      request_type,
       platf::usb::REQUEST_GET_DESCRIPTOR,
       0x00,
       descriptor_type,
-      0x00,
-      0x00,
+      static_cast<std::uint8_t>(interface_index & 0xFF),
+      static_cast<std::uint8_t>((interface_index >> 8) & 0xFF),
       static_cast<std::uint8_t>(length & 0xFF),
       static_cast<std::uint8_t>((length >> 8) & 0xFF),
     };
   }
 
-  std::array<std::uint8_t, 8> get_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+  std::array<std::uint8_t, 8> get_report_setup(
+    std::uint8_t report_type,
+    std::uint8_t report_id,
+    std::uint16_t length,
+    std::uint16_t interface_index = platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ) {
     return {
       static_cast<std::uint8_t>(platf::usb::REQUEST_DIRECTION_IN |
                                 (platf::usb::REQUEST_TYPE_CLASS << 5) |
@@ -69,22 +82,27 @@ namespace {
       platf::usb::HID_REQUEST_GET_REPORT,
       report_id,
       report_type,
-      0x00,
-      0x00,
+      static_cast<std::uint8_t>(interface_index & 0xFF),
+      static_cast<std::uint8_t>((interface_index >> 8) & 0xFF),
       static_cast<std::uint8_t>(length & 0xFF),
       static_cast<std::uint8_t>((length >> 8) & 0xFF),
     };
   }
 
-  std::array<std::uint8_t, 8> set_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+  std::array<std::uint8_t, 8> set_report_setup(
+    std::uint8_t report_type,
+    std::uint8_t report_id,
+    std::uint16_t length,
+    std::uint16_t interface_index = platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ) {
     return {
       static_cast<std::uint8_t>((platf::usb::REQUEST_TYPE_CLASS << 5) |
                                 platf::usb::RECIPIENT_INTERFACE),
       platf::usb::HID_REQUEST_SET_REPORT,
       report_id,
       report_type,
-      0x00,
-      0x00,
+      static_cast<std::uint8_t>(interface_index & 0xFF),
+      static_cast<std::uint8_t>((interface_index >> 8) & 0xFF),
       static_cast<std::uint8_t>(length & 0xFF),
       static_cast<std::uint8_t>((length >> 8) & 0xFF),
     };
@@ -489,6 +507,29 @@ TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithoutReportIdPref
   EXPECT_TRUE(result.output_report.has_rumble);
   EXPECT_EQ(result.output_report.motor_left, 0x40);
   EXPECT_EQ(result.output_report.motor_right, 0x20);
+}
+
+TEST(DualSenseUsbIpTests, DeviceIgnoresControlOutputSetReportForNonHidInterface) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    26,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_USB_SIZE,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_CONTROL
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_FALSE(result.has_output_report);
 }
 
 TEST(DualSenseUsbIpTests, DeviceReturnsErrorForUnsupportedSubmitEndpoint) {

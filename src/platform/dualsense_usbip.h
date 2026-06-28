@@ -200,6 +200,7 @@ namespace platf::dualsense_usbip {
            !usb::setup_is_in(setup.request_type) &&
            usb::setup_type(setup.request_type) == usb::REQUEST_TYPE_CLASS &&
            usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+           dualsense::dualsense_edge_targets_hid_interface(setup.index) &&
            setup.request == usb::HID_REQUEST_SET_REPORT &&
            usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_OUTPUT &&
            usb::hid_report_id(setup.value) == dualsense::OUTPUT_REPORT_USB;
