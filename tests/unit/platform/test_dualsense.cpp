@@ -127,3 +127,29 @@ TEST(DualSenseReportTests, BuildsUsbInputReportWithReportId) {
   EXPECT_EQ(report.body.sequence_number, 9);
   EXPECT_EQ(report.body.buttons[2], platf::dualsense::BUTTONS2_EDGE_FN_LEFT);
 }
+
+TEST(DualSenseReportTests, DefinesDualSenseEdgeUsbIdentity) {
+  const auto &device = platf::dualsense::DUALSENSE_EDGE_DEVICE_DESCRIPTOR;
+
+  EXPECT_EQ(device.size(), 18);
+  EXPECT_EQ(device[0], 0x12);
+  EXPECT_EQ(device[1], 0x01);
+  EXPECT_EQ(device[8] | (device[9] << 8), platf::dualsense::VENDOR_ID_SONY);
+  EXPECT_EQ(device[10] | (device[11] << 8), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
+}
+
+TEST(DualSenseReportTests, DefinesMinimalDualSenseEdgeHidConfiguration) {
+  const auto &config = platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
+  const auto report_descriptor_size = config[25] | (config[26] << 8);
+
+  EXPECT_EQ(config.size(), 41);
+  EXPECT_EQ(config[0], 0x09);
+  EXPECT_EQ(config[1], 0x02);
+  EXPECT_EQ(config[2] | (config[3] << 8), config.size());
+  EXPECT_EQ(config[18], 0x09);
+  EXPECT_EQ(config[19], 0x21);
+  EXPECT_EQ(config[24], 0x22);
+  EXPECT_EQ(report_descriptor_size, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+  EXPECT_EQ(config[29], platf::dualsense::USB_ENDPOINT_IN);
+  EXPECT_EQ(config[36], platf::dualsense::USB_ENDPOINT_OUT);
+}

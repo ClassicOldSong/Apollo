@@ -23,6 +23,64 @@ namespace platf::dualsense {
   constexpr std::size_t INPUT_REPORT_BODY_SIZE = INPUT_REPORT_USB_SIZE - 1;
   constexpr std::size_t DUALSENSE_HID_REPORT_DESCRIPTOR_SIZE = 273;
   constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
+  constexpr std::uint8_t USB_ENDPOINT_IN = 0x84;
+  constexpr std::uint8_t USB_ENDPOINT_OUT = 0x03;
+
+  inline constexpr std::array<std::uint8_t, 18> DUALSENSE_EDGE_DEVICE_DESCRIPTOR {
+    0x12,  // bLength
+    0x01,  // bDescriptorType: device
+    0x00, 0x02,  // bcdUSB 2.00
+    0x00,  // bDeviceClass
+    0x00,  // bDeviceSubClass
+    0x00,  // bDeviceProtocol
+    0x40,  // bMaxPacketSize0
+    0x4C, 0x05,  // idVendor: Sony
+    0xF2, 0x0D,  // idProduct: DualSense Edge
+    0x00, 0x01,  // bcdDevice 1.00
+    0x01,  // iManufacturer
+    0x02,  // iProduct
+    0x00,  // iSerialNumber
+    0x01,  // bNumConfigurations
+  };
+
+  inline constexpr std::array<std::uint8_t, 41> DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR {
+    0x09,  // bLength
+    0x02,  // bDescriptorType: configuration
+    0x29, 0x00,  // wTotalLength
+    0x01,  // bNumInterfaces
+    0x01,  // bConfigurationValue
+    0x00,  // iConfiguration
+    0xC0,  // bmAttributes: self-powered
+    0xFA,  // bMaxPower: 500 mA
+    0x09,  // bLength
+    0x04,  // bDescriptorType: interface
+    0x00,  // bInterfaceNumber
+    0x00,  // bAlternateSetting
+    0x02,  // bNumEndpoints
+    0x03,  // bInterfaceClass: HID
+    0x00,  // bInterfaceSubClass
+    0x00,  // bInterfaceProtocol
+    0x00,  // iInterface
+    0x09,  // bLength
+    0x21,  // bDescriptorType: HID
+    0x11, 0x01,  // bcdHID 1.11
+    0x00,  // bCountryCode
+    0x01,  // bNumDescriptors
+    0x22,  // bDescriptorType: report
+    0x85, 0x01,  // wDescriptorLength: DualSense Edge report descriptor
+    0x07,  // bLength
+    0x05,  // bDescriptorType: endpoint
+    USB_ENDPOINT_IN,
+    0x03,  // bmAttributes: interrupt
+    0x40, 0x00,  // wMaxPacketSize
+    0x06,  // bInterval
+    0x07,  // bLength
+    0x05,  // bDescriptorType: endpoint
+    USB_ENDPOINT_OUT,
+    0x03,  // bmAttributes: interrupt
+    0x40, 0x00,  // wMaxPacketSize
+    0x06,  // bInterval
+  };
 
   constexpr std::uint8_t HAT_NORTH = 0x00;
   constexpr std::uint8_t HAT_NORTHEAST = 0x01;
