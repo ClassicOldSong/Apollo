@@ -91,6 +91,9 @@ namespace platf {
     std::uint8_t last_red {};
     std::uint8_t last_green {};
     std::uint8_t last_blue {};
+
+    bool has_last_edge_buttons {};
+    std::uint32_t last_edge_buttons {};
   };
 
   struct gamepad_context_t {
@@ -568,6 +571,8 @@ namespace platf {
     edge.last_red = {};
     edge.last_green = {};
     edge.last_blue = {};
+    edge.has_last_edge_buttons = {};
+    edge.last_edge_buttons = {};
   }
 
   static int alloc_edge_gamepad(input_raw_t *raw, const gamepad_id_t &id, feedback_queue_t feedback_queue) {
@@ -1325,6 +1330,9 @@ namespace platf {
 
     if (config::input.gamepad == "ds5-edge"sv) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualSense Edge controller (experimental USB/IP)"sv;
+      BOOST_LOG(info)
+        << "Gamepad " << id.globalIndex << " reported DualSense Edge paddle/Fn buttons ["sv
+        << util::hex(metadata.supportedButtons & PADDLE_BUTTONS).to_string_view() << ']';
       if ((metadata.supportedButtons & PADDLE_BUTTONS) != PADDLE_BUTTONS) {
         BOOST_LOG(warning)
           << "Gamepad " << id.globalIndex
@@ -1656,6 +1664,15 @@ namespace platf {
     auto raw = (input_raw_t *) input.get();
     auto &edge = raw->edge_gamepads[nr];
     if (edge.server) {
+      const auto edge_buttons = gamepad_state.buttonFlags & PADDLE_BUTTONS;
+      if (!edge.has_last_edge_buttons || edge.last_edge_buttons != edge_buttons) {
+        BOOST_LOG(info)
+          << "Gamepad " << nr << " DualSense Edge paddle/Fn state changed ["sv
+          << util::hex(edge_buttons).to_string_view() << ']';
+        edge.has_last_edge_buttons = true;
+        edge.last_edge_buttons = edge_buttons;
+      }
+
       edge.server->update_input(gamepad_state);
       return;
     }
