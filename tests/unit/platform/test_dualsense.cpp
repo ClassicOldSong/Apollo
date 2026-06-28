@@ -610,6 +610,26 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     )),
     (std::vector<std::uint8_t> {0, 0})
   );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      standard_endpoint_in,
+      platf::usb::REQUEST_GET_STATUS,
+      0,
+      2,
+      platf::dualsense::USB_ENDPOINT_AUDIO_OUT
+    )),
+    (std::vector<std::uint8_t> {0, 0})
+  );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      standard_endpoint_in,
+      platf::usb::REQUEST_GET_STATUS,
+      0,
+      2,
+      platf::dualsense::USB_ENDPOINT_AUDIO_IN
+    )),
+    (std::vector<std::uint8_t> {0, 0})
+  );
   const auto invalid_endpoint = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
     standard_endpoint_in,
     platf::usb::REQUEST_GET_STATUS,
@@ -652,6 +672,15 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   ));
   EXPECT_TRUE(clear_endpoint_halt.handled);
   EXPECT_TRUE(clear_endpoint_halt.payload.empty());
+  const auto clear_audio_endpoint_halt = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_endpoint_out,
+    platf::usb::REQUEST_CLEAR_FEATURE,
+    platf::usb::FEATURE_ENDPOINT_HALT,
+    0,
+    platf::dualsense::USB_ENDPOINT_AUDIO_OUT
+  ));
+  EXPECT_TRUE(clear_audio_endpoint_halt.handled);
+  EXPECT_TRUE(clear_audio_endpoint_halt.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_interface_in, platf::usb::REQUEST_GET_INTERFACE, 0, 1)),
     (std::vector<std::uint8_t> {0})
