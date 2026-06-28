@@ -635,6 +635,7 @@ function Write-TestSystemEvidenceFiles {
     [bool] $IncludeMi03 = $true,
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
+    [bool] $IncludeGameInputEvidence = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -671,6 +672,14 @@ function Write-TestSystemEvidenceFiles {
       'DriverVersion      : 1.0.0.0',
       'InfName            : usbip_vhci_ude.inf',
       'IsSigned           : True'
+    )
+  }
+  if ($IncludeGameInputEvidence) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'gameinput-service.txt') -Encoding utf8 -Value @(
+      '### GameInput and Gaming Services context',
+      'Name         DisplayName          Status  StartType',
+      'GameInputSvc GameInput Service    Running Manual',
+      'GamingServices Gaming Services    Running Manual'
     )
   }
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
@@ -738,6 +747,7 @@ function Test-SystemSummary {
     [bool] $IncludeMi03 = $true,
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
+    [bool] $IncludeGameInputEvidence = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -752,6 +762,7 @@ function Test-SystemSummary {
       -IncludeMi03 $IncludeMi03 `
       -IncludeAttachSuccess $IncludeAttachSuccess `
       -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence `
+      -IncludeGameInputEvidence $IncludeGameInputEvidence `
       -IncludeUsbIpPortImport $IncludeUsbIpPortImport `
       -IncludeUsbIpPortEdgeVidPid $IncludeUsbIpPortEdgeVidPid `
       -SplitUsbIpPortEvidence $SplitUsbIpPortEvidence `
@@ -1035,6 +1046,7 @@ Test-SystemSummary `
     'MATCH: USB/IP service evidence was captured',
     'MATCH: USB/IP driver package evidence was captured',
     'MATCH: USB/IP signed driver evidence was captured',
+    'MATCH: GameInput/Gaming Services context was captured',
     'MATCH: usbip port shows requested busid',
     'MATCH: usbip port shows virtual Edge VID/PID',
     'MATCH: usbip port shows requested virtual Edge import on one line',
@@ -1097,6 +1109,14 @@ Test-SystemSummary `
     'SKIPPED_OR_MISSING: USB/IP service evidence was captured',
     'SKIPPED_OR_MISSING: USB/IP driver package evidence was captured',
     'SKIPPED_OR_MISSING: USB/IP signed driver evidence was captured'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-gameinput-context-pass' `
+  -IncludeGameInputEvidence $false `
+  -ExpectedOverall 'PASS' `
+  -ExpectedSummaryLines @(
+    'SKIPPED_OR_MISSING: GameInput/Gaming Services context was captured'
   )
 
 Test-SystemSummary `

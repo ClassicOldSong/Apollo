@@ -673,6 +673,7 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'USB/IP service evidence was captured'; Required = $false; Path = 'usbip-services.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'USB/IP driver package evidence was captured'; Required = $false; Path = 'usbip-driver-packages.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'USB/IP signed driver evidence was captured'; Required = $false; Path = 'usbip-signed-drivers.txt'; Pattern = $usbipDriverPattern },
+    @{ Name = 'GameInput/Gaming Services context was captured'; Required = $false; Path = 'gameinput-service.txt'; Pattern = 'GameInput|GamingServices|Gaming Services' },
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
@@ -804,6 +805,34 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-signed-drivers.txt')
     } |
     Sort-Object DeviceName,InfName |
     Select-Object DeviceName,Manufacturer,DriverProviderName,DriverVersion,DriverDate,InfName,IsSigned,Signer |
+    Format-List
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'gameinput-service.txt') -Script {
+  "### GameInput and Gaming Services context"
+  Get-Service -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -match 'GameInput|GamingServices' -or
+      $_.DisplayName -match 'GameInput|Gaming Services'
+    } |
+    Sort-Object Name |
+    Format-Table Name,DisplayName,Status,StartType -AutoSize
+
+  ""
+  "### Win32_Service details"
+  Get-CimInstance Win32_Service -ErrorAction SilentlyContinue |
+    Where-Object {
+      $_.Name -match 'GameInput|GamingServices' -or
+      $_.DisplayName -match 'GameInput|Gaming Services'
+    } |
+    Sort-Object Name |
+    Select-Object Name,DisplayName,State,StartMode,PathName |
+    Format-List
+
+  ""
+  "### Gaming Services app package"
+  Get-AppxPackage -Name '*GamingServices*' -ErrorAction SilentlyContinue |
+    Select-Object Name,PackageFullName,Version,InstallLocation |
     Format-List
 }
 

@@ -113,6 +113,18 @@ represent those bits.
   Sony's app. That is useful product context, but profile editing is separate
   from this streaming path; this branch only preserves live controller state that
   Moonlight already sends over the existing protocol.
+- `SundayMoments/DS5_Bridge#3` and `SundayMoments/DS5_Bridge#20`: another
+  DualSense Edge bridge had to add dedicated back-button handling, while users
+  reported PlayStation Accessories did not reliably work through the bridge.
+  Treat bridge/virtual-device Accessories behavior as a profile-management
+  compatibility issue, not as proof that live Edge button transport failed; use a
+  physically connected Edge for firmware and profile edits.
+- `microsoftconnect/GameInput#20`: Windows GameInput/Windows.Gaming.Input can
+  duplicate or conflict with Sony's own DualSense Edge path in some games.
+  Microsoft notes that these mappings are also used for Windows UX navigation
+  and plans to limit gamepad enumeration without breaking navigation. Capture
+  GameInput/Gaming Services context when testing affected games, but triage
+  duplicate game input separately from the raw Edge button transport proof.
 - `ValveSoftware/steam-for-linux#9256`, `ValveSoftware/steam-for-linux#12489`,
   and `ValveSoftware/steam-devices#48`: Steam's Edge feature path depends on
   `054c:0df2` HID access and the correct udev/hidraw rules; when those rules are
@@ -296,6 +308,8 @@ The key evidence to capture during validation is:
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
+- GameInput/Gaming Services context when validating games that use
+  Windows.Gaming.Input or GameInput.
 - Host-side HID/gamepad inspector evidence showing the four Edge paddle/Fn
   controls as separate inputs, not face-button remaps.
 
@@ -310,12 +324,13 @@ Apollo has logged that the USB/IP backend is listening:
 The helper writes a timestamped directory under `%TEMP%` containing
 `usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
 matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
-USB/IP-related driver package and signed-driver details, environment details,
-all present `VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP
-health/status details, present HIDClass nodes, matching CIM
-`Win32_PnPEntity` rows, and selected PnP properties. Pass one complete Apollo
-log and one complete Moonlight log from the same end-to-end run with `-LogPath`
-to copy them into the same evidence bundle; the log manifest records each copied
+USB/IP-related driver package and signed-driver details, GameInput/Gaming
+Services service and package context, environment details, all present
+`VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP health/status
+details, present HIDClass nodes, matching CIM `Win32_PnPEntity` rows, and
+selected PnP properties. Pass one complete Apollo log and one complete Moonlight
+log from the same end-to-end run with `-LogPath` to copy them into the same
+evidence bundle; the log manifest records each copied
 path's source path, destination path, type, last write time, file size, and
 SHA-256 hash when available. If an existing `-OutputDir` is reused, the helper
 clears the previous copied `logs` directory before summarizing logs, so stale
@@ -360,9 +375,10 @@ Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener's
 requested host and port, `usbip.exe`, requested busid, attach result, optional
-USB/IP service/driver package evidence, `usbip port` entries for both the
-requested busid and the virtual Edge VID/PID on the same imported-device line,
-and Windows PnP `VID_054C&PID_0DF2` / `MI_03` evidence,
+USB/IP service/driver package evidence, optional GameInput/Gaming Services
+context, `usbip port` entries for both the requested busid and the virtual Edge
+VID/PID on the same imported-device line, and Windows PnP
+`VID_054C&PID_0DF2` / `MI_03` evidence,
 including healthy PnP status checks and the first matching lines from the
 captured files. It also writes
 `host-input-evidence-summary.txt`, which lists copied host-input evidence files
@@ -404,6 +420,12 @@ When finished, remove the verbose logging flag:
 ```cmd
 %WINDIR%\system32\reg.exe delete HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters\Wdf /v VerboseOn /f
 ```
+
+If a GameInput/Windows.Gaming.Input-sensitive game alternates between input
+devices, ignores input, or sees duplicate Edge controls while the HID evidence
+still shows four distinct paddle/Fn bits, attach `gameinput-service.txt` from
+the evidence bundle and keep that as an application compatibility follow-up.
+That symptom is different from Apollo failing to transport the Edge button bits.
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
@@ -608,6 +630,9 @@ same end-to-end run:
   control is separate. Text pattern matches are a review aid; generic Windows
   tools may expose the Edge extras as vendor/Edge-specific bits rather than
   numbered generic buttons, so prefer DS5/Edge-aware HID evidence when possible.
+- If a GameInput/Windows.Gaming.Input-sensitive game was used for validation,
+  include `gameinput-service.txt` with the raw HID evidence so duplicate
+  enumeration can be triaged separately from button transport.
 - If `-ArchivePath` was supplied, `archive-summary.txt` ends with
   `overall=PASS` and records the zip file SHA-256 hash. The archive itself
   contains `evidence-artifacts-manifest.txt` for the captured bundle contents,
@@ -724,3 +749,5 @@ That follows SDL's generated mapping order:
   implementation.
 - Do not implement Sony profile editing, firmware update, or PlayStation
   Accessories app compatibility as part of this button-preservation proof.
+- Do not make GameInput/Windows.Gaming.Input game compatibility a pass/fail gate
+  for the first proof when raw HID evidence already shows distinct Edge buttons.
