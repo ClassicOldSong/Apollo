@@ -18,7 +18,8 @@ param(
   [string]$OutputDir = (Join-Path $env:TEMP ("apollo-edge-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))),
   [string[]]$LogPath = @(),
   [switch]$SkipAttach,
-  [int]$PostAttachDelaySeconds = 3
+  [int]$PostAttachDelaySeconds = 3,
+  [switch]$RequirePass
 )
 
 $ErrorActionPreference = 'Continue'
@@ -90,6 +91,26 @@ function Copy-RequestedLogs {
   }
 
   Write-TextFile -Path (Join-Path $OutputDir 'logs-manifest.txt') -Lines $manifest.ToArray()
+}
+
+function Get-EvidenceSummaryOverall {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return 'MISSING'
+  }
+
+  $line = Get-Content -LiteralPath $Path -Tail 20 -ErrorAction SilentlyContinue |
+    Where-Object { $_ -match '^overall=(PASS|FAIL)$' } |
+    Select-Object -Last 1
+
+  if ($line -match '^overall=(PASS|FAIL)$') {
+    return $Matches[1]
+  }
+
+  return 'MISSING'
 }
 
 function Write-LogEvidenceSummary {
@@ -290,6 +311,7 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "busid=$BusId",
   "log_path_count=$($LogPath.Count)",
   "skip_attach=$SkipAttach",
+  "require_pass=$RequirePass",
   "powershell=$($PSVersionTable.PSVersion)"
 )
 
@@ -411,5 +433,15 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-cim.txt') -Script
 
 Write-SystemEvidenceSummary -OutputDir $OutputDir -HostAddress $HostAddress -Port $Port -BusId $BusId -SkipAttach ([bool]$SkipAttach)
 
+$logEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'log-evidence-summary.txt')
+$systemEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'system-evidence-summary.txt')
+
 Write-Host "Evidence written to $OutputDir"
 Write-Host "Attach skipped: $SkipAttach"
+Write-Host "Log evidence overall: $logEvidenceOverall"
+Write-Host "System evidence overall: $systemEvidenceOverall"
+
+if ($RequirePass -and ($logEvidenceOverall -ne 'PASS' -or $systemEvidenceOverall -ne 'PASS')) {
+  Write-Error "DualSense Edge evidence validation failed. Expected log and system summaries to end with overall=PASS."
+  exit 1
+}
