@@ -436,6 +436,7 @@ function Write-LogEvidenceSummary {
       [void]$allLogText.AppendLine("==== $($log.Name) ====")
       [void]$allLogText.AppendLine((Get-Content -LiteralPath $log.FullName -Raw -ErrorAction Stop))
     } catch {
+      $hasFailure = $true
       $summary.Add(("{0}: ERROR reading log for all-log checks: {1}" -f $log.Name, $_.Exception.Message))
     }
   }
@@ -461,6 +462,7 @@ function Write-LogEvidenceSummary {
               $matches.Add(("{0}:{1}: {2}" -f $log.Name, $_.LineNumber, $_.Line.Trim()))
             }
         } catch {
+          $hasFailure = $true
           $summary.Add(("{0}: ERROR reading log for {1}: {2}" -f $log.Name, $check['Name'], $_.Exception.Message))
         }
       }

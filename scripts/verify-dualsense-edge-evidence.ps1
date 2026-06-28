@@ -143,6 +143,52 @@ function Test-LogSummary {
   }
 }
 
+function Test-LogSummaryReadError {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [Parameter(Mandatory = $true)][string] $DetectionLine,
+    [Parameter(Mandatory = $true)][string] $BindingsLine,
+    [Parameter(Mandatory = $true)][string] $MappingLine
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  $stream = $null
+  try {
+    Write-TestEvidenceLog `
+      -OutputDir $outputDir `
+      -DetectionLine $DetectionLine `
+      -BindingsLine $BindingsLine `
+      -MappingLine $MappingLine
+
+    $lockedLog = Join-Path $outputDir 'logs/locked.log'
+    Set-Content -LiteralPath $lockedLog -Value 'locked evidence file' -Encoding utf8
+    $stream = [System.IO.File]::Open(
+      $lockedLog,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::ReadWrite,
+      [System.IO.FileShare]::None
+    )
+
+    Write-LogEvidenceSummary -OutputDir $outputDir
+
+    $summaryPath = Join-Path $outputDir 'log-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne 'FAIL') {
+      Write-Host $summary
+      throw "$Name expected overall=FAIL, got overall=$overall"
+    }
+    Assert-Contains -Content $summary -Needle 'locked.log: ERROR reading log for all-log checks' -CaseName $Name
+  } finally {
+    if ($null -ne $stream) {
+      $stream.Dispose()
+    }
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 function Test-HostInputSummary {
   param(
     [Parameter(Mandatory = $true)][string] $Name,
@@ -496,6 +542,12 @@ Test-LogSummary `
   -BindingsLine $sdl3Bindings `
   -MappingLine $sdl3Mapping `
   -ExpectedOverall 'PASS'
+
+Test-LogSummaryReadError `
+  -Name 'log-read-error-fail' `
+  -DetectionLine $sdl3Detection `
+  -BindingsLine $sdl3Bindings `
+  -MappingLine $sdl3Mapping
 
 Test-LogSummary `
   -Name 'sdl2-undercount-fail' `
