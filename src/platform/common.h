@@ -102,6 +102,10 @@ namespace platf {
     return (buttons & EDGE_PADDLE_BUTTONS) == EDGE_PADDLE_BUTTONS;
   }
 
+  constexpr bool has_dualsense_edge_arrival_support(std::uint8_t type, std::uint32_t buttons) {
+    return type == LI_CTYPE_PS && has_all_edge_paddle_buttons(buttons);
+  }
+
   struct supported_gamepad_t {
     std::string name;
     bool is_enabled;

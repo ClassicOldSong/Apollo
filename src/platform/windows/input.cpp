@@ -1333,13 +1333,15 @@ namespace platf {
       BOOST_LOG(info)
         << "Gamepad " << id.globalIndex << " reported DualSense Edge paddle/Fn buttons ["sv
         << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view() << ']';
-      if (!has_all_edge_paddle_buttons(metadata.supportedButtons)) {
+      if (!has_dualsense_edge_arrival_support(metadata.type, metadata.supportedButtons)) {
         BOOST_LOG(error)
           << "Gamepad " << id.globalIndex
-          << " is using DualSense Edge mode, but the client did not report all Edge paddle/Fn buttons ["sv
+          << " is using DualSense Edge mode, but the client did not report a PlayStation controller with all Edge paddle/Fn buttons "
+          << "(type ["sv << util::hex(metadata.type).to_string_view()
+          << "], paddle/Fn ["sv
           << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view()
           << "]; refusing to allocate virtual Edge controller. "
-          << "Use a client that sends controller arrival support with all four Edge paddle/Fn buttons."sv;
+          << "Use a client that sends PlayStation controller arrival support with all four Edge paddle/Fn buttons."sv;
         return -1;
       }
       return alloc_edge_gamepad(raw, id, std::move(feedback_queue));

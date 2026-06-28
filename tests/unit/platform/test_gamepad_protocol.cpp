@@ -77,7 +77,7 @@ TEST(GamepadProtocolTests, ControllerArrivalCanAdvertiseAllPaddleFlags) {
   EXPECT_EQ(packet.supportedButtonFlags & paddles, paddles);
 }
 
-TEST(GamepadProtocolTests, EdgeModeRequiresCompletePaddleArrivalMask) {
+TEST(GamepadProtocolTests, EdgeModeRequiresPlayStationArrivalWithCompletePaddleMask) {
   EXPECT_TRUE(platf::has_all_edge_paddle_buttons(platf::EDGE_PADDLE_BUTTONS));
   EXPECT_TRUE(platf::has_all_edge_paddle_buttons(
     platf::EDGE_PADDLE_BUTTONS | platf::TOUCHPAD_BUTTON | platf::MISC_BUTTON
@@ -85,4 +85,19 @@ TEST(GamepadProtocolTests, EdgeModeRequiresCompletePaddleArrivalMask) {
 
   EXPECT_FALSE(platf::has_all_edge_paddle_buttons(0));
   EXPECT_FALSE(platf::has_all_edge_paddle_buttons(platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3));
+
+  EXPECT_TRUE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_PS, platf::EDGE_PADDLE_BUTTONS));
+  EXPECT_TRUE(platf::has_dualsense_edge_arrival_support(
+    LI_CTYPE_PS,
+    platf::EDGE_PADDLE_BUTTONS | platf::TOUCHPAD_BUTTON | platf::MISC_BUTTON
+  ));
+
+  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_PS, 0));
+  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(
+    LI_CTYPE_PS,
+    platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3
+  ));
+  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_UNKNOWN, platf::EDGE_PADDLE_BUTTONS));
+  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_XBOX, platf::EDGE_PADDLE_BUTTONS));
+  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_NINTENDO, platf::EDGE_PADDLE_BUTTONS));
 }
