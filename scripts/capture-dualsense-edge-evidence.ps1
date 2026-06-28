@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Continue'
 function Write-TextFile {
   param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [Parameter(Mandatory = $true)][string[]]$Lines
+    [Parameter(Mandatory = $true)][AllowEmptyString()][AllowEmptyCollection()][string[]]$Lines
   )
 
   $Lines | Out-File -FilePath $Path -Encoding utf8 -Width 4096
@@ -81,7 +81,7 @@ function Get-PnpDevicePropertyData {
 function Copy-RequestedLogs {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
-    [Parameter(Mandatory = $true)][string[]]$Paths
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Paths
   )
 
   $manifest = New-Object System.Collections.Generic.List[string]
@@ -143,7 +143,7 @@ function Get-EvidenceSummaryOverall {
 function Copy-RequestedHostInputEvidence {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
-    [Parameter(Mandatory = $true)][string[]]$Paths
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Paths
   )
 
   $manifest = New-Object System.Collections.Generic.List[string]
@@ -185,7 +185,7 @@ function Copy-RequestedHostInputEvidence {
 function Write-HostInputEvidenceSummary {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
-    [Parameter(Mandatory = $true)][string[]]$Patterns,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Patterns,
     [Parameter(Mandatory = $true)][bool]$Required
   )
 
