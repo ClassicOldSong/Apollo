@@ -67,6 +67,45 @@ TEST(DualSenseUsbIpTests, BuildsDualSenseEdgeDeviceListAndImportReplies) {
   EXPECT_EQ(platf::usbip::read_be16(import, 310), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
 }
 
+TEST(DualSenseUsbIpTests, HandlesUsbIpDeviceListRequest) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_be16(request, platf::usbip::VERSION);
+  platf::usbip::append_be16(request, static_cast<std::uint16_t>(platf::usbip::op_code::req_devlist));
+  platf::usbip::append_be32(request, 0);
+
+  const auto reply = platf::dualsense_usbip::handle_op_request(request);
+
+  ASSERT_FALSE(reply.empty());
+  EXPECT_EQ(platf::usbip::read_be16(reply, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_devlist));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 8), 1);
+  EXPECT_EQ(platf::usbip::read_be16(reply, 314), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
+}
+
+TEST(DualSenseUsbIpTests, HandlesUsbIpImportRequestForEdgeBusId) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_be16(request, platf::usbip::VERSION);
+  platf::usbip::append_be16(request, static_cast<std::uint16_t>(platf::usbip::op_code::req_import));
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_fixed_string(request, platf::dualsense_usbip::BUSID, platf::usbip::USB_DEVICE_BUSID_SIZE);
+
+  const auto reply = platf::dualsense_usbip::handle_op_request(request);
+
+  ASSERT_FALSE(reply.empty());
+  EXPECT_EQ(platf::usbip::read_be16(reply, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_import));
+  EXPECT_EQ(platf::usbip::read_be16(reply, 308), platf::dualsense::VENDOR_ID_SONY);
+  EXPECT_EQ(platf::usbip::read_be16(reply, 310), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
+}
+
+TEST(DualSenseUsbIpTests, RejectsUsbIpImportRequestForDifferentBusId) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_be16(request, platf::usbip::VERSION);
+  platf::usbip::append_be16(request, static_cast<std::uint16_t>(platf::usbip::op_code::req_import));
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_fixed_string(request, "2-1", platf::usbip::USB_DEVICE_BUSID_SIZE);
+
+  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(request).empty());
+}
+
 TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
   const auto request = submit_request(
     11,

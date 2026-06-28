@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -25,7 +26,9 @@ namespace platf::usbip {
   constexpr std::size_t USB_INTERFACE_RECORD_SIZE = 4;
 
   enum class op_code : std::uint16_t {
+    req_import = 0x8003,
     rep_import = 0x0003,
+    req_devlist = 0x8005,
     rep_devlist = 0x0005,
   };
 
@@ -73,6 +76,17 @@ namespace platf::usbip {
     std::uint8_t interface_protocol;
   };
 
+  struct op_common_t {
+    std::uint16_t version;
+    op_code code;
+    std::uint32_t status;
+  };
+
+  struct import_request_t {
+    op_common_t common;
+    std::string busid;
+  };
+
   struct basic_header_t {
     command command_code;
     std::uint32_t seqnum;
@@ -117,6 +131,30 @@ namespace platf::usbip {
            (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
            (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
            static_cast<std::uint32_t>(data[offset + 3]);
+  }
+
+  inline std::string read_fixed_string(std::span<const std::uint8_t> data, std::size_t offset, std::size_t width) {
+    std::size_t end = offset;
+    while (end < offset + width && data[end] != 0) {
+      ++end;
+    }
+
+    return {reinterpret_cast<const char *>(data.data() + offset), end - offset};
+  }
+
+  inline op_common_t parse_op_common(std::span<const std::uint8_t> data) {
+    return op_common_t {
+      .version = read_be16(data, 0),
+      .code = static_cast<op_code>(read_be16(data, 2)),
+      .status = read_be32(data, 4),
+    };
+  }
+
+  inline import_request_t parse_import_request(std::span<const std::uint8_t> data) {
+    return import_request_t {
+      .common = parse_op_common(data),
+      .busid = read_fixed_string(data, OP_COMMON_SIZE, USB_DEVICE_BUSID_SIZE),
+    };
   }
 
   inline basic_header_t parse_basic_header(std::span<const std::uint8_t> data) {

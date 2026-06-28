@@ -66,6 +66,33 @@ TEST(UsbIpTests, BuildsDualSenseEdgeImportReply) {
   EXPECT_EQ(reply[319], 1);
 }
 
+TEST(UsbIpTests, ParsesUsbIpOpCommonHeader) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_be16(request, platf::usbip::VERSION);
+  platf::usbip::append_be16(request, static_cast<std::uint16_t>(platf::usbip::op_code::req_devlist));
+  platf::usbip::append_be32(request, 0);
+
+  const auto common = platf::usbip::parse_op_common(request);
+
+  EXPECT_EQ(common.version, platf::usbip::VERSION);
+  EXPECT_EQ(common.code, platf::usbip::op_code::req_devlist);
+  EXPECT_EQ(common.status, 0);
+}
+
+TEST(UsbIpTests, ParsesUsbIpImportRequestBusId) {
+  std::vector<std::uint8_t> request;
+  platf::usbip::append_be16(request, platf::usbip::VERSION);
+  platf::usbip::append_be16(request, static_cast<std::uint16_t>(platf::usbip::op_code::req_import));
+  platf::usbip::append_be32(request, 0);
+  platf::usbip::append_fixed_string(request, "1-1", platf::usbip::USB_DEVICE_BUSID_SIZE);
+
+  const auto import = platf::usbip::parse_import_request(request);
+
+  EXPECT_EQ(import.common.version, platf::usbip::VERSION);
+  EXPECT_EQ(import.common.code, platf::usbip::op_code::req_import);
+  EXPECT_EQ(import.busid, "1-1");
+}
+
 TEST(UsbIpTests, BuildsDeviceListReplyWithHidInterface) {
   const std::array interfaces {
     platf::usbip::interface_identity_t {
