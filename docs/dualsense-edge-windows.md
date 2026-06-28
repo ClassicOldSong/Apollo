@@ -195,6 +195,39 @@ The key evidence to capture during validation is:
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
 
+The following PowerShell snippet captures the USB/IP and Windows PnP side of
+that evidence. Run it from an elevated shell after Apollo has logged that the
+USB/IP backend is listening:
+
+```powershell
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$dir = Join-Path $env:TEMP "apollo-edge-$stamp"
+New-Item -ItemType Directory -Force -Path $dir | Out-Null
+
+$usbipList = Join-Path $dir 'usbip-list.txt'
+$usbipAttach = Join-Path $dir 'usbip-attach.txt'
+$pnpEdge = Join-Path $dir 'pnp-edge.txt'
+$pnpEdgeMi03 = Join-Path $dir 'pnp-edge-mi03.txt'
+
+usbip.exe list -r 127.0.0.1 *> $usbipList
+usbip.exe attach -r 127.0.0.1 -b 1-1 *> $usbipAttach
+
+Get-PnpDevice -PresentOnly |
+  Where-Object { $_.InstanceId -match 'VID_054C&PID_0DF2' } |
+  Format-List Class,FriendlyName,InstanceId,Status |
+  Out-File -FilePath $pnpEdge -Encoding utf8
+
+Get-PnpDevice -PresentOnly |
+  Where-Object {
+    $_.InstanceId -match 'VID_054C&PID_0DF2' -and
+    $_.InstanceId -match 'MI_03'
+  } |
+  Format-List Class,FriendlyName,InstanceId,Status |
+  Out-File -FilePath $pnpEdgeMi03 -Encoding utf8
+
+Write-Host "Evidence written to $dir"
+```
+
 1. Run this Apollo branch on Windows with:
 
    ```text
