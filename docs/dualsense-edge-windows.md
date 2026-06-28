@@ -266,14 +266,16 @@ matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 USB/IP-related driver package and signed-driver details, environment details,
 all present `VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP
 health/status details, present HIDClass nodes, matching CIM
-`Win32_PnPEntity` rows, and selected PnP properties. Pass Apollo and Moonlight
-log files with `-LogPath` to copy them into the same evidence bundle; the log
-manifest records each copied path's source path, destination path, type, last
-write time, file size, and SHA-256 hash when available. If an existing
-`-OutputDir` is reused, the helper clears the previous copied `logs` directory
-before summarizing logs, so stale logs cannot satisfy `-RequirePass`. Copied
-directories include recursive per-file relative paths, sizes, and SHA-256
-hashes. Pass HID/gamepad inspector exports, logs, or screenshots with
+`Win32_PnPEntity` rows, and selected PnP properties. Pass one complete Apollo
+log and one complete Moonlight log from the same end-to-end run with `-LogPath`
+to copy them into the same evidence bundle; the log manifest records each copied
+path's source path, destination path, type, last write time, file size, and
+SHA-256 hash when available. If an existing `-OutputDir` is reused, the helper
+clears the previous copied `logs` directory before summarizing logs, so stale
+logs cannot satisfy `-RequirePass`. Unreadable copied logs fail the log evidence
+summary instead of being skipped. Copied directories include recursive per-file
+relative paths, sizes, and SHA-256 hashes. Pass HID/gamepad inspector exports,
+logs, or screenshots with
 `-HostInputEvidencePath` to keep the host-visible button proof in the same
 evidence bundle; the host-input manifest records the same file metadata and
 recursive hashes. The helper also writes `evidence-artifacts-manifest.txt`,
@@ -286,11 +288,14 @@ text such as face-button remaps or duplicated right/left controls. Screenshots
 still require manual review. JoyShockMapper-style labels are useful only when
 the evidence also records which physical Edge control was pressed, because past
 Edge support reports had duplicate mic-mute mappings and swapped left/right
-labels. For draft-ready
-validation, include both logs because the helper requires Moonlight Edge VID/PID,
-enough SDL joystick buttons for the selected raw mapping (`21+` for native SDL2
-or `17+` for `sdl2-compat`/SDL3), mapping, arrival, press, and release evidence
-plus Apollo arrival, import, and state-change evidence. The helper writes
+labels. For draft-ready validation, include both logs because the helper
+requires complete Moonlight software evidence in one copied Moonlight log and
+complete Apollo host evidence in one copied Apollo log. Partial evidence split
+across multiple logs, stale rotations, or separate runs does not satisfy
+`-RequirePass`. The Moonlight log must include Edge VID/PID, enough SDL joystick
+buttons for the selected raw mapping (`21+` for native SDL2 or `17+` for
+`sdl2-compat`/SDL3), mapping, arrival, press, and release evidence. The Apollo
+log must include arrival, import, and state-change evidence. The helper writes
 `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
@@ -497,7 +502,9 @@ same end-to-end run:
 
 - The evidence helper exits successfully with `-RequirePass`; equivalently,
   `log-evidence-summary.txt` and `system-evidence-summary.txt` both end with
-  `overall=PASS`.
+  `overall=PASS`. The log evidence must come from one complete copied Moonlight
+  log and one complete copied Apollo log from the same run, not partial logs
+  mixed across separate runs or rotations.
 - `host-input-evidence-summary.txt` ends with `overall=PASS`, and a reviewer can
   inspect the copied host-input evidence files to confirm each Edge paddle/Fn
   control is separate. Text pattern matches are a review aid; generic Windows
