@@ -423,9 +423,11 @@ namespace platf::dualsense {
            endpoint_index == USB_ENDPOINT_OUT;
   }
 
-  constexpr bool dualsense_edge_accepts_output_set_report(std::uint16_t report_value) {
+  constexpr bool dualsense_edge_accepts_output_set_report(std::uint16_t report_value, std::uint16_t report_length) {
     return usb::hid_report_type(report_value) == usb::HID_REPORT_TYPE_OUTPUT &&
-           usb::hid_report_id(report_value) == OUTPUT_REPORT_USB;
+           usb::hid_report_id(report_value) == OUTPUT_REPORT_USB &&
+           report_length >= OUTPUT_REPORT_COMMON_SIZE &&
+           report_length <= OUTPUT_REPORT_USB_SIZE;
   }
 
   constexpr bool dualsense_edge_descriptor_is_interface_scoped(std::uint8_t descriptor_type) {
@@ -775,7 +777,7 @@ namespace platf::dualsense {
 
         case usb::HID_REQUEST_SET_REPORT:
           if (!usb::setup_is_in(setup.request_type) &&
-              dualsense_edge_accepts_output_set_report(setup.value)) {
+              dualsense_edge_accepts_output_set_report(setup.value, setup.length)) {
             return handled_empty_control_response();
           }
           return unsupported_control_response();

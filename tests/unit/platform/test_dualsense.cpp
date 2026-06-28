@@ -925,10 +925,37 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
       class_interface_out,
       platf::usb::HID_REQUEST_SET_REPORT,
       0x0202,
-      0,
+      platf::dualsense::OUTPUT_REPORT_USB_SIZE,
       platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
     )).empty()
   );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_out,
+      platf::usb::HID_REQUEST_SET_REPORT,
+      0x0202,
+      platf::dualsense::OUTPUT_REPORT_COMMON_SIZE,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )).empty()
+  );
+  const auto set_output_report_too_short = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_REPORT,
+    0x0202,
+    platf::dualsense::OUTPUT_REPORT_COMMON_SIZE - 1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_output_report_too_short.handled);
+  EXPECT_TRUE(set_output_report_too_short.payload.empty());
+  const auto set_output_report_too_long = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_REPORT,
+    0x0202,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE + 1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_output_report_too_long.handled);
+  EXPECT_TRUE(set_output_report_too_long.payload.empty());
   const auto set_input_report = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
     class_interface_out,
     platf::usb::HID_REQUEST_SET_REPORT,

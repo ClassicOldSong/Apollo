@@ -203,8 +203,7 @@ namespace platf::dualsense_usbip {
            usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
            dualsense::dualsense_edge_targets_hid_interface(setup.index) &&
            setup.request == usb::HID_REQUEST_SET_REPORT &&
-           usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_OUTPUT &&
-           usb::hid_report_id(setup.value) == dualsense::OUTPUT_REPORT_USB;
+           dualsense::dualsense_edge_accepts_output_set_report(setup.value, setup.length);
   }
 
   inline dualsense::output_report_state_t parse_output_report_body(std::span<const std::uint8_t> payload) {
