@@ -670,6 +670,8 @@ function Test-SystemSummary {
 $sdl2Detection = 'DualSense Edge detected with 21 SDL joystick buttons (need 21 for SDL2 Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL 2.32.10)'
 $sdl2Bindings = 'DualSense Edge arrival support: buttons=21 sdlType=3 arrivalType=0x02 supportedButtonFlags=0x000f0000 paddle/Fn=0x000f0000 capabilities=0x00000000 bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17'
 $sdl2Mapping = 'Applied DualSense Edge paddle mappings (updated): paddle1:b20,paddle2:b19,paddle3:b18,paddle4:b17'
+$sdl2PartialMapping = 'Applied DualSense Edge paddle mappings (updated): paddle2:b19,paddle4:b17'
+$sdl2AlreadyPresentMapping = 'DualSense Edge paddle mappings already present'
 
 $sdl2UndercountDetection = 'DualSense Edge detected with 20 SDL joystick buttons (need 21 for SDL2 Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL 2.32.10)'
 
@@ -684,6 +686,20 @@ Test-LogSummary `
   -DetectionLine $sdl2Detection `
   -BindingsLine $sdl2Bindings `
   -MappingLine $sdl2Mapping `
+  -ExpectedOverall 'PASS'
+
+Test-LogSummary `
+  -Name 'sdl2-partial-mapping-line-pass' `
+  -DetectionLine $sdl2Detection `
+  -BindingsLine $sdl2Bindings `
+  -MappingLine $sdl2PartialMapping `
+  -ExpectedOverall 'PASS'
+
+Test-LogSummary `
+  -Name 'sdl2-already-present-mapping-line-pass' `
+  -DetectionLine $sdl2Detection `
+  -BindingsLine $sdl2Bindings `
+  -MappingLine $sdl2AlreadyPresentMapping `
   -ExpectedOverall 'PASS'
 
 Test-LogSummary `
