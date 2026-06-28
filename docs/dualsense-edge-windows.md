@@ -90,7 +90,11 @@ The first implementation forwards standard buttons, sticks, triggers, and the
 four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive
 trigger state are intentionally left for follow-up hardware testing. Host
 output reports are parsed for rumble and lightbar feedback and forwarded
-through Apollo's existing feedback queue.
+through Apollo's existing feedback queue. The virtual device also responds to
+the common DualSense HID feature `GET_REPORT` requests used by host drivers
+for calibration (`0x05`), pairing info (`0x09`), and firmware info (`0x20`).
+Other advertised Edge feature reports are sized according to the Edge HID
+descriptor and return zero-filled payloads with the requested report ID.
 
 ## Manual Windows Test Flow
 

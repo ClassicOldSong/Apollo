@@ -29,11 +29,16 @@ namespace platf::usb {
   constexpr std::uint8_t REQUEST_GET_INTERFACE = 0x0A;
   constexpr std::uint8_t REQUEST_SET_INTERFACE = 0x0B;
 
+  constexpr std::uint8_t HID_REQUEST_GET_REPORT = 0x01;
   constexpr std::uint8_t HID_REQUEST_GET_IDLE = 0x02;
   constexpr std::uint8_t HID_REQUEST_GET_PROTOCOL = 0x03;
   constexpr std::uint8_t HID_REQUEST_SET_REPORT = 0x09;
   constexpr std::uint8_t HID_REQUEST_SET_IDLE = 0x0A;
   constexpr std::uint8_t HID_REQUEST_SET_PROTOCOL = 0x0B;
+
+  constexpr std::uint8_t HID_REPORT_TYPE_INPUT = 0x01;
+  constexpr std::uint8_t HID_REPORT_TYPE_OUTPUT = 0x02;
+  constexpr std::uint8_t HID_REPORT_TYPE_FEATURE = 0x03;
 
   constexpr std::uint8_t DESCRIPTOR_DEVICE = 0x01;
   constexpr std::uint8_t DESCRIPTOR_CONFIGURATION = 0x02;
@@ -83,6 +88,14 @@ namespace platf::usb {
   }
 
   constexpr std::uint8_t descriptor_index(std::uint16_t value) {
+    return static_cast<std::uint8_t>(value & 0xFF);
+  }
+
+  constexpr std::uint8_t hid_report_type(std::uint16_t value) {
+    return static_cast<std::uint8_t>(value >> 8);
+  }
+
+  constexpr std::uint8_t hid_report_id(std::uint16_t value) {
     return static_cast<std::uint8_t>(value & 0xFF);
   }
 

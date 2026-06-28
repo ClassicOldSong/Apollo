@@ -36,6 +36,12 @@ namespace platf::dualsense {
   constexpr std::uint8_t USB_ENDPOINT_OUT = 0x03;
   constexpr std::string_view DUALSENSE_EDGE_MANUFACTURER = "Sony Interactive Entertainment";
   constexpr std::string_view DUALSENSE_EDGE_PRODUCT = "DualSense Edge Wireless Controller";
+  constexpr std::uint8_t FEATURE_REPORT_CALIBRATION = 0x05;
+  constexpr std::uint8_t FEATURE_REPORT_PAIRING_INFO = 0x09;
+  constexpr std::uint8_t FEATURE_REPORT_FIRMWARE_INFO = 0x20;
+  constexpr std::size_t FEATURE_REPORT_CALIBRATION_SIZE = 41;
+  constexpr std::size_t FEATURE_REPORT_PAIRING_INFO_SIZE = 20;
+  constexpr std::size_t FEATURE_REPORT_FIRMWARE_INFO_SIZE = 64;
 
   inline constexpr std::array<std::uint8_t, 18> DUALSENSE_EDGE_DEVICE_DESCRIPTOR {
     0x12,  // bLength
@@ -404,6 +410,115 @@ namespace platf::dualsense {
     }
   }
 
+  constexpr std::size_t dualsense_edge_feature_report_size(std::uint8_t report_id) {
+    if ((report_id >= 0x60 && report_id <= 0x65) ||
+        report_id == 0x68 ||
+        (report_id >= 0x70 && report_id <= 0x7B)) {
+      return 64;
+    }
+
+    switch (report_id) {
+      case FEATURE_REPORT_CALIBRATION:
+        return FEATURE_REPORT_CALIBRATION_SIZE;
+      case 0x08:
+        return 48;
+      case FEATURE_REPORT_PAIRING_INFO:
+        return FEATURE_REPORT_PAIRING_INFO_SIZE;
+      case 0x0A:
+        return 27;
+      case FEATURE_REPORT_FIRMWARE_INFO:
+        return FEATURE_REPORT_FIRMWARE_INFO_SIZE;
+      case 0x21:
+        return 5;
+      case 0x22:
+      case 0x80:
+      case 0x81:
+      case 0x83:
+      case 0x84:
+      case 0xE0:
+      case 0xF0:
+      case 0xF1:
+      case 0xF4:
+        return 64;
+      case 0x82:
+        return 10;
+      case 0x85:
+        return 3;
+      case 0xA0:
+        return 2;
+      case 0xF2:
+        return 53;
+      case 0xF5:
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
+  inline void set_le16(std::vector<std::uint8_t> &report, std::size_t offset, std::int16_t value) {
+    const auto raw = static_cast<std::uint16_t>(value);
+    report[offset] = static_cast<std::uint8_t>(raw & 0xFF);
+    report[offset + 1] = static_cast<std::uint8_t>((raw >> 8) & 0xFF);
+  }
+
+  inline void set_le32(std::vector<std::uint8_t> &report, std::size_t offset, std::uint32_t value) {
+    report[offset] = static_cast<std::uint8_t>(value & 0xFF);
+    report[offset + 1] = static_cast<std::uint8_t>((value >> 8) & 0xFF);
+    report[offset + 2] = static_cast<std::uint8_t>((value >> 16) & 0xFF);
+    report[offset + 3] = static_cast<std::uint8_t>((value >> 24) & 0xFF);
+  }
+
+  inline std::vector<std::uint8_t> dualsense_edge_feature_report(std::uint8_t report_id) {
+    const auto size = dualsense_edge_feature_report_size(report_id);
+    if (size == 0) {
+      return {};
+    }
+
+    std::vector<std::uint8_t> report(size);
+    report[0] = report_id;
+
+    switch (report_id) {
+      case FEATURE_REPORT_CALIBRATION:
+        // Synthetic but sane calibration data keeps host drivers from seeing
+        // zero denominators while the virtual device reports neutral motion.
+        set_le16(report, 7, 1024);
+        set_le16(report, 9, -1024);
+        set_le16(report, 11, 1024);
+        set_le16(report, 13, -1024);
+        set_le16(report, 15, 1024);
+        set_le16(report, 17, -1024);
+        set_le16(report, 19, 1024);
+        set_le16(report, 21, 1024);
+        set_le16(report, 23, 8192);
+        set_le16(report, 25, -8192);
+        set_le16(report, 27, 8192);
+        set_le16(report, 29, -8192);
+        set_le16(report, 31, 8192);
+        set_le16(report, 33, -8192);
+        break;
+
+      case FEATURE_REPORT_PAIRING_INFO:
+        report[1] = 0x02;
+        report[2] = 0x00;
+        report[3] = 0x00;
+        report[4] = 0x00;
+        report[5] = 0x0D;
+        report[6] = 0xF2;
+        break;
+
+      case FEATURE_REPORT_FIRMWARE_INFO:
+        set_le32(report, 24, 1);
+        set_le32(report, 28, 1);
+        set_le16(report, 44, 1);
+        break;
+
+      default:
+        break;
+    }
+
+    return report;
+  }
+
   inline std::vector<std::uint8_t> dualsense_edge_control_response(const usb::setup_packet_t &setup) {
     static constexpr std::array<std::uint8_t, 2> STATUS_SELF_POWERED {1, 0};
     static constexpr std::array<std::uint8_t, 1> CONFIGURATION_ACTIVE {1};
@@ -459,6 +574,15 @@ namespace platf::dualsense {
 
     if (usb::setup_type(setup.request_type) == usb::REQUEST_TYPE_CLASS) {
       switch (setup.request) {
+        case usb::HID_REQUEST_GET_REPORT:
+          if (usb::setup_is_in(setup.request_type) &&
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+              usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_FEATURE) {
+            const auto report = dualsense_edge_feature_report(usb::hid_report_id(setup.value));
+            return usb::limited_response(report, setup.length);
+          }
+          return {};
+
         case usb::HID_REQUEST_GET_IDLE:
           if (usb::setup_is_in(setup.request_type)) {
             return usb::limited_response(HID_IDLE_RATE, setup.length);

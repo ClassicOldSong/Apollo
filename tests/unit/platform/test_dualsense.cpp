@@ -53,6 +53,18 @@ namespace {
       .length = length,
     };
   }
+
+  platf::usb::setup_packet_t get_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+    return platf::usb::setup_packet_t {
+      .request_type = platf::usb::REQUEST_DIRECTION_IN |
+                      (platf::usb::REQUEST_TYPE_CLASS << 5) |
+                      platf::usb::RECIPIENT_INTERFACE,
+      .request = platf::usb::HID_REQUEST_GET_REPORT,
+      .value = static_cast<std::uint16_t>((report_type << 8) | report_id),
+      .index = 0,
+      .length = length,
+    };
+  }
 }  // namespace
 
 TEST(DualSenseReportTests, PacksDpadAndFaceButtons) {
@@ -299,6 +311,71 @@ TEST(DualSenseReportTests, LimitsDualSenseEdgeDescriptorResponsesToRequestedLeng
   EXPECT_EQ(response.size(), 4);
   EXPECT_EQ(response[0], 0x12);
   EXPECT_EQ(response[1], platf::usb::DESCRIPTOR_DEVICE);
+}
+
+TEST(DualSenseReportTests, ProvidesDualSenseEdgeFeatureReportsForUsbEnumeration) {
+  const auto calibration = platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE
+  ));
+
+  ASSERT_EQ(calibration.size(), platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE);
+  EXPECT_EQ(calibration[0], platf::dualsense::FEATURE_REPORT_CALIBRATION);
+  EXPECT_EQ(calibration[7], 0x00);
+  EXPECT_EQ(calibration[8], 0x04);
+  EXPECT_EQ(calibration[9], 0x00);
+  EXPECT_EQ(calibration[10], 0xFC);
+  EXPECT_EQ(calibration[23], 0x00);
+  EXPECT_EQ(calibration[24], 0x20);
+  EXPECT_EQ(calibration[25], 0x00);
+  EXPECT_EQ(calibration[26], 0xE0);
+
+  const auto pairing = platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_PAIRING_INFO,
+    platf::dualsense::FEATURE_REPORT_PAIRING_INFO_SIZE
+  ));
+  ASSERT_EQ(pairing.size(), platf::dualsense::FEATURE_REPORT_PAIRING_INFO_SIZE);
+  EXPECT_EQ(pairing[0], platf::dualsense::FEATURE_REPORT_PAIRING_INFO);
+  EXPECT_EQ(pairing[1], 0x02);
+  EXPECT_EQ(pairing[5], 0x0D);
+  EXPECT_EQ(pairing[6], 0xF2);
+
+  const auto firmware = platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO,
+    platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO_SIZE
+  ));
+  ASSERT_EQ(firmware.size(), platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO_SIZE);
+  EXPECT_EQ(firmware[0], platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO);
+  EXPECT_EQ(firmware[24], 1);
+  EXPECT_EQ(firmware[28], 1);
+  EXPECT_EQ(firmware[44], 1);
+}
+
+TEST(DualSenseReportTests, LimitsAndRejectsDualSenseEdgeFeatureReports) {
+  const auto limited = platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO,
+    4
+  ));
+  ASSERT_EQ(limited.size(), 4);
+  EXPECT_EQ(limited[0], platf::dualsense::FEATURE_REPORT_FIRMWARE_INFO);
+
+  EXPECT_EQ(platf::dualsense::dualsense_edge_feature_report_size(0x08), 48);
+  EXPECT_EQ(platf::dualsense::dualsense_edge_feature_report_size(0x7B), 64);
+  EXPECT_EQ(platf::dualsense::dualsense_edge_feature_report_size(0xF2), 53);
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_FEATURE,
+    0x99,
+    64
+  )).empty());
+  EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_INPUT,
+    platf::dualsense::INPUT_REPORT_USB,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  )).empty());
 }
 
 TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {

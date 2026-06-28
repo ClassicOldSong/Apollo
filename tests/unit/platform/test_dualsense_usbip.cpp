@@ -61,6 +61,21 @@ namespace {
     };
   }
 
+  std::array<std::uint8_t, 8> get_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+    return {
+      static_cast<std::uint8_t>(platf::usb::REQUEST_DIRECTION_IN |
+                                (platf::usb::REQUEST_TYPE_CLASS << 5) |
+                                platf::usb::RECIPIENT_INTERFACE),
+      platf::usb::HID_REQUEST_GET_REPORT,
+      report_id,
+      report_type,
+      0x00,
+      0x00,
+      static_cast<std::uint8_t>(length & 0xFF),
+      static_cast<std::uint8_t>((length >> 8) & 0xFF),
+    };
+  }
+
   std::vector<std::uint8_t> submit_payload(const std::vector<std::uint8_t> &reply) {
     return {reply.begin() + platf::usbip::SUBMIT_HEADER_SIZE, reply.end()};
   }
@@ -144,6 +159,33 @@ TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {
   ASSERT_EQ(payload.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   EXPECT_EQ(payload.front(), 0x05);
   EXPECT_EQ(payload.back(), 0xC0);
+}
+
+TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeFeatureReport) {
+  const auto request = submit_request(
+    12,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE,
+    get_report_setup(
+      platf::usb::HID_REPORT_TYPE_FEATURE,
+      platf::dualsense::FEATURE_REPORT_CALIBRATION,
+      platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE
+    )
+  );
+
+  ASSERT_TRUE(platf::dualsense_usbip::is_control_submit(request));
+
+  const auto reply = platf::dualsense_usbip::make_control_submit_reply(request);
+  const auto payload = submit_payload(reply);
+
+  EXPECT_EQ(platf::usbip::read_be32(reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 4), 12);
+  EXPECT_EQ(platf::usbip::read_be32(reply, 24), platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE);
+  ASSERT_EQ(payload.size(), platf::dualsense::FEATURE_REPORT_CALIBRATION_SIZE);
+  EXPECT_EQ(payload[0], platf::dualsense::FEATURE_REPORT_CALIBRATION);
+  EXPECT_EQ(payload[8], 0x04);
+  EXPECT_EQ(payload[10], 0xFC);
 }
 
 TEST(DualSenseUsbIpTests, BuildsInterruptInSubmitReplyWithEdgeButtons) {
