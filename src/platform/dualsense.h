@@ -680,14 +680,19 @@ namespace platf::dualsense {
 
         case usb::REQUEST_GET_CONFIGURATION:
           if (usb::setup_is_in(setup.request_type) &&
-              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE &&
+              setup.value == 0 &&
+              setup.index == 0) {
             return handled_control_response(CONFIGURATION_ACTIVE, setup.length);
           }
           return unsupported_control_response();
 
         case usb::REQUEST_SET_CONFIGURATION:
           if (!usb::setup_is_in(setup.request_type) &&
-              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE) {
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE &&
+              setup.value == 1 &&
+              setup.index == 0 &&
+              setup.length == 0) {
             return handled_empty_control_response();
           }
           return unsupported_control_response();
