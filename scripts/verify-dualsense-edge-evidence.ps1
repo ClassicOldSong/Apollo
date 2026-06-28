@@ -514,6 +514,54 @@ function Test-EvidenceBundleManifest {
   }
 }
 
+function Test-EvidenceArchive {
+  $outputDir = New-TestOutputDir -Name 'archive'
+  $archivePath = "$outputDir.zip"
+  try {
+    New-Item -ItemType Directory -Force -Path (Join-Path $outputDir 'logs') | Out-Null
+    Set-Content -LiteralPath (Join-Path $outputDir 'environment.txt') -Encoding utf8 -Value 'is_admin=True'
+    Set-Content -LiteralPath (Join-Path $outputDir 'logs/edge.log') -Encoding utf8 -Value 'edge log'
+
+    Write-EvidenceBundleManifest -OutputDir $outputDir
+    $writtenArchivePath = Write-EvidenceArchive -OutputDir $outputDir -ArchivePath $archivePath
+
+    if ($writtenArchivePath -ne $archivePath) {
+      throw "archive expected path $archivePath, got $writtenArchivePath"
+    }
+    if (-not (Test-Path -LiteralPath $archivePath)) {
+      throw "archive was not created at $archivePath"
+    }
+
+    $summary = Get-Content -LiteralPath (Join-Path $outputDir 'archive-summary.txt') -Raw
+    Assert-Contains -Content $summary -Needle 'overall=PASS' -CaseName 'archive summary pass'
+    Assert-Matches -Content $summary -Pattern 'archive_sha256=[0-9a-f]{64}' -CaseName 'archive summary hash'
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+    try {
+      $entryNames = @($archive.Entries | ForEach-Object { $_.FullName })
+      if (-not ($entryNames -contains 'environment.txt')) {
+        throw 'archive missing environment.txt'
+      }
+      if (-not ($entryNames -contains 'logs/edge.log')) {
+        throw 'archive missing logs/edge.log'
+      }
+      if (-not ($entryNames -contains 'evidence-artifacts-manifest.txt')) {
+        throw 'archive missing evidence-artifacts-manifest.txt'
+      }
+    } finally {
+      $archive.Dispose()
+    }
+  } finally {
+    if (Test-Path -LiteralPath $archivePath) {
+      Remove-Item -LiteralPath $archivePath -Force
+    }
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 function Write-TestSystemEvidenceFiles {
   param(
     [Parameter(Mandatory = $true)][string] $OutputDir,
@@ -874,6 +922,7 @@ Test-MissingHostInputSummary `
 
 Test-CopiedEvidenceManifestHashes
 Test-EvidenceBundleManifest
+Test-EvidenceArchive
 
 Test-SystemSummary `
   -Name 'system-pass' `

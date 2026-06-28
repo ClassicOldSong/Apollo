@@ -16,6 +16,7 @@ param(
   [int]$Port = 3240,
   [string]$BusId = '1-1',
   [string]$OutputDir = (Join-Path $env:TEMP ("apollo-edge-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))),
+  [string]$ArchivePath = '',
   [string[]]$LogPath = @(),
   [string[]]$HostInputEvidencePath = @(),
   [string[]]$HostInputEvidencePattern = @(),
@@ -146,6 +147,64 @@ function Write-EvidenceBundleManifest {
   }
 
   Write-TextFile -Path $manifestPath -Lines $manifest.ToArray()
+}
+
+function Write-EvidenceArchive {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ArchivePath
+  )
+
+  if ([string]::IsNullOrWhiteSpace($ArchivePath)) {
+    return $null
+  }
+
+  $summaryPath = Join-Path $OutputDir 'archive-summary.txt'
+  $summary = New-Object System.Collections.Generic.List[string]
+
+  try {
+    $rootItem = Get-Item -LiteralPath $OutputDir -ErrorAction Stop
+    $rootFullPath = [System.IO.Path]::GetFullPath($rootItem.FullName).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $archiveFullPath = [System.IO.Path]::GetFullPath($ArchivePath)
+    $rootWithSeparator = $rootFullPath + [System.IO.Path]::DirectorySeparatorChar
+
+    if ($archiveFullPath.StartsWith($rootWithSeparator, [System.StringComparison]::OrdinalIgnoreCase)) {
+      throw "ArchivePath must be outside OutputDir so the archive does not include itself."
+    }
+
+    $archiveParent = Split-Path -Parent $archiveFullPath
+    if (-not [string]::IsNullOrWhiteSpace($archiveParent)) {
+      New-Item -ItemType Directory -Force -Path $archiveParent | Out-Null
+    }
+    if (Test-Path -LiteralPath $archiveFullPath) {
+      Remove-Item -LiteralPath $archiveFullPath -Force -ErrorAction Stop
+    }
+
+    $summary.Add("archive_path=$archiveFullPath")
+    $summary.Add("source_root=$rootFullPath")
+    $summary.Add("generated_utc=$((Get-Date).ToUniversalTime().ToString('o'))")
+
+    Add-Type -AssemblyName System.IO.Compression.FileSystem -ErrorAction Stop
+    [System.IO.Compression.ZipFile]::CreateFromDirectory(
+      $rootFullPath,
+      $archiveFullPath,
+      [System.IO.Compression.CompressionLevel]::Optimal,
+      $false
+    )
+
+    $archiveItem = Get-Item -LiteralPath $archiveFullPath -ErrorAction Stop
+    $archiveHash = Get-FileHash -LiteralPath $archiveFullPath -Algorithm SHA256 -ErrorAction Stop
+    $summary.Add("archive_size_bytes=$($archiveItem.Length)")
+    $summary.Add("archive_sha256=$($archiveHash.Hash.ToLowerInvariant())")
+    $summary.Add('overall=PASS')
+    Write-TextFile -Path $summaryPath -Lines $summary.ToArray()
+    return $archiveFullPath
+  } catch {
+    $summary.Add("archive_error=$($_.Exception.Message)")
+    $summary.Add('overall=FAIL')
+    Write-TextFile -Path $summaryPath -Lines $summary.ToArray()
+    return $null
+  }
 }
 
 function Copy-RequestedLogs {
@@ -636,6 +695,8 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "host=$HostAddress",
   "port=$Port",
   "busid=$BusId",
+  "output_dir=$OutputDir",
+  "archive_path=$ArchivePath",
   "log_path_count=$($LogPath.Count)",
   "host_input_evidence_path_count=$($HostInputEvidencePath.Count)",
   "host_input_evidence_pattern_count=$($HostInputEvidencePattern.Count)",
@@ -837,12 +898,18 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-cim.txt') -Script
 
 Write-SystemEvidenceSummary -OutputDir $OutputDir -HostAddress $HostAddress -Port $Port -BusId $BusId -SkipAttach ([bool]$SkipAttach)
 Write-EvidenceBundleManifest -OutputDir $OutputDir
+$writtenArchivePath = Write-EvidenceArchive -OutputDir $OutputDir -ArchivePath $ArchivePath
 
 $logEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'log-evidence-summary.txt')
 $systemEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'system-evidence-summary.txt')
 $hostInputEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'host-input-evidence-summary.txt')
+$archiveOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'archive-summary.txt')
 
 Write-Host "Evidence written to $OutputDir"
+if (-not [string]::IsNullOrWhiteSpace($ArchivePath)) {
+  Write-Host "Evidence archive written to $writtenArchivePath"
+  Write-Host "Archive evidence overall: $archiveOverall"
+}
 Write-Host "Attach skipped: $SkipAttach"
 Write-Host "Log evidence overall: $logEvidenceOverall"
 Write-Host "System evidence overall: $systemEvidenceOverall"
@@ -855,5 +922,10 @@ if ($RequirePass -and ($logEvidenceOverall -ne 'PASS' -or $systemEvidenceOverall
 
 if ($RequireHostInputEvidence -and $hostInputEvidenceOverall -ne 'PASS') {
   Write-Error "DualSense Edge host input evidence validation failed. Expected host-input evidence summary to end with overall=PASS."
+  exit 1
+}
+
+if ((-not [string]::IsNullOrWhiteSpace($ArchivePath)) -and $archiveOverall -ne 'PASS') {
+  Write-Error "DualSense Edge evidence archive creation failed. Expected archive summary to end with overall=PASS."
   exit 1
 }
