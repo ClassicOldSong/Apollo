@@ -575,6 +575,8 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   const auto standard_interface_in = platf::usb::REQUEST_DIRECTION_IN |
                                      (platf::usb::REQUEST_TYPE_STANDARD << 5) |
                                      platf::usb::RECIPIENT_INTERFACE;
+  const auto standard_interface_out = (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                      platf::usb::RECIPIENT_INTERFACE;
   const auto standard_endpoint_in = platf::usb::REQUEST_DIRECTION_IN |
                                     (platf::usb::REQUEST_TYPE_STANDARD << 5) |
                                     platf::usb::RECIPIENT_ENDPOINT;
@@ -685,6 +687,25 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_interface_in, platf::usb::REQUEST_GET_INTERFACE, 0, 1)),
     (std::vector<std::uint8_t> {0})
   );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      standard_interface_in,
+      platf::usb::REQUEST_GET_INTERFACE,
+      0,
+      1,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_OUT
+    )),
+    (std::vector<std::uint8_t> {0})
+  );
+  const auto get_interface_with_value = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_in,
+    platf::usb::REQUEST_GET_INTERFACE,
+    1,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(get_interface_with_value.handled);
+  EXPECT_TRUE(get_interface_with_value.payload.empty());
   const auto invalid_interface = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
     standard_interface_in,
     platf::usb::REQUEST_GET_INTERFACE,
@@ -703,6 +724,33 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   ));
   EXPECT_FALSE(interface_with_high_byte.handled);
   EXPECT_TRUE(interface_with_high_byte.payload.empty());
+  const auto set_interface_alt_zero = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_out,
+    platf::usb::REQUEST_SET_INTERFACE,
+    0,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_OUT
+  ));
+  EXPECT_TRUE(set_interface_alt_zero.handled);
+  EXPECT_TRUE(set_interface_alt_zero.payload.empty());
+  const auto set_interface_alt_one = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_out,
+    platf::usb::REQUEST_SET_INTERFACE,
+    1,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_AUDIO_OUT
+  ));
+  EXPECT_FALSE(set_interface_alt_one.handled);
+  EXPECT_TRUE(set_interface_alt_one.payload.empty());
+  const auto set_interface_with_payload = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_interface_out,
+    platf::usb::REQUEST_SET_INTERFACE,
+    0,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_interface_with_payload.handled);
+  EXPECT_TRUE(set_interface_with_payload.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       class_interface_in,

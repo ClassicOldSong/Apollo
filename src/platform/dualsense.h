@@ -407,6 +407,10 @@ namespace platf::dualsense {
     return interface_index <= DUALSENSE_EDGE_INTERFACE_HID;
   }
 
+  constexpr bool dualsense_edge_accepts_alternate_setting(std::uint16_t interface_index, std::uint16_t alternate_setting) {
+    return dualsense_edge_has_interface(interface_index) && alternate_setting == 0;
+  }
+
   constexpr bool dualsense_edge_has_endpoint(std::uint16_t endpoint_index) {
     return endpoint_index == 0 ||
            endpoint_index == USB_ENDPOINT_AUDIO_OUT ||
@@ -686,6 +690,7 @@ namespace platf::dualsense {
         case usb::REQUEST_GET_INTERFACE:
           if (usb::setup_is_in(setup.request_type) &&
               usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+              setup.value == 0 &&
               dualsense_edge_has_interface(setup.index)) {
             return handled_control_response(INTERFACE_ALTERNATE_SETTING, setup.length);
           }
@@ -694,7 +699,8 @@ namespace platf::dualsense {
         case usb::REQUEST_SET_INTERFACE:
           if (!usb::setup_is_in(setup.request_type) &&
               usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
-              dualsense_edge_has_interface(setup.index)) {
+              setup.length == 0 &&
+              dualsense_edge_accepts_alternate_setting(setup.index, setup.value)) {
             return handled_empty_control_response();
           }
           return unsupported_control_response();
