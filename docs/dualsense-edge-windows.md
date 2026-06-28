@@ -107,8 +107,9 @@ descriptor and return zero-filled payloads with the requested report ID.
 2. Start a Moonlight client built from the companion DualSense Edge branch and
    connect the physical DualSense Edge.
 3. Confirm Apollo logs:
-   - `DualSense Edge USB/IP: listening on 127.0.0.1:3240`
+   - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
+   - `Gamepad ... reported DualSense Edge paddle/Fn buttons [000F0000]`
 4. In an elevated Windows shell with `usbip-win2`, list and attach the virtual
    controller:
 
@@ -127,11 +128,18 @@ descriptor and return zero-filled payloads with the requested report ID.
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
    - `PADDLE4`: left Fn
+8. Confirm each control changes Apollo's Edge-state log:
+   - `PADDLE1`: `Gamepad ... DualSense Edge paddle/Fn state changed [00010000]`
+   - `PADDLE2`: `Gamepad ... DualSense Edge paddle/Fn state changed [00020000]`
+   - `PADDLE3`: `Gamepad ... DualSense Edge paddle/Fn state changed [00040000]`
+   - `PADDLE4`: `Gamepad ... DualSense Edge paddle/Fn state changed [00080000]`
 
 If the USB/IP device enumerates but the four controls do not appear, capture
 Apollo logs and the HID inspector output first. If Apollo does not log the
-four `PADDLE1..4` flags in controller arrivals, debug the Moonlight/SDL mapping
-path before changing the Windows USB/IP backend.
+advertised `[000F0000]` controller-arrival mask, debug the Moonlight/SDL
+mapping path before changing the Windows USB/IP backend. If Apollo logs the
+arrival mask but does not log the per-control state changes, debug the streamed
+input event path before changing the USB descriptor.
 
 ## Preferred Architecture
 
