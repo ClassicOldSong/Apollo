@@ -637,6 +637,7 @@ function Write-TestSystemEvidenceFiles {
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeGameInputEvidence = $true,
     [bool] $IncludeWindowsDeviceEvents = $true,
+    [bool] $IncludeDeviceInterface = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -727,6 +728,14 @@ function Write-TestSystemEvidenceFiles {
     'InstanceId : HID\VID_054C&PID_0DF2&MI_03\EDGE',
     'Status     : OK'
   )
+  if ($IncludeDeviceInterface) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'device-interface-classes.txt') -Encoding utf8 -Value @(
+      '### DeviceClasses entries for the DualSense Edge VID/PID',
+      'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\{4d1e55b2-f16f-11cf-88cb-001111000030}\##?#HID#VID_054C&PID_0DF2&MI_03#EDGE#{4d1e55b2-f16f-11cf-88cb-001111000030}',
+      '### Filtered MI_03 interface lines',
+      'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\{4d1e55b2-f16f-11cf-88cb-001111000030}\##?#HID#VID_054C&PID_0DF2&MI_03#EDGE#{4d1e55b2-f16f-11cf-88cb-001111000030}'
+    )
+  }
   Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge-health.txt') -Encoding utf8 -Value @(
     'device_count=2',
     'edge_ok_count=2',
@@ -766,6 +775,7 @@ function Test-SystemSummary {
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeGameInputEvidence = $true,
     [bool] $IncludeWindowsDeviceEvents = $true,
+    [bool] $IncludeDeviceInterface = $true,
     [bool] $IncludeUsbIpPortImport = $true,
     [bool] $IncludeUsbIpPortEdgeVidPid = $true,
     [bool] $SplitUsbIpPortEvidence = $false,
@@ -782,6 +792,7 @@ function Test-SystemSummary {
       -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence `
       -IncludeGameInputEvidence $IncludeGameInputEvidence `
       -IncludeWindowsDeviceEvents $IncludeWindowsDeviceEvents `
+      -IncludeDeviceInterface $IncludeDeviceInterface `
       -IncludeUsbIpPortImport $IncludeUsbIpPortImport `
       -IncludeUsbIpPortEdgeVidPid $IncludeUsbIpPortEdgeVidPid `
       -SplitUsbIpPortEvidence $SplitUsbIpPortEvidence `
@@ -1072,7 +1083,8 @@ Test-SystemSummary `
     'MATCH: usbip port shows virtual Edge VID/PID',
     'MATCH: usbip port shows requested virtual Edge import on one line',
     'MATCH: PnP shows MI_03 HID child',
-    'MATCH: PnP shows healthy MI_03 HID child'
+    'MATCH: PnP shows healthy MI_03 HID child',
+    'MATCH: DeviceClasses shows Edge MI_03 HID interface'
   )
 
 Test-SystemSummary `
@@ -1090,6 +1102,14 @@ Test-SystemSummary `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
     'MISSING: Apollo listener reports requested host'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-device-interface-fail' `
+  -IncludeDeviceInterface $false `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: DeviceClasses shows Edge MI_03 HID interface'
   )
 
 Test-SystemSummary `

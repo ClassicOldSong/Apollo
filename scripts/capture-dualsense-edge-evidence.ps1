@@ -687,6 +687,7 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'PnP shows at least one healthy Edge device'; Required = $true; Path = 'pnp-edge-health.txt'; Pattern = 'edge_ok_count=[1-9][0-9]*' },
     @{ Name = 'PnP shows healthy MI_03 HID child'; Required = $true; Path = 'pnp-edge-health.txt'; Pattern = 'mi03_ok_count=[1-9][0-9]*' },
     @{ Name = 'HIDClass shows Edge HID node'; Required = $true; Path = 'pnp-edge-hidclass.txt'; Pattern = 'VID_054C&PID_0DF2|DualSense Edge' },
+    @{ Name = 'DeviceClasses shows Edge MI_03 HID interface'; Required = $true; Path = 'device-interface-classes.txt'; Pattern = 'VID_054C&PID_0DF2.*MI_03|MI_03.*VID_054C&PID_0DF2' },
     @{ Name = 'CIM shows Edge PnP entity'; Required = $true; Path = 'pnp-edge-cim.txt'; Pattern = 'VID_054C&PID_0DF2' }
   )
 
@@ -992,6 +993,25 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-hidclass.txt') -S
     } |
     Sort-Object Class,FriendlyName,InstanceId |
     Format-List Class,FriendlyName,InstanceId,Status
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'device-interface-classes.txt') -Script {
+  "### DeviceClasses entries for the DualSense Edge VID/PID"
+  $lines = @(& reg.exe query 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceClasses' /s /f 'VID_054C&PID_0DF2' 2>&1)
+  "exit_code=$LASTEXITCODE"
+  $lines | Select-Object -First 500
+  if ($lines.Count -gt 500) {
+    "truncated_line_count=$($lines.Count - 500)"
+  }
+
+  ""
+  "### Filtered MI_03 interface lines"
+  $mi03Lines = @($lines | Where-Object { $_ -match 'VID_054C&PID_0DF2' -and $_ -match 'MI_03' })
+  if ($mi03Lines.Count -eq 0) {
+    "No DeviceClasses entries containing both VID_054C&PID_0DF2 and MI_03 were found."
+  } else {
+    $mi03Lines | Select-Object -First 100
+  }
 }
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-health.txt') -Script {

@@ -325,6 +325,8 @@ The key evidence to capture during validation is:
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
+- Windows DeviceClasses entries showing a host-openable HID interface path for
+  the `VID_054C&PID_0DF2` / `MI_03` child.
 - Recent Windows device/input events for USB/IP, PnP, HIDClass,
   DriverFrameworks, and GameInput troubleshooting.
 - GameInput/Gaming Services service, package, and registry context when
@@ -348,9 +350,9 @@ Services service/package context, filtered GameInput registry context for Sony
 Edge VID/PID entries, recent Windows device/input events from relevant System,
 Application, DriverFrameworks, and GameInput logs, environment details, all
 present `VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP
-health/status details, present HIDClass nodes, matching CIM `Win32_PnPEntity`
-rows, and selected PnP properties. Pass one complete Apollo log and one complete
-Moonlight
+health/status details, present HIDClass nodes, matching DeviceClasses HID
+interface entries, matching CIM `Win32_PnPEntity` rows, and selected PnP
+properties. Pass one complete Apollo log and one complete Moonlight
 log from the same end-to-end run with `-LogPath` to copy them into the same
 evidence bundle; the log manifest records each copied
 path's source path, destination path, type, last write time, file size, and
@@ -402,8 +404,8 @@ registry context, optional recent Windows device/input events, `usbip port`
 entries for both the requested busid and the virtual Edge VID/PID on the same
 imported-device line, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence,
-including healthy PnP status checks and the first matching lines from the
-captured files. It also writes
+including healthy PnP status checks, DeviceClasses HID-interface evidence, and
+the first matching lines from the captured files. It also writes
 `host-input-evidence-summary.txt`, which lists copied host-input evidence files
 and any optional text-pattern matches. The log and system summaries end with
 `overall=PASS` only when all required checks matched and no stop-condition
@@ -677,6 +679,8 @@ same end-to-end run:
   no combined paddle/Fn state while testing one control at a time.
 - `usbip-win2` imports the loopback busid and Windows enumerates
   `VID_054C&PID_0DF2` with a healthy `MI_03` HID child.
+- Windows DeviceClasses contains a `VID_054C&PID_0DF2` / `MI_03` HID interface
+  entry that host applications can open.
 - A host-side gamepad or HID inspection tool observes four separate Edge
   paddle/Fn inputs rather than face-button remaps.
 - Standard buttons, sticks, and triggers still work through the virtual Edge
