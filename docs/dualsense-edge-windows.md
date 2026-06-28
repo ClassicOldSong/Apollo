@@ -291,6 +291,8 @@ refreshed.
    ```
 
 6. Confirm Apollo logs:
+   - `DualSense Edge USB/IP: answering device list request`
+   - `DualSense Edge USB/IP: client requested busid 1-1`
    - `DualSense Edge USB/IP: client imported virtual controller`
 7. Check Device Manager, `joy.cpl`, Steam Input, or a HID inspection tool for a
    Sony `054c:0df2` DualSense Edge device.

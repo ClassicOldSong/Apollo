@@ -190,6 +190,7 @@ namespace platf::dualsense_usbip {
     void serve_client(SOCKET client) {
       std::array<std::uint8_t, usbip::OP_COMMON_SIZE> op_header {};
       if (!recv_exact(client, op_header)) {
+        BOOST_LOG(debug) << "DualSense Edge USB/IP: client disconnected before sending an op request"sv;
         return;
       }
 
@@ -197,27 +198,54 @@ namespace platf::dualsense_usbip {
       if (common.code == usbip::op_code::req_devlist) {
         const auto reply = dualsense_usbip::handle_op_request(op_header);
         if (!reply.empty()) {
+          BOOST_LOG(info) << "DualSense Edge USB/IP: answering device list request"sv;
           send_all(client, reply);
+        } else {
+          BOOST_LOG(warning)
+            << "DualSense Edge USB/IP: rejecting device list request with version "sv
+            << common.version;
         }
         return;
       }
 
       if (common.code != usbip::op_code::req_import) {
+        BOOST_LOG(warning)
+          << "DualSense Edge USB/IP: unsupported op request "sv
+          << static_cast<std::uint16_t>(common.code)
+          << " version "sv << common.version;
         return;
       }
 
       std::array<std::uint8_t, usbip::OP_COMMON_SIZE + usbip::USB_DEVICE_BUSID_SIZE> import_request {};
       std::ranges::copy(op_header, import_request.begin());
       if (!recv_exact(client, std::span {import_request}.subspan(usbip::OP_COMMON_SIZE))) {
+        BOOST_LOG(warning) << "DualSense Edge USB/IP: client sent a short import request"sv;
         return;
       }
 
+      const auto import = usbip::parse_import_request(import_request);
+      BOOST_LOG(info) << "DualSense Edge USB/IP: client requested busid "sv << import.busid;
       const auto import_reply = dualsense_usbip::handle_op_request(import_request);
-      if (import_reply.empty() || !send_all(client, import_reply)) {
+      if (import_reply.empty()) {
+        BOOST_LOG(warning)
+          << "DualSense Edge USB/IP: rejecting import request for busid "sv
+          << import.busid
+          << " with version "sv << common.version;
+        return;
+      }
+      if (!send_all(client, import_reply)) {
+        BOOST_LOG(warning)
+          << "DualSense Edge USB/IP: failed to send import reply for busid "sv
+          << import.busid;
         return;
       }
 
-      if (usbip::read_be32(import_reply, 4) != 0) {
+      const auto import_status = usbip::read_be32(import_reply, 4);
+      if (import_status != 0) {
+        BOOST_LOG(warning)
+          << "DualSense Edge USB/IP: rejected import request for busid "sv
+          << import.busid
+          << " status "sv << import_status;
         return;
       }
 
@@ -309,6 +337,9 @@ namespace platf::dualsense_usbip {
             break;
           }
         } else {
+          BOOST_LOG(warning)
+            << "DualSense Edge USB/IP: unsupported imported-session command "sv
+            << static_cast<std::uint32_t>(basic.command_code);
           break;
         }
       }
