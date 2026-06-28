@@ -443,6 +443,47 @@ TEST(DualSenseReportTests, RejectsDescriptorsWithWrongRecipient) {
   EXPECT_TRUE(string.payload.empty());
 }
 
+TEST(DualSenseReportTests, RejectsDescriptorsWithInvalidIndexFields) {
+  auto device_descriptor_index_one = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_DEVICE,
+    1,
+    18
+  );
+  const auto device = platf::dualsense::dualsense_edge_control_transfer_response(device_descriptor_index_one);
+  EXPECT_FALSE(device.handled);
+  EXPECT_TRUE(device.payload.empty());
+
+  auto config_descriptor_with_index = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_CONFIGURATION,
+    0,
+    9,
+    1
+  );
+  const auto config = platf::dualsense::dualsense_edge_control_transfer_response(config_descriptor_with_index);
+  EXPECT_FALSE(config.handled);
+  EXPECT_TRUE(config.payload.empty());
+
+  auto hid_descriptor_index_one = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_HID,
+    1,
+    9,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  );
+  const auto hid = platf::dualsense::dualsense_edge_control_transfer_response(hid_descriptor_index_one);
+  EXPECT_FALSE(hid.handled);
+  EXPECT_TRUE(hid.payload.empty());
+
+  auto report_descriptor_index_one = get_descriptor_setup(
+    platf::usb::DESCRIPTOR_HID_REPORT,
+    1,
+    1024,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  );
+  const auto report = platf::dualsense::dualsense_edge_control_transfer_response(report_descriptor_index_one);
+  EXPECT_FALSE(report.handled);
+  EXPECT_TRUE(report.payload.empty());
+}
+
 TEST(DualSenseReportTests, ProvidesDualSenseEdgeStringDescriptorsForUsbEnumeration) {
   const auto language = platf::dualsense::dualsense_edge_control_response(
     get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 0, 255)

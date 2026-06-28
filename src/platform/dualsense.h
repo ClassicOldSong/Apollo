@@ -669,12 +669,17 @@ namespace platf::dualsense {
             return handled_control_response(descriptor, setup.length);
           }
 
+          if (usb::descriptor_index(setup.value) != 0) {
+            return unsupported_control_response();
+          }
+
           if (dualsense_edge_descriptor_is_interface_scoped(type)) {
             if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_INTERFACE ||
                 !dualsense_edge_targets_hid_interface(setup.index)) {
               return unsupported_control_response();
             }
-          } else if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_DEVICE) {
+          } else if (usb::setup_recipient(setup.request_type) != usb::RECIPIENT_DEVICE ||
+                     setup.index != 0) {
             return unsupported_control_response();
           }
 
