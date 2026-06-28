@@ -92,6 +92,43 @@ trigger state are intentionally left for follow-up hardware testing. Host
 output reports are parsed for rumble and lightbar feedback and forwarded
 through Apollo's existing feedback queue.
 
+## Manual Windows Test Flow
+
+1. Run this Apollo branch on Windows with:
+
+   ```text
+   gamepad = ds5-edge
+   ```
+
+2. Start a Moonlight client built from the companion DualSense Edge branch and
+   connect the physical DualSense Edge.
+3. Confirm Apollo logs:
+   - `DualSense Edge USB/IP: listening on 127.0.0.1:3240`
+   - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
+4. In an elevated Windows shell with `usbip-win2`, list and attach the virtual
+   controller:
+
+   ```powershell
+   usbip.exe list -r 127.0.0.1
+   usbip.exe attach -r 127.0.0.1 -b 1-1
+   ```
+
+5. Confirm Apollo logs:
+   - `DualSense Edge USB/IP: client imported virtual controller`
+6. Check Device Manager, `joy.cpl`, Steam Input, or a HID inspection tool for a
+   Sony `054c:0df2` DualSense Edge device.
+7. Press each Edge-specific control and verify four distinct host-visible
+   inputs:
+   - `PADDLE1`: right rear paddle
+   - `PADDLE2`: left rear paddle
+   - `PADDLE3`: right Fn
+   - `PADDLE4`: left Fn
+
+If the USB/IP device enumerates but the four controls do not appear, capture
+Apollo logs and the HID inspector output first. If Apollo does not log the
+four `PADDLE1..4` flags in controller arrivals, debug the Moonlight/SDL mapping
+path before changing the Windows USB/IP backend.
+
 ## Preferred Architecture
 
 Add a Windows virtual DualSense/Edge backend beside the current ViGEm backend.
