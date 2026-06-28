@@ -336,8 +336,8 @@ namespace platf::dualsense {
     }
 
     if (dualsense_edge) {
-      // SDL exposes DualSense Edge raw buttons b20, b19, b18, b17 as PADDLE1
-      // through PADDLE4. Preserve that order when packing the Edge-only byte.
+      // Moonlight normalizes native SDL2 and sdl2-compat/SDL3 Edge raw inputs
+      // into PADDLE1 through PADDLE4 before Apollo packs the Edge-only byte.
       if (flags & PADDLE1) {
         report.buttons2 |= BUTTONS2_EDGE_RIGHT_PADDLE;
       }
