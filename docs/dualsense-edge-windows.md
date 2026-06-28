@@ -257,8 +257,9 @@ Apollo has logged that the USB/IP backend is listening:
 The helper writes a timestamped directory under `%TEMP%` containing
 `usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
 matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
-environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
-`MI_03` child, PnP health/status details, present HIDClass nodes, matching CIM
+USB/IP-related driver package and signed-driver details, environment details,
+all present `VID_054C&PID_0DF2` PnP devices, the expected `MI_03` child, PnP
+health/status details, present HIDClass nodes, matching CIM
 `Win32_PnPEntity` rows, and selected PnP properties. Pass Apollo and Moonlight
 log files with `-LogPath` to copy them into the same evidence bundle; the log
 manifest records each copied path's source path, destination path, type, last
@@ -279,9 +280,10 @@ plus Apollo arrival, import, and state-change evidence. The helper writes
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
-`usbip.exe`, requested busid, attach result, and Windows PnP
-`VID_054C&PID_0DF2` / `MI_03` evidence, including healthy PnP status checks and
-the first matching lines from the captured files. It also writes
+`usbip.exe`, requested busid, attach result, optional USB/IP service/driver
+package evidence, and Windows PnP `VID_054C&PID_0DF2` / `MI_03` evidence,
+including healthy PnP status checks and the first matching lines from the
+captured files. It also writes
 `host-input-evidence-summary.txt`, which lists copied host-input evidence files
 and any optional text-pattern matches. The log and system summaries end with
 `overall=PASS` only when all required checks matched and no stop-condition
@@ -462,8 +464,10 @@ mapping path before changing the Windows USB/IP backend. If Apollo logs the
 arrival mask but does not log the per-control state changes, enable Moonlight
 debug logging and debug the streamed input event path before changing the USB
 descriptor. If `usbip.exe attach` succeeds but Windows does not show the
-`VID_054C&PID_0DF2` device, capture `usbip-win2` UDE/filter logs next; that
-points to USB enumeration or driver behavior rather than Moonlight's mapping.
+`VID_054C&PID_0DF2` device, inspect `usbip-driver-packages.txt`,
+`usbip-signed-drivers.txt`, and `usbip-services.txt`, then capture `usbip-win2`
+UDE/filter logs next; that points to USB enumeration or driver behavior rather
+than Moonlight's mapping.
 
 Do not mark the PR ready until the evidence shows all of the following in the
 same end-to-end run:

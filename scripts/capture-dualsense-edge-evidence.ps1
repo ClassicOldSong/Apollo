@@ -426,11 +426,15 @@ function Write-SystemEvidenceSummary {
 
   $summary = New-Object System.Collections.Generic.List[string]
   $usbipPortPattern = 'Port|Imported|Remote|' + [regex]::Escape($HostAddress) + '|' + [regex]::Escape($BusId) + '|054c|0df2'
+  $usbipDriverPattern = 'usbip|vhci|ude|USB/IP|virtual host controller|vadim|cezanne'
   $hasFailure = $false
   $checks = @(
     @{ Name = 'PowerShell is elevated'; Required = $true; Path = 'environment.txt'; Pattern = 'is_admin=True' },
     @{ Name = 'Apollo listener is visible on requested host/port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape([string]$Port) },
     @{ Name = 'usbip.exe command is resolvable'; Required = $true; Path = 'usbip-command.txt'; Pattern = 'usbip\.exe' },
+    @{ Name = 'USB/IP service evidence was captured'; Required = $false; Path = 'usbip-services.txt'; Pattern = $usbipDriverPattern },
+    @{ Name = 'USB/IP driver package evidence was captured'; Required = $false; Path = 'usbip-driver-packages.txt'; Pattern = $usbipDriverPattern },
+    @{ Name = 'USB/IP signed driver evidence was captured'; Required = $false; Path = 'usbip-signed-drivers.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
@@ -533,6 +537,30 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-services.txt') -Scri
     } |
     Sort-Object Name |
     Format-Table Name,DisplayName,Status,StartType -AutoSize
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-driver-packages.txt') -Script {
+  $pattern = 'usbip|vhci|ude|USB/IP|virtual host controller|vadim|cezanne'
+  "### pnputil /enum-drivers filtered for USB/IP-related packages"
+  $output = @(& pnputil.exe /enum-drivers 2>&1)
+  $matches = $output | Select-String -Pattern $pattern -Context 8,8
+  if ($matches) {
+    $matches
+  } else {
+    "No matching USB/IP driver package lines found with pattern: $pattern"
+  }
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-signed-drivers.txt') -Script {
+  Get-CimInstance Win32_PnPSignedDriver -ErrorAction Stop |
+    Where-Object {
+      $_.DeviceName -match 'usbip|vhci|ude|USB/IP|virtual host controller' -or
+      $_.DriverProviderName -match 'usbip|vhci|ude|vadim|cezanne' -or
+      $_.InfName -match 'usbip|vhci|ude'
+    } |
+    Sort-Object DeviceName,InfName |
+    Select-Object DeviceName,Manufacturer,DriverProviderName,DriverVersion,DriverDate,InfName,IsSigned,Signer |
+    Format-List
 }
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'apollo-listener.txt') -Script {

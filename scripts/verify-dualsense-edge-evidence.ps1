@@ -209,7 +209,8 @@ function Write-TestSystemEvidenceFiles {
   param(
     [Parameter(Mandatory = $true)][string] $OutputDir,
     [bool] $IncludeMi03 = $true,
-    [bool] $IncludeAttachSuccess = $true
+    [bool] $IncludeAttachSuccess = $true,
+    [bool] $IncludeUsbIpDriverEvidence = $true
   )
 
   New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -225,6 +226,25 @@ function Write-TestSystemEvidenceFiles {
     'Name   : usbip.exe',
     'Source : C:\Program Files\usbip-win2\usbip.exe'
   )
+  if ($IncludeUsbIpDriverEvidence) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-services.txt') -Encoding utf8 -Value @(
+      'Name        DisplayName                         Status  StartType',
+      'usbipd-win2 USB/IP VHCI UDE Host Controller     Running Manual'
+    )
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-driver-packages.txt') -Encoding utf8 -Value @(
+      '### pnputil /enum-drivers filtered for USB/IP-related packages',
+      'Driver Package Provider : usbip-win2',
+      'Published Name          : oem42.inf',
+      'Original Name           : usbip_vhci_ude.inf'
+    )
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-signed-drivers.txt') -Encoding utf8 -Value @(
+      'DeviceName         : USB/IP VHCI UDE Host Controller',
+      'DriverProviderName : usbip-win2',
+      'DriverVersion      : 1.0.0.0',
+      'InfName            : usbip_vhci_ude.inf',
+      'IsSigned           : True'
+    )
+  }
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
     '1-1: Sony Corp. : DualSense Edge Wireless Controller (054c:0df2)'
   )
@@ -275,6 +295,7 @@ function Test-SystemSummary {
     [bool] $SkipAttach = $false,
     [bool] $IncludeMi03 = $true,
     [bool] $IncludeAttachSuccess = $true,
+    [bool] $IncludeUsbIpDriverEvidence = $true,
     [string[]] $ExpectedSummaryLines = @()
   )
 
@@ -283,7 +304,8 @@ function Test-SystemSummary {
     Write-TestSystemEvidenceFiles `
       -OutputDir $outputDir `
       -IncludeMi03 $IncludeMi03 `
-      -IncludeAttachSuccess $IncludeAttachSuccess
+      -IncludeAttachSuccess $IncludeAttachSuccess `
+      -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence
 
     Write-SystemEvidenceSummary `
       -OutputDir $outputDir `
@@ -465,6 +487,9 @@ Test-SystemSummary `
   -Name 'system-pass' `
   -ExpectedOverall 'PASS' `
   -ExpectedSummaryLines @(
+    'MATCH: USB/IP service evidence was captured',
+    'MATCH: USB/IP driver package evidence was captured',
+    'MATCH: USB/IP signed driver evidence was captured',
     'MATCH: PnP shows MI_03 HID child',
     'MATCH: PnP shows healthy MI_03 HID child'
   )
@@ -476,6 +501,16 @@ Test-SystemSummary `
   -ExpectedSummaryLines @(
     'MISSING: PnP shows MI_03 HID child',
     'MISSING: PnP shows healthy MI_03 HID child'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-usbip-driver-evidence-pass' `
+  -IncludeUsbIpDriverEvidence $false `
+  -ExpectedOverall 'PASS' `
+  -ExpectedSummaryLines @(
+    'SKIPPED_OR_MISSING: USB/IP service evidence was captured',
+    'SKIPPED_OR_MISSING: USB/IP driver package evidence was captured',
+    'SKIPPED_OR_MISSING: USB/IP signed driver evidence was captured'
   )
 
 Test-SystemSummary `
