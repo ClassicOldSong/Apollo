@@ -70,6 +70,12 @@ represent those bits.
   buttons also firing their left-side counterparts in another mapping layer. The
   evidence flow therefore requires one-at-a-time testing with no combined
   paddle/Fn state such as `0x00030000`, `0x00050000`, or `0x00090000`.
+- `Electronicks/JoyShockMapper#90` and `JibbSmart/JoyShockMapper#169`: earlier
+  Edge support reports included the left back paddle being seen as a duplicate
+  mic-mute button, a legacy build missing left Fn, and left-side label swaps
+  before JoyShockMapper v3.5.1. Treat third-party labels such as `LSL`, `LSR`,
+  `RSL`, and `RSR` as tool-specific evidence only; draft-ready validation still
+  needs the physical one-at-a-time press order and the Edge byte masks below.
 - `libsdl-org/SDL#14581`: Edge motion support can depend on low-level HID access
   on Linux. That does not block the paddle/Fn transport path, but it explains why
   motion remains a follow-up validation item rather than part of the first
@@ -271,7 +277,10 @@ button proof in the same evidence bundle. If the inspector can export text,
 `-HostInputEvidencePattern` can be repeated to require specific regex matches in
 those files, and `-HostInputStopPattern` can be repeated to fail on known-bad
 text such as face-button remaps or duplicated right/left controls. Screenshots
-still require manual review. For draft-ready
+still require manual review. JoyShockMapper-style labels are useful only when
+the evidence also records which physical Edge control was pressed, because past
+Edge support reports had duplicate mic-mute mappings and swapped left/right
+labels. For draft-ready
 validation, include both logs because the helper requires Moonlight Edge VID/PID,
 enough SDL joystick buttons for the selected raw mapping (`21+` for native SDL2
 or `17+` for `sdl2-compat`/SDL3), mapping, arrival, press, and release evidence
@@ -391,6 +400,12 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
    - `PADDLE4`: left Fn
+
+   If the host inspection tool uses JoyShockMapper-style names such as `LSL`,
+   `LSR`, `RSL`, or `RSR`, record the physical control pressed beside that label
+   and cross-check it against the Moonlight/Apollo masks. Those labels have
+   changed across JoyShockMapper versions and are not enough by themselves to
+   prove the streamed Edge controls are physically correct.
 
    A quick PowerShell check for the virtual Sony device is:
 
