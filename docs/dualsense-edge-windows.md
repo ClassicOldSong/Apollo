@@ -268,10 +268,13 @@ so stale logs cannot satisfy `-RequirePass`. Pass HID/gamepad inspector exports,
 logs, or screenshots with `-HostInputEvidencePath` to keep the host-visible
 button proof in the same evidence bundle. If the inspector can export text,
 `-HostInputEvidencePattern` can be repeated to require specific regex matches in
-those files; screenshots still require manual review. For draft-ready
+those files, and `-HostInputStopPattern` can be repeated to fail on known-bad
+text such as face-button remaps or duplicated right/left controls. Screenshots
+still require manual review. For draft-ready
 validation, include both logs because the helper requires Moonlight Edge VID/PID,
-at least `21` SDL joystick buttons, mapping, arrival, press, and release
-evidence plus Apollo arrival, import, and state-change evidence. The helper writes
+enough SDL joystick buttons for the selected raw mapping (`21+` for native SDL2
+or `17+` for `sdl2-compat`/SDL3), mapping, arrival, press, and release evidence
+plus Apollo arrival, import, and state-change evidence. The helper writes
 `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
@@ -285,18 +288,30 @@ and any optional text-pattern matches. The log and system summaries end with
 matched. Add `-RequirePass` when collecting draft-ready evidence to make the
 helper exit with a failure if either summary is missing or does not end with
 `overall=PASS`. Add `-RequireHostInputEvidence` to also fail when no host-input
-evidence was copied or when a supplied host-input regex pattern did not match.
+evidence was copied, when a supplied host-input regex pattern did not match, or
+when a supplied host-input stop pattern matched. Positive text patterns are not
+an automated proof that the controls were not remapped; use stop patterns when
+the exported evidence can show that, and manually review screenshots.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
+
+Before collecting physical evidence, the evidence-summary regex gates can be
+checked without Windows hardware:
+
+```powershell
+pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
+```
 
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
   -LogPath 'C:\path\to\apollo.log','C:\path\to\Moonlight.log' `
   -HostInputEvidencePath 'C:\path\to\hid-inspector-output.txt','C:\path\to\joy-cpl-screenshot.png' `
-  -HostInputEvidencePattern 'PADDLE1|right rear|Button 20' `
-  -HostInputEvidencePattern 'PADDLE2|left rear|Button 19' `
-  -HostInputEvidencePattern 'PADDLE3|right Fn|Button 18' `
-  -HostInputEvidencePattern 'PADDLE4|left Fn|Button 17' `
+  -HostInputEvidencePattern 'PADDLE1|right rear|right paddle|0x80' `
+  -HostInputEvidencePattern 'PADDLE2|left rear|left paddle|0x40' `
+  -HostInputEvidencePattern 'PADDLE3|right Fn|Fn right|0x20' `
+  -HostInputEvidencePattern 'PADDLE4|left Fn|Fn left|0x10' `
+  -HostInputStopPattern 'same event.*(Cross|Circle|Square|Triangle|face)' `
+  -HostInputStopPattern 'same event.*(left.*right|right.*left)' `
   -RequirePass `
   -RequireHostInputEvidence
 ```
@@ -458,7 +473,9 @@ same end-to-end run:
   `overall=PASS`.
 - `host-input-evidence-summary.txt` ends with `overall=PASS`, and a reviewer can
   inspect the copied host-input evidence files to confirm each Edge paddle/Fn
-  control is separate.
+  control is separate. Text pattern matches are a review aid; generic Windows
+  tools may expose the Edge extras as vendor/Edge-specific bits rather than
+  numbered generic buttons, so prefer DS5/Edge-aware HID evidence when possible.
 - Moonlight advertises PlayStation arrival type `0x02` and the Edge paddle/Fn
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`

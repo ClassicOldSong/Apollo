@@ -19,6 +19,7 @@ param(
   [string[]]$LogPath = @(),
   [string[]]$HostInputEvidencePath = @(),
   [string[]]$HostInputEvidencePattern = @(),
+  [string[]]$HostInputStopPattern = @(),
   [switch]$SkipAttach,
   [int]$PostAttachDelaySeconds = 3,
   [switch]$RequirePass,
@@ -186,6 +187,7 @@ function Write-HostInputEvidenceSummary {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
     [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Patterns,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$StopPatterns,
     [Parameter(Mandatory = $true)][bool]$Required
   )
 
@@ -248,6 +250,38 @@ function Write-HostInputEvidenceSummary {
     }
   }
 
+  if ($StopPatterns.Count -eq 0) {
+    $summary.Add('No -HostInputStopPattern values provided. A reviewer must manually inspect the copied host-input evidence for face-button remaps or duplicated Edge controls.')
+  } else {
+    for ($i = 0; $i -lt $StopPatterns.Count; $i++) {
+      $pattern = $StopPatterns[$i]
+      $matches = New-Object System.Collections.Generic.List[string]
+
+      foreach ($file in $files) {
+        try {
+          Select-String -LiteralPath $file.FullName -Pattern $pattern -ErrorAction Stop |
+            Select-Object -First 20 |
+            ForEach-Object {
+              $matches.Add(("{0}:{1}: {2}" -f $file.Name, $_.LineNumber, $_.Line.Trim()))
+            }
+        } catch {
+          $summary.Add(("{0}: ERROR reading host input evidence for stop pattern[{1}]: {2}" -f $file.Name, $i, $_.Exception.Message))
+        }
+      }
+
+      if ($matches.Count -gt 0) {
+        $hasFailure = $true
+        $summary.Add("STOP_MATCH: host input stop pattern[$i] $pattern")
+      } else {
+        $summary.Add("OK_NO_STOP_MATCH: host input stop pattern[$i] $pattern")
+      }
+
+      foreach ($match in $matches) {
+        $summary.Add("  $match")
+      }
+    }
+  }
+
   $summary.Add('')
   if ($hasFailure) {
     $summary.Add('overall=FAIL')
@@ -283,9 +317,13 @@ function Write-LogEvidenceSummary {
     return
   }
 
+  $edgeRawButtonCountPattern =
+    'DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2|' +
+    'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2'
+
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge VID/PID'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*VID/PID: 0x054c/0x0df2' },
-    @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need (17|21) for (SDL2|SDL3/sdl2-compat) Edge raw mapping\).*VID/PID: 0x054c/0x0df2' },
+    @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = $edgeRawButtonCountPattern },
     @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13)' },
@@ -471,6 +509,7 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "log_path_count=$($LogPath.Count)",
   "host_input_evidence_path_count=$($HostInputEvidencePath.Count)",
   "host_input_evidence_pattern_count=$($HostInputEvidencePattern.Count)",
+  "host_input_stop_pattern_count=$($HostInputStopPattern.Count)",
   "skip_attach=$SkipAttach",
   "require_pass=$RequirePass",
   "require_host_input_evidence=$RequireHostInputEvidence",
@@ -480,7 +519,7 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
 Copy-RequestedLogs -OutputDir $OutputDir -Paths $LogPath
 Copy-RequestedHostInputEvidence -OutputDir $OutputDir -Paths $HostInputEvidencePath
 Write-LogEvidenceSummary -OutputDir $OutputDir
-Write-HostInputEvidenceSummary -OutputDir $OutputDir -Patterns $HostInputEvidencePattern -Required ([bool]$RequireHostInputEvidence)
+Write-HostInputEvidenceSummary -OutputDir $OutputDir -Patterns $HostInputEvidencePattern -StopPatterns $HostInputStopPattern -Required ([bool]$RequireHostInputEvidence)
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-command.txt') -Script {
   Get-Command usbip.exe -ErrorAction Stop | Format-List Name,Source,Version
