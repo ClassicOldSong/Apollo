@@ -111,6 +111,8 @@ descriptor and return zero-filled payloads with the requested report ID.
      at least `21`.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
+   - If the mapping was `added` rather than `updated`, also expect
+     `Reopened DualSense Edge after adding paddle mappings`.
    - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...`
 4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
