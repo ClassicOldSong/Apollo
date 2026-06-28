@@ -569,6 +569,11 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   const auto standard_interface_in = platf::usb::REQUEST_DIRECTION_IN |
                                      (platf::usb::REQUEST_TYPE_STANDARD << 5) |
                                      platf::usb::RECIPIENT_INTERFACE;
+  const auto standard_endpoint_in = platf::usb::REQUEST_DIRECTION_IN |
+                                    (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                    platf::usb::RECIPIENT_ENDPOINT;
+  const auto standard_endpoint_out = (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                     platf::usb::RECIPIENT_ENDPOINT;
   const auto class_interface_in = platf::usb::REQUEST_DIRECTION_IN |
                                   (platf::usb::REQUEST_TYPE_CLASS << 5) |
                                   platf::usb::RECIPIENT_INTERFACE;
@@ -590,12 +595,48 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     (std::vector<std::uint8_t> {0, 0})
   );
   EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      standard_endpoint_in,
+      platf::usb::REQUEST_GET_STATUS,
+      0,
+      2,
+      platf::dualsense::USB_ENDPOINT_IN
+    )),
+    (std::vector<std::uint8_t> {0, 0})
+  );
+  const auto invalid_endpoint = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_endpoint_in,
+    platf::usb::REQUEST_GET_STATUS,
+    0,
+    2,
+    0x05
+  ));
+  EXPECT_FALSE(invalid_endpoint.handled);
+  EXPECT_TRUE(invalid_endpoint.payload.empty());
+  EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_CONFIGURATION, 0, 1)),
     (std::vector<std::uint8_t> {1})
   );
+  const auto set_address = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_device_out,
+    platf::usb::REQUEST_SET_ADDRESS,
+    7,
+    0
+  ));
+  EXPECT_TRUE(set_address.handled);
+  EXPECT_TRUE(set_address.payload.empty());
   EXPECT_TRUE(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_out, platf::usb::REQUEST_SET_CONFIGURATION, 1, 0)).empty()
   );
+  const auto clear_endpoint_halt = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_endpoint_out,
+    platf::usb::REQUEST_CLEAR_FEATURE,
+    platf::usb::FEATURE_ENDPOINT_HALT,
+    0,
+    platf::dualsense::USB_ENDPOINT_IN
+  ));
+  EXPECT_TRUE(clear_endpoint_halt.handled);
+  EXPECT_TRUE(clear_endpoint_halt.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_interface_in, platf::usb::REQUEST_GET_INTERFACE, 0, 1)),
     (std::vector<std::uint8_t> {0})

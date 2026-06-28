@@ -21,13 +21,19 @@ namespace platf::usb {
 
   constexpr std::uint8_t RECIPIENT_DEVICE = 0;
   constexpr std::uint8_t RECIPIENT_INTERFACE = 1;
+  constexpr std::uint8_t RECIPIENT_ENDPOINT = 2;
 
   constexpr std::uint8_t REQUEST_GET_STATUS = 0x00;
+  constexpr std::uint8_t REQUEST_CLEAR_FEATURE = 0x01;
+  constexpr std::uint8_t REQUEST_SET_FEATURE = 0x03;
+  constexpr std::uint8_t REQUEST_SET_ADDRESS = 0x05;
   constexpr std::uint8_t REQUEST_GET_DESCRIPTOR = 0x06;
   constexpr std::uint8_t REQUEST_GET_CONFIGURATION = 0x08;
   constexpr std::uint8_t REQUEST_SET_CONFIGURATION = 0x09;
   constexpr std::uint8_t REQUEST_GET_INTERFACE = 0x0A;
   constexpr std::uint8_t REQUEST_SET_INTERFACE = 0x0B;
+
+  constexpr std::uint16_t FEATURE_ENDPOINT_HALT = 0x00;
 
   constexpr std::uint8_t HID_REQUEST_GET_REPORT = 0x01;
   constexpr std::uint8_t HID_REQUEST_GET_IDLE = 0x02;

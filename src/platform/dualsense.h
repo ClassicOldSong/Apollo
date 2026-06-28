@@ -405,6 +405,13 @@ namespace platf::dualsense {
     return static_cast<std::uint8_t>(interface_index & 0xFF) <= DUALSENSE_EDGE_INTERFACE_HID;
   }
 
+  constexpr bool dualsense_edge_has_endpoint(std::uint16_t endpoint_index) {
+    const auto endpoint = static_cast<std::uint8_t>(endpoint_index & 0xFF);
+    return endpoint == 0 ||
+           endpoint == USB_ENDPOINT_IN ||
+           endpoint == USB_ENDPOINT_OUT;
+  }
+
   constexpr bool dualsense_edge_descriptor_is_interface_scoped(std::uint8_t descriptor_type) {
     return descriptor_type == usb::DESCRIPTOR_HID ||
            descriptor_type == usb::DESCRIPTOR_HID_REPORT;
@@ -578,6 +585,7 @@ namespace platf::dualsense {
   inline control_response_t dualsense_edge_control_transfer_response(const usb::setup_packet_t &setup) {
     static constexpr std::array<std::uint8_t, 2> STATUS_SELF_POWERED {1, 0};
     static constexpr std::array<std::uint8_t, 2> STATUS_INTERFACE {0, 0};
+    static constexpr std::array<std::uint8_t, 2> STATUS_ENDPOINT {0, 0};
     static constexpr std::array<std::uint8_t, 1> CONFIGURATION_ACTIVE {1};
     static constexpr std::array<std::uint8_t, 1> INTERFACE_ALTERNATE_SETTING {0};
     static constexpr std::array<std::uint8_t, 1> HID_IDLE_RATE {0};
@@ -595,6 +603,30 @@ namespace platf::dualsense {
           if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
               dualsense_edge_has_interface(setup.index)) {
             return handled_control_response(STATUS_INTERFACE, setup.length);
+          }
+          if (usb::setup_recipient(setup.request_type) == usb::RECIPIENT_ENDPOINT &&
+              dualsense_edge_has_endpoint(setup.index)) {
+            return handled_control_response(STATUS_ENDPOINT, setup.length);
+          }
+          return unsupported_control_response();
+
+        case usb::REQUEST_CLEAR_FEATURE:
+          if (!usb::setup_is_in(setup.request_type) &&
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_ENDPOINT &&
+              setup.value == usb::FEATURE_ENDPOINT_HALT &&
+              setup.length == 0 &&
+              dualsense_edge_has_endpoint(setup.index)) {
+            return handled_empty_control_response();
+          }
+          return unsupported_control_response();
+
+        case usb::REQUEST_SET_ADDRESS:
+          if (!usb::setup_is_in(setup.request_type) &&
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_DEVICE &&
+              setup.value <= 127 &&
+              setup.index == 0 &&
+              setup.length == 0) {
+            return handled_empty_control_response();
           }
           return unsupported_control_response();
 
