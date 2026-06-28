@@ -233,10 +233,10 @@ controller is already attached and only the PnP evidence should be refreshed.
      `Reopened DualSense Edge after adding paddle mappings`.
    - Do not continue to the Apollo USB/IP backend if Moonlight logs
      `DualSense Edge paddle mappings are present, but SDL did not expose the
-     paddle controller buttons` or
-     `DualSense Edge paddle mapping update did not expose the paddle controller
-     buttons`; that means SDL still is not reporting the Edge-specific controls
-     at the controller-button layer.
+     expected paddle controller bindings` or
+     `DualSense Edge paddle mapping update did not expose the expected paddle
+     controller bindings`; that means SDL still is not reporting the
+     Edge-specific controls at the expected controller-button layer bindings.
    - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...`
 4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
