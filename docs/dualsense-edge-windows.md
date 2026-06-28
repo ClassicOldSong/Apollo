@@ -185,6 +185,13 @@ the signed virtual USB host controller enumerates the device. The backend is
 separate from ViGEm, so the existing `auto`, `x360`, and `ds4` paths remain
 unchanged.
 
+This is not raw client-to-host USB passthrough. The physical DualSense Edge
+stays owned by Moonlight on the client, and Apollo reconstructs a host-local
+USB/HID device from controller state already carried by the Moonlight/Sunshine
+protocol. That avoids the exclusive-device ownership and remote USB packet
+loss/jitter risks called out in the upstream USB/IP discussions, but it also
+means the first proof can only expose state that Moonlight already sends.
+
 The first implementation forwards standard buttons, sticks, triggers, and the
 four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive
 trigger state are intentionally left for follow-up hardware testing. The
