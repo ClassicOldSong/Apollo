@@ -334,10 +334,10 @@ controller is already attached and only the PnP evidence should be refreshed.
    - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
    - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
    - Do not continue if pressing an Edge-specific control logs `Ignoring
-     DualSense Edge controller button ... bound to raw paddle...`; that means a
-     stale SDL mapping is still binding an Edge-only raw button to a normal
-     controller button, and Moonlight is suppressing that alias instead of
-     transmitting it as a native Edge input.
+     DualSense Edge controller button ... bound to raw paddle... as stale Edge
+     raw alias`; that means a stale SDL mapping is still binding an Edge-only
+     raw button to a normal controller button, and Moonlight is suppressing that
+     alias instead of transmitting it as a native Edge input.
 
    For SDL2 builds, set `SDL_LOGGING=application=debug` before launching
    Moonlight. For example, on Windows PowerShell:
