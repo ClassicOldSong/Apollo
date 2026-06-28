@@ -7,6 +7,7 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -139,6 +140,20 @@ namespace {
       .index = interface_index,
       .length = length,
     };
+  }
+
+  std::string ascii_string_descriptor_text(const std::vector<std::uint8_t> &descriptor) {
+    std::string text;
+
+    for (std::size_t i = 2; i + 1 < descriptor.size(); i += 2) {
+      if (descriptor[i + 1] != 0) {
+        return {};
+      }
+
+      text.push_back(static_cast<char>(descriptor[i]));
+    }
+
+    return text;
   }
 }  // namespace
 
@@ -328,8 +343,18 @@ TEST(DualSenseReportTests, DefinesDualSenseEdgeUsbIdentity) {
   EXPECT_EQ(device.size(), 18);
   EXPECT_EQ(device[0], 0x12);
   EXPECT_EQ(device[1], 0x01);
+  EXPECT_EQ(device[2] | (device[3] << 8), 0x0200);
+  EXPECT_EQ(device[4], 0x00);
+  EXPECT_EQ(device[5], 0x00);
+  EXPECT_EQ(device[6], 0x00);
+  EXPECT_EQ(device[7], 0x40);
   EXPECT_EQ(device[8] | (device[9] << 8), platf::dualsense::VENDOR_ID_SONY);
   EXPECT_EQ(device[10] | (device[11] << 8), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
+  EXPECT_EQ(device[12] | (device[13] << 8), 0x0100);
+  EXPECT_EQ(device[14], 1);
+  EXPECT_EQ(device[15], 2);
+  EXPECT_EQ(device[16], 0);
+  EXPECT_EQ(device[17], 1);
 }
 
 TEST(DualSenseReportTests, DefinesCapturedDualSenseEdgeCompositeConfiguration) {
@@ -599,15 +624,26 @@ TEST(DualSenseReportTests, ProvidesDualSenseEdgeStringDescriptorsForUsbEnumerati
   );
   EXPECT_EQ(language, platf::usb::make_language_string_descriptor());
 
+  const auto manufacturer = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 1, 255)
+  );
+  EXPECT_EQ(ascii_string_descriptor_text(manufacturer), platf::dualsense::DUALSENSE_EDGE_MANUFACTURER);
+
   const auto product = platf::dualsense::dualsense_edge_control_response(
     get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 2, 255)
   );
   ASSERT_GE(product.size(), 4);
   EXPECT_EQ(product[1], platf::usb::DESCRIPTOR_STRING);
+  EXPECT_EQ(ascii_string_descriptor_text(product), platf::dualsense::DUALSENSE_EDGE_PRODUCT);
   EXPECT_EQ(product[2], 'D');
   EXPECT_EQ(product[3], 0);
   EXPECT_EQ(product[4], 'u');
   EXPECT_EQ(product[5], 0);
+
+  const auto serial = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 3, 255)
+  );
+  EXPECT_TRUE(serial.empty());
 }
 
 TEST(DualSenseReportTests, LimitsDualSenseEdgeDescriptorResponsesToRequestedLength) {
