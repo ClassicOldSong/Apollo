@@ -408,6 +408,22 @@ TEST(DualSenseReportTests, ProvidesDualSenseEdgeFeatureReportsForUsbEnumeration)
   EXPECT_EQ(firmware[44], 1);
 }
 
+TEST(DualSenseReportTests, ProvidesNeutralDualSenseEdgeInputReportForControlGetReport) {
+  const auto report = platf::dualsense::dualsense_edge_control_response(get_report_setup(
+    platf::usb::HID_REPORT_TYPE_INPUT,
+    platf::dualsense::INPUT_REPORT_USB,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+
+  ASSERT_EQ(report.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  EXPECT_EQ(report[0], platf::dualsense::INPUT_REPORT_USB);
+  EXPECT_EQ(report[7], 0);
+  EXPECT_EQ(report[8], platf::dualsense::HAT_NONE);
+  EXPECT_EQ(report[10], 0);
+  EXPECT_EQ(report[33], 0x80);
+  EXPECT_EQ(report[37], 0x80);
+}
+
 TEST(DualSenseReportTests, DualSenseEdgeFeatureReportSizesMatchHidDescriptor) {
   const auto sizes = feature_report_sizes_from_descriptor();
 
@@ -442,7 +458,7 @@ TEST(DualSenseReportTests, LimitsAndRejectsDualSenseEdgeFeatureReports) {
   )).empty());
   EXPECT_TRUE(platf::dualsense::dualsense_edge_control_response(get_report_setup(
     platf::usb::HID_REPORT_TYPE_INPUT,
-    platf::dualsense::INPUT_REPORT_USB,
+    0x31,
     platf::dualsense::INPUT_REPORT_USB_SIZE
   )).empty());
 }

@@ -356,6 +356,11 @@ namespace platf::dualsense {
     };
   }
 
+  inline std::vector<std::uint8_t> report_bytes(const usb_input_report_t &report) {
+    const auto *data = reinterpret_cast<const std::uint8_t *>(&report);
+    return {data, data + sizeof(report)};
+  }
+
   inline output_report_state_t parse_output_report(std::span<const std::uint8_t> report) {
     if (report.size() < OUTPUT_REPORT_USB_MIN_SIZE || report.front() != OUTPUT_REPORT_USB) {
       return {};
@@ -576,10 +581,17 @@ namespace platf::dualsense {
       switch (setup.request) {
         case usb::HID_REQUEST_GET_REPORT:
           if (usb::setup_is_in(setup.request_type) &&
-              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
-              usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_FEATURE) {
-            const auto report = dualsense_edge_feature_report(usb::hid_report_id(setup.value));
-            return usb::limited_response(report, setup.length);
+              usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE) {
+            if (usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_INPUT &&
+                usb::hid_report_id(setup.value) == INPUT_REPORT_USB) {
+              const auto report = report_bytes(make_usb_input_report({}, 0, true));
+              return usb::limited_response(report, setup.length);
+            }
+
+            if (usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_FEATURE) {
+              const auto report = dualsense_edge_feature_report(usb::hid_report_id(setup.value));
+              return usb::limited_response(report, setup.length);
+            }
           }
           return {};
 

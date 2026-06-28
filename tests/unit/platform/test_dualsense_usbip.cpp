@@ -188,6 +188,34 @@ TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeFeatureReport) {
   EXPECT_EQ(payload[10], 0xFC);
 }
 
+TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeInputReport) {
+  const auto request = submit_request(
+    13,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::INPUT_REPORT_USB_SIZE,
+    get_report_setup(
+      platf::usb::HID_REPORT_TYPE_INPUT,
+      platf::dualsense::INPUT_REPORT_USB,
+      platf::dualsense::INPUT_REPORT_USB_SIZE
+    )
+  );
+
+  ASSERT_TRUE(platf::dualsense_usbip::is_control_submit(request));
+
+  const auto reply = platf::dualsense_usbip::make_control_submit_reply(request);
+  const auto payload = submit_payload(reply);
+
+  EXPECT_EQ(platf::usbip::read_be32(reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 4), 13);
+  EXPECT_EQ(platf::usbip::read_be32(reply, 24), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  ASSERT_EQ(payload.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  EXPECT_EQ(payload[0], platf::dualsense::INPUT_REPORT_USB);
+  EXPECT_EQ(payload[8], platf::dualsense::HAT_NONE);
+  EXPECT_EQ(payload[33], 0x80);
+  EXPECT_EQ(payload[37], 0x80);
+}
+
 TEST(DualSenseUsbIpTests, BuildsInterruptInSubmitReplyWithEdgeButtons) {
   auto state = platf::gamepad_state_t {
     .buttonFlags = platf::A | platf::PADDLE1,
