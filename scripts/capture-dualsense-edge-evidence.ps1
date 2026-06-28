@@ -363,6 +363,7 @@ function Write-HostInputEvidenceSummary {
               $matches.Add(("{0}:{1}: {2}" -f $file.Name, $_.LineNumber, $_.Line.Trim()))
             }
         } catch {
+          $hasFailure = $true
           $summary.Add(("{0}: ERROR reading host input evidence for pattern[{1}]: {2}" -f $file.Name, $i, $_.Exception.Message))
         }
       }
@@ -395,6 +396,7 @@ function Write-HostInputEvidenceSummary {
               $matches.Add(("{0}:{1}: {2}" -f $file.Name, $_.LineNumber, $_.Line.Trim()))
             }
         } catch {
+          $hasFailure = $true
           $summary.Add(("{0}: ERROR reading host input evidence for stop pattern[{1}]: {2}" -f $file.Name, $i, $_.Exception.Message))
         }
       }

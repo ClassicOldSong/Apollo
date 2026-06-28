@@ -415,6 +415,51 @@ function Test-MissingHostInputSummary {
   }
 }
 
+function Test-HostInputSummaryReadError {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  $stream = $null
+  try {
+    $hostInputDir = Join-Path $outputDir 'host-input'
+    New-Item -ItemType Directory -Force -Path $hostInputDir | Out-Null
+    Set-Content -LiteralPath (Join-Path $hostInputDir 'host-input.txt') -Encoding utf8 -Value 'PADDLE1 right rear 0x80'
+
+    $lockedEvidence = Join-Path $hostInputDir 'locked-host-input.txt'
+    Set-Content -LiteralPath $lockedEvidence -Value 'locked host input evidence' -Encoding utf8
+    $stream = [System.IO.File]::Open(
+      $lockedEvidence,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::ReadWrite,
+      [System.IO.FileShare]::None
+    )
+
+    Write-HostInputEvidenceSummary `
+      -OutputDir $outputDir `
+      -Patterns @('PADDLE1') `
+      -StopPatterns @() `
+      -Required $true
+
+    $summaryPath = Join-Path $outputDir 'host-input-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne 'FAIL') {
+      Write-Host $summary
+      throw "$Name expected overall=FAIL, got overall=$overall"
+    }
+    Assert-Contains -Content $summary -Needle 'locked-host-input.txt: ERROR reading host input evidence for pattern[0]' -CaseName $Name
+  } finally {
+    if ($null -ne $stream) {
+      $stream.Dispose()
+    }
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 function Test-CopiedEvidenceManifestHashes {
   $outputDir = New-TestOutputDir -Name 'manifest-hashes'
   try {
@@ -954,6 +999,9 @@ Test-MissingHostInputSummary `
   -ExpectedSummaryLines @(
     'No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.'
   )
+
+Test-HostInputSummaryReadError `
+  -Name 'host-input-read-error-fail'
 
 Test-CopiedEvidenceManifestHashes
 Test-EvidenceBundleManifest
