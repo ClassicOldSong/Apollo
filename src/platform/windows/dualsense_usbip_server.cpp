@@ -253,6 +253,13 @@ namespace platf::dualsense_usbip {
 
         if (basic.command_code == usbip::command::cmd_submit) {
           const auto request = usbip::parse_submit_request(header);
+          if (!dualsense_usbip::is_valid_out_payload_length(request)) {
+            BOOST_LOG(warning)
+              << "DualSense Edge USB/IP: rejecting oversized OUT payload length "sv
+              << request.transfer_buffer_length;
+            break;
+          }
+
           std::vector<std::uint8_t> out_payload;
           if (request.header.transfer_direction == usbip::direction::out &&
               request.transfer_buffer_length > 0) {

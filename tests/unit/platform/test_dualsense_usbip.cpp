@@ -299,6 +299,29 @@ TEST(DualSenseUsbIpTests, RecognizesMinimumCommonOutputReport) {
   );
 }
 
+TEST(DualSenseUsbIpTests, BoundsOutPayloadLength) {
+  EXPECT_TRUE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
+    21,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_OUT,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE
+  )));
+
+  EXPECT_FALSE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
+    22,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_OUT,
+    platf::dualsense_usbip::MAX_OUT_PAYLOAD_SIZE + 1
+  )));
+
+  EXPECT_TRUE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
+    23,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense_usbip::MAX_OUT_PAYLOAD_SIZE + 1
+  )));
+}
+
 TEST(DualSenseUsbIpTests, DeviceHandlesInterruptInSubmitsWithUpdatedInputState) {
   platf::dualsense_usbip::device_t device;
   device.update_input(platf::gamepad_state_t {
