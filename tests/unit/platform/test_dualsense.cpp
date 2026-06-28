@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <utility>
 #include <vector>
 
 #include <src/platform/dualsense.h>
@@ -32,6 +33,59 @@ namespace {
     }
 
     return false;
+  }
+
+  std::vector<std::pair<std::uint8_t, std::size_t>> feature_report_sizes_from_descriptor() {
+    std::vector<std::pair<std::uint8_t, std::size_t>> sizes;
+    const auto &descriptor = platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
+    std::uint8_t report_id = 0;
+    std::uint32_t report_size = 0;
+    std::uint32_t report_count = 0;
+
+    for (std::size_t i = 0; i < descriptor.size();) {
+      const auto item = descriptor[i++];
+      if (item == 0xFE) {
+        if (i >= descriptor.size()) {
+          break;
+        }
+        i += static_cast<std::size_t>(descriptor[i]) + 2;
+        continue;
+      }
+
+      std::size_t data_size = item & 0x03;
+      if (data_size == 3) {
+        data_size = 4;
+      }
+
+      std::uint32_t value = 0;
+      for (std::size_t byte = 0; byte < data_size && i + byte < descriptor.size(); ++byte) {
+        value |= static_cast<std::uint32_t>(descriptor[i + byte]) << (byte * 8);
+      }
+      i += data_size;
+
+      switch (item) {
+        case 0x75:  // Report Size
+          report_size = value;
+          break;
+
+        case 0x85:  // Report ID
+          report_id = static_cast<std::uint8_t>(value);
+          break;
+
+        case 0x95:  // Report Count
+          report_count = value;
+          break;
+
+        case 0xB1:  // Feature
+          sizes.emplace_back(report_id, 1 + ((report_count * report_size + 7) / 8));
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    return sizes;
   }
 
   platf::usb::setup_packet_t get_descriptor_setup(std::uint8_t descriptor_type, std::uint8_t descriptor_index, std::uint16_t length) {
@@ -352,6 +406,21 @@ TEST(DualSenseReportTests, ProvidesDualSenseEdgeFeatureReportsForUsbEnumeration)
   EXPECT_EQ(firmware[24], 1);
   EXPECT_EQ(firmware[28], 1);
   EXPECT_EQ(firmware[44], 1);
+}
+
+TEST(DualSenseReportTests, DualSenseEdgeFeatureReportSizesMatchHidDescriptor) {
+  const auto sizes = feature_report_sizes_from_descriptor();
+
+  ASSERT_FALSE(sizes.empty());
+  for (const auto &[report_id, expected_size] : sizes) {
+    EXPECT_EQ(platf::dualsense::dualsense_edge_feature_report_size(report_id), expected_size)
+      << "feature report 0x" << std::hex << static_cast<int>(report_id);
+
+    const auto report = platf::dualsense::dualsense_edge_feature_report(report_id);
+    ASSERT_EQ(report.size(), expected_size)
+      << "feature report 0x" << std::hex << static_cast<int>(report_id);
+    EXPECT_EQ(report[0], report_id);
+  }
 }
 
 TEST(DualSenseReportTests, LimitsAndRejectsDualSenseEdgeFeatureReports) {
