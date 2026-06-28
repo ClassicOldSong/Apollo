@@ -131,6 +131,21 @@ namespace platf {
       .sPreviousTouch = {ds4_touch_unused, ds4_touch_unused}}}
   };
 
+  constexpr std::uint32_t PADDLE_BUTTONS = PADDLE1 | PADDLE2 | PADDLE3 | PADDLE4;
+
+  static void warn_unsupported_paddles(int gamepad_index, const char *emulated_type, std::uint32_t supported_buttons) {
+    auto paddle_buttons = supported_buttons & PADDLE_BUTTONS;
+    if (!paddle_buttons) {
+      return;
+    }
+
+    BOOST_LOG(warning)
+      << "Gamepad " << gamepad_index
+      << " reports independent paddle buttons ["sv << util::hex(paddle_buttons).to_string_view()
+      << "], but " << emulated_type
+      << " emulation cannot expose them as separate buttons"sv;
+  }
+
   /**
    * @brief Updates the DS4 input report with the provided motion data.
    * @details Acceleration is in m/s^2 and gyro is in deg/s.
@@ -1205,6 +1220,7 @@ namespace platf {
     }
 
     if (selectedGamepadType == Xbox360Wired) {
+      warn_unsupported_paddles(id.globalIndex, "Xbox 360", metadata.supportedButtons);
       if (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO)) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " has motion sensors, but they are not usable when emulating an Xbox 360 controller"sv;
       }
@@ -1215,6 +1231,7 @@ namespace platf {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " has an RGB LED, but it is not usable when emulating an Xbox 360 controller"sv;
       }
     } else if (selectedGamepadType == DualShock4Wired) {
+      warn_unsupported_paddles(id.globalIndex, "DualShock 4", metadata.supportedButtons);
       if (!(metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) {
         BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is emulating a DualShock 4 controller, but the client gamepad doesn't have motion sensors active"sv;
       }
