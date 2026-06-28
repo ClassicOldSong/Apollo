@@ -201,6 +201,18 @@ namespace platf::dualsense_usbip {
            out_payload.size() == setup.length;
   }
 
+  inline bool control_direction_matches_setup(const usbip::submit_request_t &request) {
+    if (!is_control_submit(request)) {
+      return true;
+    }
+
+    const auto setup = usb::parse_setup_packet(request.setup);
+    const auto expected_direction = usb::setup_is_in(setup.request_type) ?
+                                      usbip::direction::in :
+                                      usbip::direction::out;
+    return request.header.transfer_direction == expected_direction;
+  }
+
   inline std::vector<std::uint8_t> make_interrupt_in_submit_reply(
     const usbip::submit_request_t &request,
     const dualsense::usb_input_report_t &input_report
@@ -298,6 +310,14 @@ namespace platf::dualsense_usbip {
 
     submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
       if (is_control_submit(request)) {
+        if (!control_direction_matches_setup(request)) {
+          return {
+            .reply = make_control_stall_submit_reply(request),
+            .has_output_report = false,
+            .output_report = {},
+          };
+        }
+
         if (!control_out_payload_matches_setup(request, out_payload)) {
           return {
             .reply = make_control_stall_submit_reply(request),

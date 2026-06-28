@@ -503,6 +503,29 @@ TEST(DualSenseUsbIpTests, DeviceHandlesInterruptOutSubmitWithParsedFeedback) {
   EXPECT_EQ(result.output_report.lightbar_blue, 0xCC);
 }
 
+TEST(DualSenseUsbIpTests, DeviceRejectsControlSubmitWithMismatchedSetupDirection) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    23,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    0,
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID_REPORT,
+      platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE
+    )
+  );
+
+  const auto result = device.handle_submit(request);
+
+  EXPECT_FALSE(result.has_output_report);
+  EXPECT_TRUE(submit_payload(result.reply).empty());
+  EXPECT_EQ(
+    platf::usbip::read_be32(result.reply, 20),
+    static_cast<std::uint32_t>(platf::dualsense_usbip::CONTROL_STALL_STATUS)
+  );
+}
+
 TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithParsedFeedback) {
   platf::dualsense_usbip::device_t device;
   const auto request = submit_request(
