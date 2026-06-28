@@ -31,7 +31,7 @@ namespace platf::dualsense_usbip {
 
   namespace {
     constexpr SOCKET INVALID_SERVER_SOCKET = INVALID_SOCKET;
-    constexpr auto INPUT_REPLY_INTERVAL = 4ms;
+    constexpr auto INPUT_REPLY_INTERVAL = std::chrono::milliseconds {dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_INTERVAL_MS};
 
     bool send_all(SOCKET socket, std::span<const std::uint8_t> data) {
       std::size_t sent = 0;

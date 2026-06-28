@@ -69,6 +69,10 @@ represent those bits.
   on Linux. That does not block the paddle/Fn transport path, but it explains why
   motion remains a follow-up validation item rather than part of the first
   Windows button-preservation proof.
+- `libsdl-org/SDL#13339`: DualSense Edge reports at 1 kHz over USB; Apollo
+  therefore answers queued interrupt IN requests at the captured high-speed
+  endpoint's 1 ms interval, while the available input state is still bounded by
+  Moonlight's client update cadence.
 - Sony's PC/Mac/mobile DualSense Edge support page documents that feature
   availability varies by device and connection type. That supports keeping audio,
   headset, haptics, and adaptive trigger behavior outside this first proof while
@@ -149,7 +153,10 @@ gamepad = ds5-edge
 When selected, Apollo starts a local USB/IP server on `127.0.0.1:3240` and
 serves one virtual DualSense Edge device at busid `1-1`. It advertises the
 captured composite USB configuration so the gamepad HID interface appears as
-`MI_03`, while unsupported audio interfaces are descriptor-only. Unsupported
+`MI_03`, while unsupported audio interfaces are descriptor-only. The captured
+HID interrupt IN endpoint uses high-speed `bInterval=4`, which is a 1 ms poll
+interval, so the USB/IP backend answers queued input requests at that cadence
+with the latest client state. Unsupported
 non-HID endpoint submissions are bounded and rejected without tearing down the
 HID controller session. Standard endpoint status and clear-halt controls are
 accepted for every endpoint in the captured descriptor, but HID descriptors and

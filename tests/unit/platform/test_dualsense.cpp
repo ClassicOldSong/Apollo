@@ -309,6 +309,8 @@ TEST(DualSenseReportTests, DefinesDualSenseEdgeUsbIdentity) {
 TEST(DualSenseReportTests, DefinesCapturedDualSenseEdgeCompositeConfiguration) {
   const auto &config = platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
   const auto hid_offset = platf::dualsense::DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET;
+  const auto input_endpoint_offset = platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_ENDPOINT_DESCRIPTOR_OFFSET;
+  const auto output_endpoint_offset = platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_OUT_ENDPOINT_DESCRIPTOR_OFFSET;
   const auto report_descriptor_size = config[hid_offset + 7] | (config[hid_offset + 8] << 8);
 
   EXPECT_EQ(config.size(), platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE);
@@ -324,8 +326,17 @@ TEST(DualSenseReportTests, DefinesCapturedDualSenseEdgeCompositeConfiguration) {
   EXPECT_EQ(config[hid_offset + 1], 0x21);
   EXPECT_EQ(config[hid_offset + 6], 0x22);
   EXPECT_EQ(report_descriptor_size, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
-  EXPECT_EQ(config[215], platf::dualsense::USB_ENDPOINT_IN);
-  EXPECT_EQ(config[222], platf::dualsense::USB_ENDPOINT_OUT);
+  EXPECT_EQ(config[input_endpoint_offset], 0x07);
+  EXPECT_EQ(config[input_endpoint_offset + 1], 0x05);
+  EXPECT_EQ(config[input_endpoint_offset + 2], platf::dualsense::USB_ENDPOINT_IN);
+  EXPECT_EQ(config[input_endpoint_offset + 3], 0x03);
+  EXPECT_EQ(config[input_endpoint_offset + 6], platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_INTERVAL);
+  EXPECT_EQ(config[output_endpoint_offset], 0x07);
+  EXPECT_EQ(config[output_endpoint_offset + 1], 0x05);
+  EXPECT_EQ(config[output_endpoint_offset + 2], platf::dualsense::USB_ENDPOINT_OUT);
+  EXPECT_EQ(config[output_endpoint_offset + 3], 0x03);
+  EXPECT_EQ(config[output_endpoint_offset + 6], platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_OUT_INTERVAL);
+  EXPECT_EQ(platf::dualsense::DUALSENSE_EDGE_HID_INTERRUPT_IN_INTERVAL_MS, 1);
 }
 
 TEST(DualSenseReportTests, DefinesDualSenseEdgeHidReportDescriptor) {
