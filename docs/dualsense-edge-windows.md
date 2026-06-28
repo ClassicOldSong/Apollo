@@ -212,9 +212,17 @@ Apollo has logged that the USB/IP backend is listening:
 
 The helper writes a timestamped directory under `%TEMP%` containing
 `usbip.exe list` / `attach` / `port` output, the resolved `usbip.exe` path,
+matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
-`MI_03` child, and selected PnP properties. Use `-SkipAttach` if the virtual
-controller is already attached and only the PnP evidence should be refreshed.
+`MI_03` child, and selected PnP properties. Pass Apollo and Moonlight log files
+with `-LogPath` to copy them into the same evidence bundle. Use `-SkipAttach` if
+the virtual controller is already attached and only the PnP evidence should be
+refreshed.
+
+```powershell
+.\scripts\capture-dualsense-edge-evidence.ps1 `
+  -LogPath 'C:\path\to\apollo.log','C:\path\to\Moonlight.log'
+```
 
 1. Run this Apollo branch on Windows with:
 

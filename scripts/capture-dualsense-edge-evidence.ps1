@@ -13,8 +13,10 @@ VID_054C&PID_0DF2 device, including the expected MI_03 HID child.
 [CmdletBinding()]
 param(
   [string]$HostAddress = '127.0.0.1',
+  [int]$Port = 3240,
   [string]$BusId = '1-1',
   [string]$OutputDir = (Join-Path $env:TEMP ("apollo-edge-" + (Get-Date -Format 'yyyyMMdd-HHmmss'))),
+  [string[]]$LogPath = @(),
   [switch]$SkipAttach,
   [int]$PostAttachDelaySeconds = 3
 )
@@ -58,6 +60,38 @@ function Invoke-PowerShellCapture {
   }
 }
 
+function Copy-RequestedLogs {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][string[]]$Paths
+  )
+
+  $manifest = New-Object System.Collections.Generic.List[string]
+  if ($Paths.Count -eq 0) {
+    $manifest.Add('No log paths provided. Pass -LogPath to copy Apollo/Moonlight logs into this evidence bundle.')
+    Write-TextFile -Path (Join-Path $OutputDir 'logs-manifest.txt') -Lines $manifest.ToArray()
+    return
+  }
+
+  $logDir = Join-Path $OutputDir 'logs'
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+
+  for ($i = 0; $i -lt $Paths.Count; $i++) {
+    $source = $Paths[$i]
+    try {
+      $item = Get-Item -LiteralPath $source -ErrorAction Stop
+      $destination = Join-Path $logDir ("{0:D2}-{1}" -f $i, $item.Name)
+      Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force -ErrorAction Stop
+      $manifest.Add("copied[$i]=$($item.FullName) -> $destination")
+    } catch {
+      $manifest.Add("failed[$i]=$source")
+      $manifest.Add("error[$i]=$($_.Exception.Message)")
+    }
+  }
+
+  Write-TextFile -Path (Join-Path $OutputDir 'logs-manifest.txt') -Lines $manifest.ToArray()
+}
+
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -69,13 +103,59 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "user=$env:USERNAME",
   "is_admin=$isAdmin",
   "host=$HostAddress",
+  "port=$Port",
   "busid=$BusId",
+  "log_path_count=$($LogPath.Count)",
   "skip_attach=$SkipAttach",
   "powershell=$($PSVersionTable.PSVersion)"
 )
 
+Copy-RequestedLogs -OutputDir $OutputDir -Paths $LogPath
+
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-command.txt') -Script {
   Get-Command usbip.exe -ErrorAction Stop | Format-List Name,Source,Version
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'usbip-services.txt') -Script {
+  Get-Service -ErrorAction Stop |
+    Where-Object {
+      $_.Name -match 'usbip|vhci|ude' -or
+      $_.DisplayName -match 'USB/IP|usbip|virtual host controller|UDE'
+    } |
+    Sort-Object Name |
+    Format-Table Name,DisplayName,Status,StartType -AutoSize
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'apollo-listener.txt') -Script {
+  Get-NetTCPConnection -LocalAddress $HostAddress -LocalPort $Port -State Listen -ErrorAction Stop |
+    ForEach-Object {
+      $process = Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue
+      $processName = ''
+      $processPath = ''
+      if ($process) {
+        $processName = $process.ProcessName
+        try {
+          $processPath = $process.Path
+        } catch {
+          $processPath = ''
+        }
+      }
+
+      [PSCustomObject]@{
+        LocalAddress = $_.LocalAddress
+        LocalPort = $_.LocalPort
+        State = $_.State
+        OwningProcess = $_.OwningProcess
+        ProcessName = $processName
+        Path = $processPath
+      }
+    } |
+    Format-List
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'apollo-listener-netstat.txt') -Script {
+  & netstat.exe -ano -p tcp |
+    Select-String -Pattern (":$Port\s")
 }
 
 Invoke-NativeCapture `
