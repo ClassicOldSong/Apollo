@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <vector>
 
 #include <src/platform/dualsense.h>
 
@@ -38,6 +39,16 @@ namespace {
       .request_type = 0x80,
       .request = platf::usb::REQUEST_GET_DESCRIPTOR,
       .value = static_cast<std::uint16_t>((descriptor_type << 8) | descriptor_index),
+      .index = 0,
+      .length = length,
+    };
+  }
+
+  platf::usb::setup_packet_t control_setup(std::uint8_t request_type, std::uint8_t request, std::uint16_t value, std::uint16_t length) {
+    return platf::usb::setup_packet_t {
+      .request_type = request_type,
+      .request = request,
+      .value = value,
       .index = 0,
       .length = length,
     };
@@ -286,4 +297,50 @@ TEST(DualSenseReportTests, LimitsDualSenseEdgeDescriptorResponsesToRequestedLeng
   EXPECT_EQ(response.size(), 4);
   EXPECT_EQ(response[0], 0x12);
   EXPECT_EQ(response[1], platf::usb::DESCRIPTOR_DEVICE);
+}
+
+TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
+  const auto standard_device_in = platf::usb::REQUEST_DIRECTION_IN |
+                                  (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                  platf::usb::RECIPIENT_DEVICE;
+  const auto standard_device_out = (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                   platf::usb::RECIPIENT_DEVICE;
+  const auto standard_interface_in = platf::usb::REQUEST_DIRECTION_IN |
+                                     (platf::usb::REQUEST_TYPE_STANDARD << 5) |
+                                     platf::usb::RECIPIENT_INTERFACE;
+  const auto class_interface_in = platf::usb::REQUEST_DIRECTION_IN |
+                                  (platf::usb::REQUEST_TYPE_CLASS << 5) |
+                                  platf::usb::RECIPIENT_INTERFACE;
+  const auto class_interface_out = (platf::usb::REQUEST_TYPE_CLASS << 5) |
+                                   platf::usb::RECIPIENT_INTERFACE;
+
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_STATUS, 0, 2)),
+    (std::vector<std::uint8_t> {1, 0})
+  );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_CONFIGURATION, 0, 1)),
+    (std::vector<std::uint8_t> {1})
+  );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_out, platf::usb::REQUEST_SET_CONFIGURATION, 1, 0)).empty()
+  );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(standard_interface_in, platf::usb::REQUEST_GET_INTERFACE, 0, 1)),
+    (std::vector<std::uint8_t> {0})
+  );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_in, platf::usb::HID_REQUEST_GET_IDLE, 0, 1)),
+    (std::vector<std::uint8_t> {0})
+  );
+  EXPECT_EQ(
+    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_in, platf::usb::HID_REQUEST_GET_PROTOCOL, 0, 1)),
+    (std::vector<std::uint8_t> {1})
+  );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_out, platf::usb::HID_REQUEST_SET_IDLE, 0, 0)).empty()
+  );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(class_interface_out, platf::usb::HID_REQUEST_SET_REPORT, 0x0202, 0)).empty()
+  );
 }

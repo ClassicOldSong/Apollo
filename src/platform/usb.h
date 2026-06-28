@@ -13,10 +13,27 @@
 #include <vector>
 
 namespace platf::usb {
+  constexpr std::uint8_t REQUEST_DIRECTION_IN = 0x80;
+  constexpr std::uint8_t REQUEST_RECIPIENT_MASK = 0x1F;
+
   constexpr std::uint8_t REQUEST_TYPE_STANDARD = 0;
   constexpr std::uint8_t REQUEST_TYPE_CLASS = 1;
 
+  constexpr std::uint8_t RECIPIENT_DEVICE = 0;
+  constexpr std::uint8_t RECIPIENT_INTERFACE = 1;
+
+  constexpr std::uint8_t REQUEST_GET_STATUS = 0x00;
   constexpr std::uint8_t REQUEST_GET_DESCRIPTOR = 0x06;
+  constexpr std::uint8_t REQUEST_GET_CONFIGURATION = 0x08;
+  constexpr std::uint8_t REQUEST_SET_CONFIGURATION = 0x09;
+  constexpr std::uint8_t REQUEST_GET_INTERFACE = 0x0A;
+  constexpr std::uint8_t REQUEST_SET_INTERFACE = 0x0B;
+
+  constexpr std::uint8_t HID_REQUEST_GET_IDLE = 0x02;
+  constexpr std::uint8_t HID_REQUEST_GET_PROTOCOL = 0x03;
+  constexpr std::uint8_t HID_REQUEST_SET_REPORT = 0x09;
+  constexpr std::uint8_t HID_REQUEST_SET_IDLE = 0x0A;
+  constexpr std::uint8_t HID_REQUEST_SET_PROTOCOL = 0x0B;
 
   constexpr std::uint8_t DESCRIPTOR_DEVICE = 0x01;
   constexpr std::uint8_t DESCRIPTOR_CONFIGURATION = 0x02;
@@ -51,6 +68,14 @@ namespace platf::usb {
 
   constexpr std::uint8_t setup_type(std::uint8_t request_type) {
     return (request_type >> 5) & 0x03;
+  }
+
+  constexpr bool setup_is_in(std::uint8_t request_type) {
+    return request_type & REQUEST_DIRECTION_IN;
+  }
+
+  constexpr std::uint8_t setup_recipient(std::uint8_t request_type) {
+    return request_type & REQUEST_RECIPIENT_MASK;
   }
 
   constexpr std::uint8_t descriptor_type(std::uint16_t value) {
