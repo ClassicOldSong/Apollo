@@ -212,6 +212,8 @@ function Write-TestSystemEvidenceFiles {
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeUsbIpPortImport = $true,
+    [bool] $IncludeUsbIpPortEdgeVidPid = $true,
+    [bool] $SplitUsbIpPortEvidence = $false,
     [string] $ListenerAddress = '127.0.0.1'
   )
 
@@ -251,9 +253,17 @@ function Write-TestSystemEvidenceFiles {
     '1-1: Sony Corp. : DualSense Edge Wireless Controller (054c:0df2)'
   )
   if ($IncludeUsbIpPortImport) {
-    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
-      'Port 00: Imported from 127.0.0.1 busid 1-1 remote 054c:0df2'
-    )
+    $usbipPortVidPid = if ($IncludeUsbIpPortEdgeVidPid) { '054c:0df2' } else { '0000:0000' }
+    if ($SplitUsbIpPortEvidence) {
+      Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
+        'Port 00: Imported from 127.0.0.1 busid 1-1 remote 0000:0000',
+        'Port 01: Imported from 127.0.0.1 busid 9-9 remote 054c:0df2'
+      )
+    } else {
+      Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
+        "Port 00: Imported from 127.0.0.1 busid 1-1 remote $usbipPortVidPid"
+      )
+    }
   } else {
     Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
       'Port 00: Imported from 127.0.0.1 busid 9-9 remote 0000:0000'
@@ -305,6 +315,8 @@ function Test-SystemSummary {
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
     [bool] $IncludeUsbIpPortImport = $true,
+    [bool] $IncludeUsbIpPortEdgeVidPid = $true,
+    [bool] $SplitUsbIpPortEvidence = $false,
     [string] $ListenerAddress = '127.0.0.1',
     [string[]] $ExpectedSummaryLines = @()
   )
@@ -317,6 +329,8 @@ function Test-SystemSummary {
       -IncludeAttachSuccess $IncludeAttachSuccess `
       -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence `
       -IncludeUsbIpPortImport $IncludeUsbIpPortImport `
+      -IncludeUsbIpPortEdgeVidPid $IncludeUsbIpPortEdgeVidPid `
+      -SplitUsbIpPortEvidence $SplitUsbIpPortEvidence `
       -ListenerAddress $ListenerAddress
 
     Write-SystemEvidenceSummary `
@@ -499,12 +513,14 @@ Test-SystemSummary `
   -Name 'system-pass' `
   -ExpectedOverall 'PASS' `
   -ExpectedSummaryLines @(
-    'MATCH: Apollo listener is visible on requested host',
-    'MATCH: Apollo listener is visible on requested port',
+    'MATCH: Apollo listener reports requested host',
+    'MATCH: Apollo listener reports requested port',
     'MATCH: USB/IP service evidence was captured',
     'MATCH: USB/IP driver package evidence was captured',
     'MATCH: USB/IP signed driver evidence was captured',
-    'MATCH: usbip port shows requested virtual Edge import',
+    'MATCH: usbip port shows requested busid',
+    'MATCH: usbip port shows virtual Edge VID/PID',
+    'MATCH: usbip port shows requested virtual Edge import on one line',
     'MATCH: PnP shows MI_03 HID child',
     'MATCH: PnP shows healthy MI_03 HID child'
   )
@@ -523,7 +539,7 @@ Test-SystemSummary `
   -ListenerAddress '0.0.0.0' `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
-    'MISSING: Apollo listener is visible on requested host'
+    'MISSING: Apollo listener reports requested host'
   )
 
 Test-SystemSummary `
@@ -531,7 +547,29 @@ Test-SystemSummary `
   -IncludeUsbIpPortImport $false `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
-    'MISSING: usbip port shows requested virtual Edge import'
+    'MISSING: usbip port shows requested busid',
+    'MISSING: usbip port shows virtual Edge VID/PID',
+    'MISSING: usbip port shows requested virtual Edge import on one line'
+  )
+
+Test-SystemSummary `
+  -Name 'system-usbip-port-busid-without-edge-fail' `
+  -IncludeUsbIpPortEdgeVidPid $false `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MATCH: usbip port shows requested busid',
+    'MISSING: usbip port shows virtual Edge VID/PID',
+    'MISSING: usbip port shows requested virtual Edge import on one line'
+  )
+
+Test-SystemSummary `
+  -Name 'system-usbip-port-split-import-evidence-fail' `
+  -SplitUsbIpPortEvidence $true `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MATCH: usbip port shows requested busid',
+    'MATCH: usbip port shows virtual Edge VID/PID',
+    'MISSING: usbip port shows requested virtual Edge import on one line'
   )
 
 Test-SystemSummary `

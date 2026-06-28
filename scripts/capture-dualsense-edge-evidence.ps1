@@ -425,13 +425,13 @@ function Write-SystemEvidenceSummary {
   )
 
   $summary = New-Object System.Collections.Generic.List[string]
-  $usbipImportedPortPattern = [regex]::Escape($BusId) + '|054c:0df2|VID_054C&PID_0DF2'
   $usbipDriverPattern = 'usbip|vhci|ude|USB/IP|virtual host controller|vadim|cezanne'
+  $usbipPortRequestedEdgePattern = '(?=.*' + [regex]::Escape($BusId) + ')(?=.*(?:054c:0df2|VID_054C&PID_0DF2))'
   $hasFailure = $false
   $checks = @(
     @{ Name = 'PowerShell is elevated'; Required = $true; Path = 'environment.txt'; Pattern = 'is_admin=True' },
-    @{ Name = 'Apollo listener is visible on requested host'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape($HostAddress) },
-    @{ Name = 'Apollo listener is visible on requested port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape([string]$Port) },
+    @{ Name = 'Apollo listener reports requested host'; Required = $true; Path = 'apollo-listener.txt'; Pattern = 'LocalAddress\s*:\s*' + [regex]::Escape($HostAddress) },
+    @{ Name = 'Apollo listener reports requested port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = 'LocalPort\s*:\s*' + [regex]::Escape([string]$Port) },
     @{ Name = 'usbip.exe command is resolvable'; Required = $true; Path = 'usbip-command.txt'; Pattern = 'usbip\.exe' },
     @{ Name = 'USB/IP service evidence was captured'; Required = $false; Path = 'usbip-services.txt'; Pattern = $usbipDriverPattern },
     @{ Name = 'USB/IP driver package evidence was captured'; Required = $false; Path = 'usbip-driver-packages.txt'; Pattern = $usbipDriverPattern },
@@ -439,7 +439,9 @@ function Write-SystemEvidenceSummary {
     @{ Name = 'usbip list shows requested busid'; Required = $true; Path = 'usbip-list.txt'; Pattern = [regex]::Escape($BusId) },
     @{ Name = 'usbip list shows DualSense Edge VID/PID'; Required = $true; Path = 'usbip-list.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
     @{ Name = 'usbip attach command succeeded'; Required = (-not $SkipAttach); Path = 'usbip-attach.txt'; Pattern = 'exit_code=0' },
-    @{ Name = 'usbip port shows requested virtual Edge import'; Required = $true; Path = 'usbip-port.txt'; Pattern = $usbipImportedPortPattern },
+    @{ Name = 'usbip port shows requested busid'; Required = $true; Path = 'usbip-port.txt'; Pattern = [regex]::Escape($BusId) },
+    @{ Name = 'usbip port shows virtual Edge VID/PID'; Required = $true; Path = 'usbip-port.txt'; Pattern = '054c:0df2|VID_054C&PID_0DF2' },
+    @{ Name = 'usbip port shows requested virtual Edge import on one line'; Required = $true; Path = 'usbip-port.txt'; Pattern = $usbipPortRequestedEdgePattern },
     @{ Name = 'PnP shows DualSense Edge VID/PID'; Required = $true; Path = 'pnp-edge.txt'; Pattern = 'VID_054C&PID_0DF2' },
     @{ Name = 'PnP shows MI_03 HID child'; Required = $true; Path = 'pnp-edge-mi03.txt'; Pattern = 'VID_054C&PID_0DF2.*MI_03' },
     @{ Name = 'PnP shows at least one healthy Edge device'; Required = $true; Path = 'pnp-edge-health.txt'; Pattern = 'edge_ok_count=[1-9][0-9]*' },

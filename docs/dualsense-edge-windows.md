@@ -290,9 +290,9 @@ Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener's
 requested host and port, `usbip.exe`, requested busid, attach result, optional
-USB/IP service/driver package evidence, a `usbip port` entry that references
-the requested virtual Edge import, and Windows PnP `VID_054C&PID_0DF2` /
-`MI_03` evidence,
+USB/IP service/driver package evidence, `usbip port` entries for both the
+requested busid and the virtual Edge VID/PID on the same imported-device line,
+and Windows PnP `VID_054C&PID_0DF2` / `MI_03` evidence,
 including healthy PnP status checks and the first matching lines from the
 captured files. It also writes
 `host-input-evidence-summary.txt`, which lists copied host-input evidence files
