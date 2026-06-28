@@ -210,7 +210,9 @@ function Write-TestSystemEvidenceFiles {
     [Parameter(Mandatory = $true)][string] $OutputDir,
     [bool] $IncludeMi03 = $true,
     [bool] $IncludeAttachSuccess = $true,
-    [bool] $IncludeUsbIpDriverEvidence = $true
+    [bool] $IncludeUsbIpDriverEvidence = $true,
+    [bool] $IncludeUsbIpPortImport = $true,
+    [string] $ListenerAddress = '127.0.0.1'
   )
 
   New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
@@ -219,7 +221,7 @@ function Write-TestSystemEvidenceFiles {
     'is_admin=True'
   )
   Set-Content -LiteralPath (Join-Path $OutputDir 'apollo-listener.txt') -Encoding utf8 -Value @(
-    'LocalAddress : 127.0.0.1',
+    "LocalAddress : $ListenerAddress",
     'LocalPort    : 3240'
   )
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-command.txt') -Encoding utf8 -Value @(
@@ -248,9 +250,15 @@ function Write-TestSystemEvidenceFiles {
   Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-list.txt') -Encoding utf8 -Value @(
     '1-1: Sony Corp. : DualSense Edge Wireless Controller (054c:0df2)'
   )
-  Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
-    'Port 00: Imported from 127.0.0.1 busid 1-1 remote 054c:0df2'
-  )
+  if ($IncludeUsbIpPortImport) {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
+      'Port 00: Imported from 127.0.0.1 busid 1-1 remote 054c:0df2'
+    )
+  } else {
+    Set-Content -LiteralPath (Join-Path $OutputDir 'usbip-port.txt') -Encoding utf8 -Value @(
+      'Port 00: Imported from 127.0.0.1 busid 9-9 remote 0000:0000'
+    )
+  }
   Set-Content -LiteralPath (Join-Path $OutputDir 'pnp-edge.txt') -Encoding utf8 -Value @(
     'InstanceId : USB\VID_054C&PID_0DF2\EDGE',
     'Status     : OK'
@@ -296,6 +304,8 @@ function Test-SystemSummary {
     [bool] $IncludeMi03 = $true,
     [bool] $IncludeAttachSuccess = $true,
     [bool] $IncludeUsbIpDriverEvidence = $true,
+    [bool] $IncludeUsbIpPortImport = $true,
+    [string] $ListenerAddress = '127.0.0.1',
     [string[]] $ExpectedSummaryLines = @()
   )
 
@@ -305,7 +315,9 @@ function Test-SystemSummary {
       -OutputDir $outputDir `
       -IncludeMi03 $IncludeMi03 `
       -IncludeAttachSuccess $IncludeAttachSuccess `
-      -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence
+      -IncludeUsbIpDriverEvidence $IncludeUsbIpDriverEvidence `
+      -IncludeUsbIpPortImport $IncludeUsbIpPortImport `
+      -ListenerAddress $ListenerAddress
 
     Write-SystemEvidenceSummary `
       -OutputDir $outputDir `
@@ -487,9 +499,12 @@ Test-SystemSummary `
   -Name 'system-pass' `
   -ExpectedOverall 'PASS' `
   -ExpectedSummaryLines @(
+    'MATCH: Apollo listener is visible on requested host',
+    'MATCH: Apollo listener is visible on requested port',
     'MATCH: USB/IP service evidence was captured',
     'MATCH: USB/IP driver package evidence was captured',
     'MATCH: USB/IP signed driver evidence was captured',
+    'MATCH: usbip port shows requested virtual Edge import',
     'MATCH: PnP shows MI_03 HID child',
     'MATCH: PnP shows healthy MI_03 HID child'
   )
@@ -501,6 +516,22 @@ Test-SystemSummary `
   -ExpectedSummaryLines @(
     'MISSING: PnP shows MI_03 HID child',
     'MISSING: PnP shows healthy MI_03 HID child'
+  )
+
+Test-SystemSummary `
+  -Name 'system-wrong-listener-host-fail' `
+  -ListenerAddress '0.0.0.0' `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: Apollo listener is visible on requested host'
+  )
+
+Test-SystemSummary `
+  -Name 'system-missing-usbip-port-import-fail' `
+  -IncludeUsbIpPortImport $false `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: usbip port shows requested virtual Edge import'
   )
 
 Test-SystemSummary `
