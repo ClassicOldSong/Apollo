@@ -23,12 +23,36 @@ represent those bits.
 
 - `ClassicOldSong/Apollo#805`: DualSense support is currently Linux-only because
   Apollo has no Windows DS5 emulation path.
+- `ClassicOldSong/Apollo#851`: upstream confirmed the public/open ViGEmBus path
+  does not provide a usable DualSense emulation target, despite confusing third
+  party claims about DS5 support.
 - `ClassicOldSong/Apollo#957`: USB passthrough is considered feasible but too
   much work; the preferred direction is forwarding/reconstructing raw HID rather
   than tunneling arbitrary USB.
+- `ClassicOldSong/Apollo#1060`: VirtualHere/USB passthrough remains a recurring
+  request, but upstream continues to point out the driver, signing, compatibility,
+  and maintenance cost.
 - `ClassicOldSong/Apollo#1237`: remapped handheld back buttons should arrive as
   normal A/B/etc. That case is different from DualSense Edge, where SDL exposes
   the extra controls as separate paddle-style controller buttons.
+- `moonlight-stream/moonlight-qt#1881`: Moonlight maintainers explicitly describe
+  today's protocol surface as basic buttons, paddles, sticks, triggers, motion,
+  battery, and touchpads. Full device-specific Steam Input style behavior needs a
+  larger HID passthrough feature, but paddles are already in scope for the
+  existing controller protocol.
+- `libsdl-org/SDL#13835`: SDL maintainers recommend probing the specific
+  controller buttons an app needs with `SDL_GamepadHasButton()`/
+  `SDL_GameControllerHasButton()`, which is why raw Edge button count is treated
+  as a diagnostic prerequisite rather than proof that the controller-button layer
+  is usable.
+- `libsdl-org/SDL#14544`: a reported DualSense Edge duplicate-button mapping
+  regression was traced to an application mapping-layer issue, while SDL's own
+  test controller behaved correctly. This reinforces normalizing stale app-level
+  paddle mappings before trusting them.
+- `libsdl-org/SDL#14581`: Edge motion support can depend on low-level HID access
+  on Linux. That does not block the paddle/Fn transport path, but it explains why
+  motion remains a follow-up validation item rather than part of the first
+  Windows button-preservation proof.
 - Community experiments exist, especially `CTM-Bridge/CTM-USBIP` and
   `sh00bx/Apollo`, but they should be treated as research inputs rather than a
   ready-to-merge Apollo patch.
