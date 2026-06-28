@@ -332,8 +332,8 @@ evidence should be refreshed.
    - Confirm the HID instance path includes `MI_03`. If paddle/Fn buttons are
      present in generic HID/game-controller tools but missing only from
      DS5-specific filter tools, capture the HID path and filter-driver logs.
-8. Press each Edge-specific control and verify four distinct host-visible
-   inputs:
+8. Press and release each Edge-specific control one at a time, then verify four
+   distinct host-visible inputs:
    - `PADDLE1`: right rear paddle
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
@@ -353,6 +353,8 @@ evidence should be refreshed.
    - `PADDLE2`: `DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)`
    - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
    - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
+   - Each control also logs a matching `released` line with
+     `paddle/Fn flags: 0x00000000` after it is released.
    - Do not continue if pressing an Edge-specific control logs `Ignoring
      DualSense Edge controller button ... bound to raw paddle... as stale Edge
      raw alias`; that means a stale SDL mapping is still binding an Edge-only
@@ -378,6 +380,8 @@ evidence should be refreshed.
    - `PADDLE2`: `Gamepad ... DualSense Edge paddle/Fn state changed [00020000]`
    - `PADDLE3`: `Gamepad ... DualSense Edge paddle/Fn state changed [00040000]`
    - `PADDLE4`: `Gamepad ... DualSense Edge paddle/Fn state changed [00080000]`
+   - Releasing each control returns the Apollo Edge state to
+     `Gamepad ... DualSense Edge paddle/Fn state changed [00000000]`.
 
 11. Detach the virtual controller after testing. Use the port number printed by
     `usbip.exe attach`:
@@ -411,7 +415,8 @@ same end-to-end run:
 - Moonlight advertises PlayStation arrival type `0x02` and the Edge paddle/Fn
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
-  arrival mask, and logs a distinct state change for each `PADDLE1..4` bit.
+  arrival mask, logs a distinct state change for each `PADDLE1..4` bit, and
+  logs a return to `[00000000]` after one-at-a-time release.
 - `usbip-win2` imports the loopback busid and Windows enumerates
   `VID_054C&PID_0DF2` with a healthy `MI_03` HID child.
 - A host-side gamepad or HID inspection tool observes four separate Edge
