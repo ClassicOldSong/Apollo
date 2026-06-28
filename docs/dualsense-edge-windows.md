@@ -131,16 +131,18 @@ This was rechecked against `libsdl-org/SDL` branch `SDL2` at
 `b8b3f5ef2001cbe7c11f62d41a9bf47d4a2d8b07`: `SDL_hidapi_ps5.c` sets
 `joystick->nbuttons = 21` for the DualSense Edge, and
 `SDL_gamecontroller.c` appends the mapping block above for Edge devices.
-Moonlight's bundled macOS SDL2 headers/library report version `2.32.70`,
-which has the SDL2 paddle button enum surface that the companion Moonlight
-branch targets.
+Moonlight's bundled macOS SDL2 compatibility library reports version `2.32.70`
+and loads SDL3 `3.4.11` through `sdl2-compat`. That still exposes the SDL2
+`SDL_GameController` API surface, but the raw Edge button numbers follow SDL3's
+generated mapping.
 
 SDL3's current gamepad layer labels the same semantic controls as right rear,
 left rear, right Fn, and left Fn, but its generated mapping uses different raw
 button numbers (`paddle1:b16,paddle2:b15,paddle3:b14,paddle4:b13`). The
 companion Moonlight branch intentionally targets Moonlight's current SDL2
-`SDL_GameController` API and validates the SDL2 raw bindings before advertising
-or transmitting Edge paddle/Fn flags.
+`SDL_GameController` API while selecting the native SDL2 or `sdl2-compat`/SDL3
+raw binding set at runtime before advertising or transmitting Edge paddle/Fn
+flags.
 
 Apollo should preserve that SDL/Sunshine paddle order unless hardware testing
 proves it produces the wrong physical labels.
@@ -306,10 +308,13 @@ evidence should be refreshed.
    Moonlight with `SDL_LOGGING=application=debug` so mapping and per-button
    diagnostics are captured.
 3. Confirm Moonlight logs:
-   - `DualSense Edge detected with ... SDL joystick buttons (VID/PID:
-     0x054c/0x0df2) (SDL x.y.z)` where the count is at least `21`. The VID/PID
-     proves Moonlight identified the physical Edge, and the SDL version matters
-     because the branch validates SDL2's Edge raw-button mapping.
+   - `DualSense Edge detected with ... SDL joystick buttons (need ... for ...
+     Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL x.y.z)` where the count is
+     at least `21` for native SDL2's `b20,b19,b18,b17` mapping or at least `17`
+     for `sdl2-compat`/SDL3's `b16,b15,b14,b13` mapping. The VID/PID proves
+     Moonlight identified the physical Edge, and the SDL version/raw-mapping
+     label matters because Moonlight validates those raw bindings before
+     transmitting Edge flags.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
    - If the mapping was `added` rather than `updated`, also expect
@@ -324,8 +329,10 @@ evidence should be refreshed.
      Edge-specific controls at the expected controller-button layer bindings.
      Capture the warning's `actual:` binding summary with the Moonlight log.
    - `DualSense Edge arrival support: ... arrivalType=0x02 ...
-     paddle/Fn=0x000f0000 ...
-     bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17`
+     paddle/Fn=0x000f0000 ...` with either native SDL2 bindings
+     `paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17` or
+     `sdl2-compat`/SDL3 bindings
+     `paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13`.
    - Do not continue if Moonlight logs `DualSense Edge controller button ... is
      bound to raw paddle...; not advertising it as a normal button`; that means
      a stale SDL mapping would have advertised an Edge-only control as a normal
@@ -511,12 +518,12 @@ if (buttonFlags & PADDLE3) buttons[2] |= 0x20;
 if (buttonFlags & PADDLE4) buttons[2] |= 0x10;
 ```
 
-That follows SDL2's generated mapping order:
+That follows SDL's generated mapping order:
 
-- `PADDLE1` from raw button 20: right rear paddle
-- `PADDLE2` from raw button 19: left rear paddle
-- `PADDLE3` from raw button 18: right Fn
-- `PADDLE4` from raw button 17: left Fn
+- `PADDLE1`: right rear paddle (`b20` on native SDL2, `b16` on `sdl2-compat`/SDL3)
+- `PADDLE2`: left rear paddle (`b19` on native SDL2, `b15` on `sdl2-compat`/SDL3)
+- `PADDLE3`: right Fn (`b18` on native SDL2, `b14` on `sdl2-compat`/SDL3)
+- `PADDLE4`: left Fn (`b17` on native SDL2, `b13` on `sdl2-compat`/SDL3)
 
 ## Milestones
 
