@@ -280,13 +280,19 @@ function Test-EvidenceBundleManifest {
     New-Item -ItemType Directory -Force -Path (Join-Path $outputDir 'logs') | Out-Null
     Set-Content -LiteralPath (Join-Path $outputDir 'environment.txt') -Encoding utf8 -Value 'is_admin=True'
     Set-Content -LiteralPath (Join-Path $outputDir 'logs/edge.log') -Encoding utf8 -Value 'edge log'
+    Set-Content -LiteralPath (Join-Path $outputDir 'logs/.edge-hidden.log') -Encoding utf8 -Value 'hidden edge log'
 
-    Write-EvidenceBundleManifest -OutputDir $outputDir
+    Push-Location -LiteralPath (Split-Path -Parent $outputDir)
+    try {
+      Write-EvidenceBundleManifest -OutputDir (Split-Path -Leaf $outputDir)
+    } finally {
+      Pop-Location
+    }
 
     $manifest = Get-Content -LiteralPath (Join-Path $outputDir 'evidence-artifacts-manifest.txt') -Raw
     Assert-Contains `
       -Content $manifest `
-      -Needle 'artifact_count=2' `
+      -Needle 'artifact_count=3' `
       -CaseName 'bundle-manifest count'
     Assert-Contains `
       -Content $manifest `
@@ -296,6 +302,10 @@ function Test-EvidenceBundleManifest {
       -Content $manifest `
       -Pattern 'artifact\[[0-9]+\]\.relative_path=logs[/\\]edge\.log' `
       -CaseName 'bundle-manifest nested path'
+    Assert-Matches `
+      -Content $manifest `
+      -Pattern 'artifact\[[0-9]+\]\.relative_path=logs[/\\]\.edge-hidden\.log' `
+      -CaseName 'bundle-manifest hidden nested path'
     Assert-Matches `
       -Content $manifest `
       -Pattern 'artifact\[[0-9]+\]\.sha256=[0-9a-f]{64}' `

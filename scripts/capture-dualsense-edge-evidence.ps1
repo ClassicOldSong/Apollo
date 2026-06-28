@@ -95,7 +95,7 @@ function Add-CopiedPathHashes {
     }
 
     $root = $item.FullName.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
-    $files = @(Get-ChildItem -LiteralPath $item.FullName -Recurse -File -ErrorAction Stop | Sort-Object FullName)
+    $files = @(Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force -ErrorAction Stop | Sort-Object FullName)
     $Manifest.Add("copied[$Index].file_count=$($files.Count)")
     for ($fileIndex = 0; $fileIndex -lt $files.Count; $fileIndex++) {
       $file = $files[$fileIndex]
@@ -120,10 +120,11 @@ function Write-EvidenceBundleManifest {
 
   try {
     $rootItem = Get-Item -LiteralPath $OutputDir -ErrorAction Stop
+    $manifestFullPath = [System.IO.Path]::GetFullPath((Join-Path $rootItem.FullName 'evidence-artifacts-manifest.txt'))
     $root = $rootItem.FullName.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
     $files = @(
-      Get-ChildItem -LiteralPath $rootItem.FullName -Recurse -File -ErrorAction Stop |
-        Where-Object { $_.FullName -ne $manifestPath } |
+      Get-ChildItem -LiteralPath $rootItem.FullName -Recurse -File -Force -ErrorAction Stop |
+        Where-Object { [System.IO.Path]::GetFullPath($_.FullName) -ne $manifestFullPath } |
         Sort-Object FullName
     )
 
