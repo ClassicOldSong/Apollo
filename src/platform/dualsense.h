@@ -14,8 +14,15 @@
 #include "src/platform/common.h"
 
 namespace platf::dualsense {
+  constexpr std::uint16_t VENDOR_ID_SONY = 0x054C;
+  constexpr std::uint16_t PRODUCT_ID_DUALSENSE = 0x0CE6;
+  constexpr std::uint16_t PRODUCT_ID_DUALSENSE_EDGE = 0x0DF2;
+
   constexpr std::uint8_t INPUT_REPORT_USB = 0x01;
   constexpr std::size_t INPUT_REPORT_USB_SIZE = 64;
+  constexpr std::size_t INPUT_REPORT_BODY_SIZE = INPUT_REPORT_USB_SIZE - 1;
+  constexpr std::size_t DUALSENSE_HID_REPORT_DESCRIPTOR_SIZE = 273;
+  constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
 
   constexpr std::uint8_t HAT_NORTH = 0x00;
   constexpr std::uint8_t HAT_NORTHEAST = 0x01;
@@ -75,7 +82,13 @@ namespace platf::dualsense {
     std::array<std::uint8_t, 8> reserved4;
   };
 
-  static_assert(sizeof(input_report_t) == INPUT_REPORT_USB_SIZE - 1);
+  struct usb_input_report_t {
+    std::uint8_t report_id;
+    input_report_t body;
+  };
+
+  static_assert(sizeof(input_report_t) == INPUT_REPORT_BODY_SIZE);
+  static_assert(sizeof(usb_input_report_t) == INPUT_REPORT_USB_SIZE);
 
   constexpr std::uint8_t pack_dpad(std::uint32_t flags) {
     const bool up = flags & DPAD_UP;
@@ -211,5 +224,12 @@ namespace platf::dualsense {
     report.buttons = {buttons.buttons0, buttons.buttons1, buttons.buttons2, 0};
 
     return report;
+  }
+
+  constexpr usb_input_report_t make_usb_input_report(const gamepad_state_t &gamepad_state, std::uint8_t sequence_number, bool dualsense_edge) {
+    return usb_input_report_t {
+      .report_id = INPUT_REPORT_USB,
+      .body = make_input_report(gamepad_state, sequence_number, dualsense_edge),
+    };
   }
 }  // namespace platf::dualsense

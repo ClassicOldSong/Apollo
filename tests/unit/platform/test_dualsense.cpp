@@ -77,6 +77,25 @@ TEST(DualSenseReportTests, PacksDualSenseEdgeButtonsOnlyWhenRequested) {
                                     platf::dualsense::BUTTONS2_EDGE_FN_LEFT);
 }
 
+TEST(DualSenseReportTests, PreservesSdlDualSenseEdgePaddleOrder) {
+  EXPECT_EQ(
+    platf::dualsense::pack_buttons(platf::PADDLE1, 0, 0, true).buttons2,
+    platf::dualsense::BUTTONS2_EDGE_RIGHT_PADDLE
+  );
+  EXPECT_EQ(
+    platf::dualsense::pack_buttons(platf::PADDLE2, 0, 0, true).buttons2,
+    platf::dualsense::BUTTONS2_EDGE_LEFT_PADDLE
+  );
+  EXPECT_EQ(
+    platf::dualsense::pack_buttons(platf::PADDLE3, 0, 0, true).buttons2,
+    platf::dualsense::BUTTONS2_EDGE_FN_RIGHT
+  );
+  EXPECT_EQ(
+    platf::dualsense::pack_buttons(platf::PADDLE4, 0, 0, true).buttons2,
+    platf::dualsense::BUTTONS2_EDGE_FN_LEFT
+  );
+}
+
 TEST(DualSenseReportTests, BuildsUsbInputReportPayload) {
   auto state = state_with_buttons(platf::A | platf::PADDLE1);
   state.lt = 64;
@@ -96,4 +115,15 @@ TEST(DualSenseReportTests, BuildsUsbInputReportPayload) {
   EXPECT_EQ(report.buttons[1], platf::dualsense::BUTTONS1_L2 | platf::dualsense::BUTTONS1_R2);
   EXPECT_EQ(report.buttons[2], platf::dualsense::BUTTONS2_EDGE_RIGHT_PADDLE);
   EXPECT_EQ(report.buttons[3], 0);
+}
+
+TEST(DualSenseReportTests, BuildsUsbInputReportWithReportId) {
+  auto state = state_with_buttons(platf::PADDLE4);
+
+  const auto report = platf::dualsense::make_usb_input_report(state, 9, true);
+
+  EXPECT_EQ(sizeof(report), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  EXPECT_EQ(report.report_id, platf::dualsense::INPUT_REPORT_USB);
+  EXPECT_EQ(report.body.sequence_number, 9);
+  EXPECT_EQ(report.body.buttons[2], platf::dualsense::BUTTONS2_EDGE_FN_LEFT);
 }

@@ -43,6 +43,11 @@ the DualSense input report's third button byte:
 - bit 6: left rear paddle
 - bit 7: right rear paddle
 
+The same byte-level order is visible in `hhd-dev/hwinfo`'s public
+`ps5edge_LFnRFnLBRB.txt` hardware capture: byte 10 transitions in order
+`0x10`, `0x20`, `0x40`, `0x80` when left Fn, right Fn, left rear, and right
+rear are pressed.
+
 SDL2's DualSense Edge HIDAPI path exposes these as raw joystick buttons 17-20,
 and its generated controller mapping uses:
 
@@ -105,6 +110,14 @@ Prefer a separate backend boundary:
   - face buttons and d-pad to DS5 `buttons[0]`
   - shoulders, triggers, Create, Options, sticks to `buttons[1]`
   - PS, touchpad click, mic, Edge Fn/paddles to `buttons[2]`
+
+For native Edge buttons, the virtual device must enumerate as an Edge-compatible
+device, not just a standard DualSense. A standard DualSense identity
+(`054c:0ce6`) is useful as a compatibility fallback, but its public HID report
+descriptor exposes only the standard 15 gamepad buttons and leaves the Edge
+bits as vendor data. The Edge identity (`054c:0df2`) and Edge HID report
+descriptor are the clean target for preserving the four extra controls as
+host-visible inputs.
 
 For DualSense Edge mode, `buttons[2]` should include:
 
