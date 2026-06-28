@@ -290,9 +290,10 @@ evidence should be refreshed.
    Moonlight with `SDL_LOGGING=application=debug` so mapping and per-button
    diagnostics are captured.
 3. Confirm Moonlight logs:
-   - `DualSense Edge detected with ... SDL joystick buttons (SDL x.y.z)` where
-     the count is at least `21`. The SDL version matters because the branch
-     validates SDL2's Edge raw-button mapping.
+   - `DualSense Edge detected with ... SDL joystick buttons (VID/PID:
+     0x054c/0x0df2) (SDL x.y.z)` where the count is at least `21`. The VID/PID
+     proves Moonlight identified the physical Edge, and the SDL version matters
+     because the branch validates SDL2's Edge raw-button mapping.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
    - If the mapping was `added` rather than `updated`, also expect
