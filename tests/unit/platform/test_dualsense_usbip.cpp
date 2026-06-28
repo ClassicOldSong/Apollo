@@ -172,3 +172,85 @@ TEST(DualSenseUsbIpTests, RecognizesMinimumCommonOutputReport) {
     platf::dualsense::OUTPUT_REPORT_COMMON_SIZE
   );
 }
+
+TEST(DualSenseUsbIpTests, DeviceHandlesInterruptInSubmitsWithUpdatedInputState) {
+  platf::dualsense_usbip::device_t device;
+  device.update_input(platf::gamepad_state_t {
+    .buttonFlags = platf::PADDLE4,
+    .lt = 0,
+    .rt = 0,
+    .lsX = 0,
+    .lsY = 0,
+    .rsX = 0,
+    .rsY = 0,
+  });
+
+  const auto first = device.handle_submit(submit_request(
+    20,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+  const auto second = device.handle_submit(submit_request(
+    21,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+
+  const auto first_payload = submit_payload(first.reply);
+  const auto second_payload = submit_payload(second.reply);
+
+  ASSERT_EQ(first_payload.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  ASSERT_EQ(second_payload.size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+  EXPECT_EQ(first_payload[7], 0);
+  EXPECT_EQ(second_payload[7], 1);
+  EXPECT_EQ(first_payload[10], platf::dualsense::BUTTONS2_EDGE_FN_LEFT);
+  EXPECT_FALSE(first.has_output_report);
+}
+
+TEST(DualSenseUsbIpTests, DeviceHandlesInterruptOutSubmitWithParsedFeedback) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    22,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_OUT,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[2] = platf::dualsense::OUTPUT_VALID_FLAG1_LIGHTBAR_CONTROL_ENABLE;
+  report[3] = 0x20;
+  report[4] = 0x40;
+  report[45] = 0xAA;
+  report[46] = 0xBB;
+  report[47] = 0xCC;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_TRUE(result.has_output_report);
+  EXPECT_TRUE(result.output_report.has_rumble);
+  EXPECT_EQ(result.output_report.motor_left, 0x40);
+  EXPECT_EQ(result.output_report.motor_right, 0x20);
+  EXPECT_TRUE(result.output_report.has_lightbar);
+  EXPECT_EQ(result.output_report.lightbar_red, 0xAA);
+  EXPECT_EQ(result.output_report.lightbar_green, 0xBB);
+  EXPECT_EQ(result.output_report.lightbar_blue, 0xCC);
+}
+
+TEST(DualSenseUsbIpTests, DeviceReturnsErrorForUnsupportedSubmitEndpoint) {
+  platf::dualsense_usbip::device_t device;
+  const auto result = device.handle_submit(submit_request(
+    23,
+    platf::usbip::direction::in,
+    9,
+    64
+  ));
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 23);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
+  EXPECT_FALSE(result.has_output_report);
+}

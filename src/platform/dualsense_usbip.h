@@ -50,6 +50,12 @@ namespace platf::dualsense_usbip {
     },
   };
 
+  struct submit_result_t {
+    std::vector<std::uint8_t> reply;
+    bool has_output_report;
+    dualsense::output_report_state_t output_report;
+  };
+
   inline std::vector<std::uint8_t> make_devlist_reply() {
     return usbip::make_devlist_reply(DEVICE, INTERFACES);
   }
@@ -139,4 +145,59 @@ namespace platf::dualsense_usbip {
       0
     );
   }
+
+  class device_t {
+  public:
+    void update_input(const gamepad_state_t &state) {
+      input_state_ = state;
+    }
+
+    const gamepad_state_t &input_state() const {
+      return input_state_;
+    }
+
+    submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
+      if (is_control_submit(request)) {
+        return {
+          .reply = make_control_submit_reply(request),
+          .has_output_report = false,
+          .output_report = {},
+        };
+      }
+
+      if (is_interrupt_in_submit(request)) {
+        const auto report = dualsense::make_usb_input_report(input_state_, sequence_number_++, true);
+        return {
+          .reply = make_interrupt_in_submit_reply(request, report),
+          .has_output_report = false,
+          .output_report = {},
+        };
+      }
+
+      if (is_interrupt_out_submit(request)) {
+        const auto output = dualsense::parse_output_report(out_payload);
+        return {
+          .reply = make_interrupt_out_submit_ack(request),
+          .has_output_report = output.valid,
+          .output_report = output,
+        };
+      }
+
+      return {
+        .reply = usbip::make_ret_submit(
+          request.header.seqnum,
+          request.header.devid,
+          request.header.transfer_direction,
+          request.header.endpoint,
+          -1
+        ),
+        .has_output_report = false,
+        .output_report = {},
+      };
+    }
+
+  private:
+    gamepad_state_t input_state_ {};
+    std::uint8_t sequence_number_ {};
+  };
 }  // namespace platf::dualsense_usbip
