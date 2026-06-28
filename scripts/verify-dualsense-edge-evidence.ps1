@@ -224,11 +224,18 @@ function Test-CopiedEvidenceManifestHashes {
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
     $logPath = Join-Path $outputDir 'apollo.log'
     $hostInputPath = Join-Path $outputDir 'host-input.txt'
+    $logDirPath = Join-Path $outputDir 'apollo-log-dir'
+    $hostInputDirPath = Join-Path $outputDir 'host-input-dir'
     Set-Content -LiteralPath $logPath -Encoding utf8 -Value 'apollo edge log'
     Set-Content -LiteralPath $hostInputPath -Encoding utf8 -Value 'host input evidence'
+    New-Item -ItemType Directory -Force -Path (Join-Path $logDirPath 'nested') | Out-Null
+    New-Item -ItemType Directory -Force -Path $hostInputDirPath | Out-Null
+    Set-Content -LiteralPath (Join-Path $logDirPath 'apollo-dir.log') -Encoding utf8 -Value 'apollo directory log'
+    Set-Content -LiteralPath (Join-Path $logDirPath 'nested/moonlight-dir.log') -Encoding utf8 -Value 'moonlight directory log'
+    Set-Content -LiteralPath (Join-Path $hostInputDirPath 'host-dir.txt') -Encoding utf8 -Value 'host input directory evidence'
 
-    Copy-RequestedLogs -OutputDir $outputDir -Paths @($logPath)
-    Copy-RequestedHostInputEvidence -OutputDir $outputDir -Paths @($hostInputPath)
+    Copy-RequestedLogs -OutputDir $outputDir -Paths @($logPath, $logDirPath)
+    Copy-RequestedHostInputEvidence -OutputDir $outputDir -Paths @($hostInputPath, $hostInputDirPath)
 
     $logManifest = Get-Content -LiteralPath (Join-Path $outputDir 'logs-manifest.txt') -Raw
     $hostInputManifest = Get-Content -LiteralPath (Join-Path $outputDir 'host-input-manifest.txt') -Raw
@@ -240,6 +247,26 @@ function Test-CopiedEvidenceManifestHashes {
       -Content $hostInputManifest `
       -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
       -CaseName 'manifest-hashes host-input'
+    Assert-Contains `
+      -Content $logManifest `
+      -Needle 'copied[1].file_count=2' `
+      -CaseName 'manifest-hashes log directory count'
+    Assert-Matches `
+      -Content $logManifest `
+      -Pattern 'copied\[1\]\.file\[[0-9]+\]\.relative_path=.*moonlight-dir\.log' `
+      -CaseName 'manifest-hashes log directory relative path'
+    Assert-Matches `
+      -Content $logManifest `
+      -Pattern 'copied\[1\]\.file\[[0-9]+\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes log directory hash'
+    Assert-Contains `
+      -Content $hostInputManifest `
+      -Needle 'copied[1].file_count=1' `
+      -CaseName 'manifest-hashes host-input directory count'
+    Assert-Matches `
+      -Content $hostInputManifest `
+      -Pattern 'copied\[1\]\.file\[0\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes host-input directory hash'
   } finally {
     if (Test-Path -LiteralPath $outputDir) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force

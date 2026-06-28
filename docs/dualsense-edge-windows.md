@@ -271,11 +271,12 @@ log files with `-LogPath` to copy them into the same evidence bundle; the log
 manifest records each copied path's source path, destination path, type, last
 write time, file size, and SHA-256 hash when available. If an existing
 `-OutputDir` is reused, the helper clears the previous copied `logs` directory
-before summarizing logs, so stale logs cannot satisfy `-RequirePass`. Pass
-HID/gamepad inspector exports, logs, or screenshots with
+before summarizing logs, so stale logs cannot satisfy `-RequirePass`. Copied
+directories include recursive per-file relative paths, sizes, and SHA-256
+hashes. Pass HID/gamepad inspector exports, logs, or screenshots with
 `-HostInputEvidencePath` to keep the host-visible button proof in the same
 evidence bundle; the host-input manifest records the same file metadata and
-SHA-256 hashes for copied files. If the inspector can export text,
+recursive hashes. If the inspector can export text,
 `-HostInputEvidencePattern` can be repeated to require specific regex matches in
 those files, and `-HostInputStopPattern` can be repeated to fail on known-bad
 text such as face-button remaps or duplicated right/left controls. Screenshots
