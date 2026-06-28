@@ -549,6 +549,9 @@ function Test-EvidenceArchive {
       if (-not ($entryNames -contains 'evidence-artifacts-manifest.txt')) {
         throw 'archive missing evidence-artifacts-manifest.txt'
       }
+      if ($entryNames -contains 'archive-summary.txt') {
+        throw 'archive should not contain archive-summary.txt because it records the final archive hash'
+      }
     } finally {
       $archive.Dispose()
     }
