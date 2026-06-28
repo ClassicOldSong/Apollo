@@ -287,10 +287,12 @@ evidence bundle; the host-input manifest records the same file metadata and
 recursive hashes. The helper also writes `evidence-artifacts-manifest.txt`,
 which records relative paths, sizes, and SHA-256 hashes for every generated and
 copied artifact in the final bundle except the manifest itself. Pass
-`-ArchivePath` to also write a zip archive outside the evidence directory; the
-helper writes `archive-summary.txt` in the evidence directory with the archive
-path, size, SHA-256 hash, and `overall=PASS` after the archive is created. If
-the inspector can export text,
+`-ArchivePath` to also write a zip archive outside the evidence directory. The
+zip contains the captured evidence bundle and `evidence-artifacts-manifest.txt`;
+after creating the zip, the helper writes `archive-summary.txt` in the evidence
+directory with the archive path, size, SHA-256 hash, and `overall=PASS`. Copy
+that summary into the PR or attach it alongside the zip when sharing physical
+validation evidence. If the inspector can export text,
 `-HostInputEvidencePattern` can be repeated to require specific regex matches in
 those files, and `-HostInputStopPattern` can be repeated to fail on known-bad
 text such as face-button remaps or duplicated right/left controls. Screenshots
@@ -522,8 +524,8 @@ same end-to-end run:
   tools may expose the Edge extras as vendor/Edge-specific bits rather than
   numbered generic buttons, so prefer DS5/Edge-aware HID evidence when possible.
 - If `-ArchivePath` was supplied, `archive-summary.txt` ends with
-  `overall=PASS` and records the zip file SHA-256 hash for the reviewer-ready
-  evidence bundle.
+  `overall=PASS` and records the zip file SHA-256 hash. The archive itself
+  contains `evidence-artifacts-manifest.txt` for the captured bundle contents.
 - Moonlight advertises PlayStation arrival type `0x02` and the Edge paddle/Fn
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
