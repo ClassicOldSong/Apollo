@@ -44,6 +44,18 @@ represent those bits.
   than this button-preservation path. Maintainer comments describe most standard
   controller features as already present, while sound and adaptive triggers remain
   separate SDL/protocol work.
+- `LizardByte/Sunshine#3468` and `LizardByte/Sunshine#3600`: Linux DualSense
+  support moved from a uinput-only shape toward UHID because native DS5 games can
+  reject or mis-map virtual devices that do not look enough like a real HID
+  DualSense. That reinforces exposing a real Edge-shaped HID device for Windows
+  rather than presenting another generic gamepad.
+- `LizardByte/Sunshine#3527` and `LizardByte/Sunshine#4948`: a WinUHid-based
+  Windows DualSense backend is an attractive long-term direction, but the PR was
+  closed while driver distribution/signing remained unresolved. Maintainers noted
+  that WinUHid currently lacks a ready prebuilt installer, and Cameron Gutman
+  clarified that broad architecture support would require WHQL/EV signing. This
+  branch therefore keeps `usbip-win2` as the currently testable signed-driver path
+  while treating WinUHid as a future cleaner backend candidate.
 - `libsdl-org/SDL#13835`: SDL maintainers recommend probing the specific
   controller buttons an app needs with `SDL_GamepadHasButton()`/
   `SDL_GameControllerHasButton()`, which is why raw Edge button count is treated
@@ -311,6 +323,9 @@ Candidate transport:
 - A local USB/IP server attached by `usbip-win2` is the most practical current
   research path. It uses an existing signed virtual host controller and matches
   the raw-HID-over-reconstructed-device direction discussed upstream.
+- WinUHid is likely the cleaner Windows-native target once a signed, easy to
+  install driver package exists. Until then, depending on it would leave the proof
+  blocked on driver distribution rather than on the Edge button transport itself.
 
 ## Implementation Shape
 
