@@ -89,6 +89,19 @@ function Assert-Contains {
   }
 }
 
+function Assert-Matches {
+  param(
+    [Parameter(Mandatory = $true)][string] $Content,
+    [Parameter(Mandatory = $true)][string] $Pattern,
+    [Parameter(Mandatory = $true)][string] $CaseName
+  )
+
+  if ($Content -notmatch $Pattern) {
+    Write-Host $Content
+    throw "$CaseName missing expected pattern: $Pattern"
+  }
+}
+
 function Test-LogSummary {
   param(
     [Parameter(Mandatory = $true)][string] $Name,
@@ -198,6 +211,35 @@ function Test-MissingHostInputSummary {
     foreach ($line in $ExpectedSummaryLines) {
       Assert-Contains -Content $summary -Needle $line -CaseName $Name
     }
+  } finally {
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
+function Test-CopiedEvidenceManifestHashes {
+  $outputDir = New-TestOutputDir -Name 'manifest-hashes'
+  try {
+    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+    $logPath = Join-Path $outputDir 'apollo.log'
+    $hostInputPath = Join-Path $outputDir 'host-input.txt'
+    Set-Content -LiteralPath $logPath -Encoding utf8 -Value 'apollo edge log'
+    Set-Content -LiteralPath $hostInputPath -Encoding utf8 -Value 'host input evidence'
+
+    Copy-RequestedLogs -OutputDir $outputDir -Paths @($logPath)
+    Copy-RequestedHostInputEvidence -OutputDir $outputDir -Paths @($hostInputPath)
+
+    $logManifest = Get-Content -LiteralPath (Join-Path $outputDir 'logs-manifest.txt') -Raw
+    $hostInputManifest = Get-Content -LiteralPath (Join-Path $outputDir 'host-input-manifest.txt') -Raw
+    Assert-Matches `
+      -Content $logManifest `
+      -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes logs'
+    Assert-Matches `
+      -Content $hostInputManifest `
+      -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes host-input'
   } finally {
     if (Test-Path -LiteralPath $outputDir) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force
@@ -508,6 +550,8 @@ Test-MissingHostInputSummary `
   -ExpectedSummaryLines @(
     'No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.'
   )
+
+Test-CopiedEvidenceManifestHashes
 
 Test-SystemSummary `
   -Name 'system-pass' `

@@ -79,6 +79,21 @@ function Get-PnpDevicePropertyData {
   }
 }
 
+function Add-CopiedFileHash {
+  param(
+    [Parameter(Mandatory = $true)][System.Collections.Generic.List[string]]$Manifest,
+    [Parameter(Mandatory = $true)][int]$Index,
+    [Parameter(Mandatory = $true)][string]$Path
+  )
+
+  try {
+    $hash = Get-FileHash -LiteralPath $Path -Algorithm SHA256 -ErrorAction Stop
+    $Manifest.Add("copied[$Index].sha256=$($hash.Hash.ToLowerInvariant())")
+  } catch {
+    $Manifest.Add("copied[$Index].sha256_error=$($_.Exception.Message)")
+  }
+}
+
 function Copy-RequestedLogs {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
@@ -111,6 +126,7 @@ function Copy-RequestedLogs {
       $manifest.Add("copied[$i].last_write_utc=$($item.LastWriteTimeUtc.ToString('o'))")
       if (-not $item.PSIsContainer) {
         $manifest.Add("copied[$i].size_bytes=$($item.Length)")
+        Add-CopiedFileHash -Manifest $manifest -Index $i -Path $destination
       }
     } catch {
       $manifest.Add("failed[$i]=$source")
@@ -173,6 +189,7 @@ function Copy-RequestedHostInputEvidence {
       $manifest.Add("copied[$i].last_write_utc=$($item.LastWriteTimeUtc.ToString('o'))")
       if (-not $item.PSIsContainer) {
         $manifest.Add("copied[$i].size_bytes=$($item.Length)")
+        Add-CopiedFileHash -Manifest $manifest -Index $i -Path $destination
       }
     } catch {
       $manifest.Add("failed[$i]=$source")
