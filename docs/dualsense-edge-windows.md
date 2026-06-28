@@ -106,11 +106,17 @@ descriptor and return zero-filled payloads with the requested report ID.
 
 2. Start a Moonlight client built from the companion DualSense Edge branch and
    connect the physical DualSense Edge.
-3. Confirm Apollo logs:
+3. Confirm Moonlight logs:
+   - `DualSense Edge detected with ... SDL joystick buttons` where the count is
+     at least `21`.
+   - Either `Applied DualSense Edge paddle mappings (...)` or
+     `DualSense Edge paddle mappings already present`.
+   - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...`
+4. Confirm Apollo logs:
    - `DualSense Edge USB/IP backend is listening on 127.0.0.1:3240`
    - `Gamepad ... will be DualSense Edge controller (experimental USB/IP)`
    - `Gamepad ... reported DualSense Edge paddle/Fn buttons [000F0000]`
-4. In an elevated Windows shell with `usbip-win2`, list and attach the virtual
+5. In an elevated Windows shell with `usbip-win2`, list and attach the virtual
    controller:
 
    ```powershell
@@ -118,17 +124,22 @@ descriptor and return zero-filled payloads with the requested report ID.
    usbip.exe attach -r 127.0.0.1 -b 1-1
    ```
 
-5. Confirm Apollo logs:
+6. Confirm Apollo logs:
    - `DualSense Edge USB/IP: client imported virtual controller`
-6. Check Device Manager, `joy.cpl`, Steam Input, or a HID inspection tool for a
+7. Check Device Manager, `joy.cpl`, Steam Input, or a HID inspection tool for a
    Sony `054c:0df2` DualSense Edge device.
-7. Press each Edge-specific control and verify four distinct host-visible
+8. Press each Edge-specific control and verify four distinct host-visible
    inputs:
    - `PADDLE1`: right rear paddle
    - `PADDLE2`: left rear paddle
    - `PADDLE3`: right Fn
    - `PADDLE4`: left Fn
-8. Confirm each control changes Apollo's Edge-state log:
+9. Confirm each control changes Moonlight's Edge-state log:
+   - `PADDLE1`: `DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)`
+   - `PADDLE2`: `DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)`
+   - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
+   - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
+10. Confirm each control changes Apollo's Edge-state log:
    - `PADDLE1`: `Gamepad ... DualSense Edge paddle/Fn state changed [00010000]`
    - `PADDLE2`: `Gamepad ... DualSense Edge paddle/Fn state changed [00020000]`
    - `PADDLE3`: `Gamepad ... DualSense Edge paddle/Fn state changed [00040000]`
