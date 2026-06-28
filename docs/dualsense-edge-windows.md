@@ -266,7 +266,9 @@ controller is already attached and only the PnP evidence should be refreshed.
    ```
 
 2. Start a Moonlight client built from the companion DualSense Edge branch and
-   connect the physical DualSense Edge.
+   connect the physical DualSense Edge. For the first validation run, launch
+   Moonlight with `SDL_LOGGING=application=debug` so mapping and per-button
+   diagnostics are captured.
 3. Confirm Moonlight logs:
    - `DualSense Edge detected with ... SDL joystick buttons` where the count is
      at least `21`.
@@ -325,12 +327,17 @@ controller is already attached and only the PnP evidence should be refreshed.
      Select-Object Class,FriendlyName,InstanceId
    ```
 
-9. Optionally, with Moonlight's SDL application debug logging enabled, confirm
-   each control changes Moonlight's Edge-state log:
+9. With Moonlight's SDL application debug logging enabled, confirm each control
+   changes Moonlight's Edge-state log:
    - `PADDLE1`: `DualSense Edge PADDLE1 pressed (paddle/Fn flags: 0x00010000)`
    - `PADDLE2`: `DualSense Edge PADDLE2 pressed (paddle/Fn flags: 0x00020000)`
    - `PADDLE3`: `DualSense Edge PADDLE3 pressed (paddle/Fn flags: 0x00040000)`
    - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
+   - Do not continue if pressing an Edge-specific control logs `Ignoring
+     DualSense Edge controller button ... bound to raw paddle...`; that means a
+     stale SDL mapping is still binding an Edge-only raw button to a normal
+     controller button, and Moonlight is suppressing that alias instead of
+     transmitting it as a native Edge input.
 
    For SDL2 builds, set `SDL_LOGGING=application=debug` before launching
    Moonlight. For example, on Windows PowerShell:
