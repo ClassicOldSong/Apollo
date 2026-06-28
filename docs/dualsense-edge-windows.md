@@ -243,6 +243,8 @@ refreshed.
      `DualSense Edge paddle mappings are present, but SDL did not expose the
      expected paddle controller bindings` or
      `DualSense Edge paddle mapping update did not expose the expected paddle
+     controller bindings` or
+     `DualSense Edge paddle mapping add did not expose the expected paddle
      controller bindings`; that means SDL still is not reporting the
      Edge-specific controls at the expected controller-button layer bindings.
    - `DualSense Edge arrival support: ... paddle/Fn=0x000f0000 ...`
