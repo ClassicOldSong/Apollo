@@ -102,6 +102,8 @@ function Write-LogEvidenceSummary {
 
   if (-not (Test-Path -LiteralPath $logDir)) {
     $summary.Add('No copied logs found. Pass Apollo and Moonlight logs with -LogPath to summarize software-side evidence.')
+    $summary.Add('')
+    $summary.Add('overall=FAIL')
     Write-TextFile -Path (Join-Path $OutputDir 'log-evidence-summary.txt') -Lines $summary.ToArray()
     return
   }
@@ -109,6 +111,8 @@ function Write-LogEvidenceSummary {
   $logs = @(Get-ChildItem -LiteralPath $logDir -Recurse -File -ErrorAction SilentlyContinue)
   if ($logs.Count -eq 0) {
     $summary.Add('No copied log files found under the logs directory.')
+    $summary.Add('')
+    $summary.Add('overall=FAIL')
     Write-TextFile -Path (Join-Path $OutputDir 'log-evidence-summary.txt') -Lines $summary.ToArray()
     return
   }
@@ -136,6 +140,7 @@ function Write-LogEvidenceSummary {
     @{ Name = 'STOP: Apollo refused Edge allocation'; Required = $false; Stop = $true; Pattern = 'refusing to allocate virtual Edge controller' }
   )
 
+  $hasFailure = $false
   $summary.Add("log_count=$($logs.Count)")
   foreach ($log in $logs) {
     $summary.Add("log=$($log.FullName)")
@@ -159,6 +164,7 @@ function Write-LogEvidenceSummary {
 
     if ($check['Stop']) {
       if ($matches.Count -gt 0) {
+        $hasFailure = $true
         $summary.Add("STOP_MATCH: $($check['Name'])")
       } else {
         $summary.Add("OK_NO_STOP_MATCH: $($check['Name'])")
@@ -167,6 +173,7 @@ function Write-LogEvidenceSummary {
       if ($matches.Count -gt 0) {
         $summary.Add("MATCH: $($check['Name'])")
       } else {
+        $hasFailure = $true
         $summary.Add("MISSING: $($check['Name'])")
       }
     } else {
@@ -180,6 +187,13 @@ function Write-LogEvidenceSummary {
     foreach ($match in $matches) {
       $summary.Add("  $match")
     }
+  }
+
+  $summary.Add('')
+  if ($hasFailure) {
+    $summary.Add('overall=FAIL')
+  } else {
+    $summary.Add('overall=PASS')
   }
 
   Write-TextFile -Path (Join-Path $OutputDir 'log-evidence-summary.txt') -Lines $summary.ToArray()
@@ -196,6 +210,7 @@ function Write-SystemEvidenceSummary {
 
   $summary = New-Object System.Collections.Generic.List[string]
   $usbipPortPattern = 'Port|Imported|Remote|' + [regex]::Escape($HostAddress) + '|' + [regex]::Escape($BusId) + '|054c|0df2'
+  $hasFailure = $false
   $checks = @(
     @{ Name = 'PowerShell is elevated'; Required = $true; Path = 'environment.txt'; Pattern = 'is_admin=True' },
     @{ Name = 'Apollo listener is visible on requested host/port'; Required = $true; Path = 'apollo-listener.txt'; Pattern = [regex]::Escape([string]$Port) },
@@ -235,6 +250,7 @@ function Write-SystemEvidenceSummary {
     if ($matches.Count -gt 0) {
       $summary.Add("MATCH: $($check['Name'])")
     } elseif ($check['Required']) {
+      $hasFailure = $true
       $summary.Add("MISSING: $($check['Name'])")
     } else {
       $summary.Add("SKIPPED_OR_MISSING: $($check['Name'])")
@@ -244,6 +260,13 @@ function Write-SystemEvidenceSummary {
     foreach ($match in $matches) {
       $summary.Add("  $match")
     }
+  }
+
+  $summary.Add('')
+  if ($hasFailure) {
+    $summary.Add('overall=FAIL')
+  } else {
+    $summary.Add('overall=PASS')
   }
 
   Write-TextFile -Path (Join-Path $OutputDir 'system-evidence-summary.txt') -Lines $summary.ToArray()

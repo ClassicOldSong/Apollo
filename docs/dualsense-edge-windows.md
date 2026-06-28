@@ -258,7 +258,8 @@ allocation failures. The helper always writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
 `usbip.exe`, requested busid, attach result, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence, including the first matching lines from
-the captured files.
+the captured files. Both summaries end with `overall=PASS` only when all
+required checks matched and no stop-condition matched.
 Use `-SkipAttach` if the virtual controller is already attached and only the PnP
 evidence should be refreshed.
 
@@ -398,6 +399,8 @@ points to USB enumeration or driver behavior rather than Moonlight's mapping.
 Do not mark the PR ready until the evidence shows all of the following in the
 same end-to-end run:
 
+- `log-evidence-summary.txt` and `system-evidence-summary.txt` both end with
+  `overall=PASS`.
 - Moonlight advertises the Edge paddle/Fn capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
   arrival mask, and logs a distinct state change for each `PADDLE1..4` bit.
