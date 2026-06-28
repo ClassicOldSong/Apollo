@@ -8,13 +8,17 @@
 #include <Windows.h>
 
 // standard includes
+#include <array>
 #include <cmath>
+#include <memory>
 #include <thread>
+#include <utility>
 
 // lib includes
 #include <ViGEm/Client.h>
 
 // local includes
+#include "dualsense_usbip_server.h"
 #include "keylayout.h"
 #include "misc.h"
 #include "src/config.h"
@@ -71,6 +75,22 @@ namespace platf {
     uint8_t pointerIndex;
     uint16_t x;
     uint16_t y;
+  };
+
+  struct edge_gamepad_context_t {
+    std::unique_ptr<dualsense_usbip::server_t> server;
+    feedback_queue_t feedback_queue;
+
+    uint8_t client_relative_index {};
+
+    bool has_last_rumble {};
+    std::uint16_t last_lowfreq {};
+    std::uint16_t last_highfreq {};
+
+    bool has_last_rgb_led {};
+    std::uint8_t last_red {};
+    std::uint8_t last_green {};
+    std::uint8_t last_blue {};
   };
 
   struct gamepad_context_t {
@@ -464,9 +484,15 @@ namespace platf {
 
   struct input_raw_t {
     ~input_raw_t() {
+      for (auto &edge : edge_gamepads) {
+        if (edge.server) {
+          edge.server->stop();
+        }
+      }
       delete vigem;
     }
 
+    std::array<edge_gamepad_context_t, MAX_GAMEPADS> edge_gamepads {};
     vigem_t *vigem;
 
     decltype(CreateSyntheticPointerDevice) *fnCreateSyntheticPointerDevice;
@@ -474,14 +500,111 @@ namespace platf {
     decltype(DestroySyntheticPointerDevice) *fnDestroySyntheticPointerDevice;
   };
 
+  static bool has_edge_gamepad(input_raw_t *raw) {
+    for (const auto &edge : raw->edge_gamepads) {
+      if (edge.server) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  static void raise_edge_feedback(edge_gamepad_context_t &edge, const dualsense::output_report_state_t &report) {
+    if (!edge.feedback_queue) {
+      return;
+    }
+
+    if (report.has_rumble && config::input.forward_rumble) {
+      const auto lowfreq = static_cast<std::uint16_t>(report.motor_left << 8);
+      const auto highfreq = static_cast<std::uint16_t>(report.motor_right << 8);
+
+      if (!edge.has_last_rumble ||
+          lowfreq != edge.last_lowfreq ||
+          highfreq != edge.last_highfreq) {
+        edge.feedback_queue->raise(gamepad_feedback_msg_t::make_rumble(edge.client_relative_index, lowfreq, highfreq));
+        edge.has_last_rumble = true;
+        edge.last_lowfreq = lowfreq;
+        edge.last_highfreq = highfreq;
+      }
+    }
+
+    if (report.has_lightbar) {
+      if (!edge.has_last_rgb_led ||
+          report.lightbar_red != edge.last_red ||
+          report.lightbar_green != edge.last_green ||
+          report.lightbar_blue != edge.last_blue) {
+        edge.feedback_queue->raise(gamepad_feedback_msg_t::make_rgb_led(
+          edge.client_relative_index,
+          report.lightbar_red,
+          report.lightbar_green,
+          report.lightbar_blue
+        ));
+        edge.has_last_rgb_led = true;
+        edge.last_red = report.lightbar_red;
+        edge.last_green = report.lightbar_green;
+        edge.last_blue = report.lightbar_blue;
+      }
+    }
+  }
+
+  static void free_edge_gamepad(edge_gamepad_context_t &edge) {
+    if (edge.server) {
+      edge.server->stop();
+      edge.server.reset();
+    }
+
+    edge.feedback_queue.reset();
+    edge.client_relative_index = {};
+    edge.has_last_rumble = {};
+    edge.last_lowfreq = {};
+    edge.last_highfreq = {};
+    edge.has_last_rgb_led = {};
+    edge.last_red = {};
+    edge.last_green = {};
+    edge.last_blue = {};
+  }
+
+  static int alloc_edge_gamepad(input_raw_t *raw, const gamepad_id_t &id, feedback_queue_t feedback_queue) {
+    if (raw->edge_gamepads[id.globalIndex].server) {
+      BOOST_LOG(warning) << "Gamepad " << id.globalIndex << " is already allocated as a DualSense Edge controller"sv;
+      return -1;
+    }
+
+    if (has_edge_gamepad(raw)) {
+      BOOST_LOG(warning) << "DualSense Edge USB/IP mode currently supports one virtual controller at a time"sv;
+      return -1;
+    }
+
+    auto &edge = raw->edge_gamepads[id.globalIndex];
+    edge.client_relative_index = id.clientRelativeIndex;
+    edge.feedback_queue = std::move(feedback_queue);
+    edge.server = std::make_unique<dualsense_usbip::server_t>();
+
+    if (!edge.server->start([&edge](const dualsense::output_report_state_t &report) {
+          raise_edge_feedback(edge, report);
+        })) {
+      BOOST_LOG(error) << "Failed to start DualSense Edge USB/IP backend"sv;
+      free_edge_gamepad(edge);
+      return -1;
+    }
+
+    BOOST_LOG(info)
+      << "DualSense Edge USB/IP backend is listening on 127.0.0.1:3240. "
+      << "Attach usbip-win2 to busid 1-1 to expose the virtual controller."sv;
+    return 0;
+  }
+
   input_t input() {
     input_t result {new input_raw_t {}};
     auto &raw = *(input_raw_t *) result.get();
 
-    raw.vigem = new vigem_t {};
-    if (raw.vigem->init()) {
-      delete raw.vigem;
-      raw.vigem = nullptr;
+    if (config::input.gamepad != "ds5-edge"sv) {
+      raw.vigem = new vigem_t {};
+      if (raw.vigem->init()) {
+        delete raw.vigem;
+        raw.vigem = nullptr;
+      }
     }
 
     // Get pointers to virtual touch/pen input functions (Win10 1809+)
@@ -1197,6 +1320,17 @@ namespace platf {
   int alloc_gamepad(input_t &input, const gamepad_id_t &id, const gamepad_arrival_t &metadata, feedback_queue_t feedback_queue) {
     auto raw = (input_raw_t *) input.get();
 
+    if (config::input.gamepad == "ds5-edge"sv) {
+      BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualSense Edge controller (experimental USB/IP)"sv;
+      if ((metadata.supportedButtons & PADDLE_BUTTONS) != PADDLE_BUTTONS) {
+        BOOST_LOG(warning)
+          << "Gamepad " << id.globalIndex
+          << " is using DualSense Edge mode, but the client did not report all Edge paddle/Fn buttons ["sv
+          << util::hex(metadata.supportedButtons & PADDLE_BUTTONS).to_string_view() << ']';
+      }
+      return alloc_edge_gamepad(raw, id, std::move(feedback_queue));
+    }
+
     if (!raw->vigem) {
       return 0;
     }
@@ -1252,6 +1386,11 @@ namespace platf {
 
   void free_gamepad(input_t &input, int nr) {
     auto raw = (input_raw_t *) input.get();
+
+    if (raw->edge_gamepads[nr].server) {
+      free_edge_gamepad(raw->edge_gamepads[nr]);
+      return;
+    }
 
     if (!raw->vigem) {
       return;
@@ -1511,7 +1650,14 @@ namespace platf {
    * @param gamepad_state The gamepad button/axis state sent from the client.
    */
   void gamepad_update(input_t &input, int nr, const gamepad_state_t &gamepad_state) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    auto &edge = raw->edge_gamepads[nr];
+    if (edge.server) {
+      edge.server->update_input(gamepad_state);
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1543,7 +1689,12 @@ namespace platf {
    * @param touch The touch event.
    */
   void gamepad_touch(input_t &input, const gamepad_touch_t &touch) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    if (raw->edge_gamepads[touch.id.globalIndex].server) {
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1649,7 +1800,12 @@ namespace platf {
    * @param motion The motion event.
    */
   void gamepad_motion(input_t &input, const gamepad_motion_t &motion) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    if (raw->edge_gamepads[motion.id.globalIndex].server) {
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1676,7 +1832,12 @@ namespace platf {
    * @param battery The battery event.
    */
   void gamepad_battery(input_t &input, const gamepad_battery_t &battery) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    if (raw->edge_gamepads[battery.id.globalIndex].server) {
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1755,6 +1916,7 @@ namespace platf {
         supported_gamepad_t {"auto", true, ""},
         supported_gamepad_t {"x360", false, ""},
         supported_gamepad_t {"ds4", false, ""},
+        supported_gamepad_t {"ds5-edge", false, ""},
       };
 
       return gps;
@@ -1768,7 +1930,8 @@ namespace platf {
     static std::vector gps {
       supported_gamepad_t {"auto", true, reason},
       supported_gamepad_t {"x360", enabled, reason},
-      supported_gamepad_t {"ds4", enabled, reason}
+      supported_gamepad_t {"ds4", enabled, reason},
+      supported_gamepad_t {"ds5-edge", true, ""}
     };
 
     for (auto &[name, is_enabled, reason_disabled] : gps) {
@@ -1787,8 +1950,9 @@ namespace platf {
   platform_caps::caps_t get_capabilities() {
     platform_caps::caps_t caps = 0;
 
-    // We support controller touchpad input as long as we're not emulating X360
-    if (config::input.gamepad != "x360"sv) {
+    // We support controller touchpad input through ViGEm DS4. DualSense Edge USB/IP touch reports
+    // need a follow-up implementation.
+    if (config::input.gamepad != "x360"sv && config::input.gamepad != "ds5-edge"sv) {
       caps |= platform_caps::controller_touch;
     }
 

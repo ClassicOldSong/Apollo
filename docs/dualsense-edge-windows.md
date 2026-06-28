@@ -59,7 +59,7 @@ and its generated controller mapping uses:
 Apollo should preserve that SDL/Sunshine paddle order unless hardware testing
 proves it produces the wrong physical labels.
 
-## Current Windows Backend Limitation
+## Existing ViGEm Backend Limitation
 
 `src/platform/windows/input.cpp` uses ViGEmClient:
 
@@ -72,13 +72,33 @@ Apollo's vendored ViGEmClient headers do not expose a DS5 target. Adding a fake
 mapping from Edge paddles to DS4 or X360 buttons would not be a clean fix,
 because games still would not see independent Edge controls.
 
+## Experimental Windows Backend
+
+This branch adds an opt-in Windows mode:
+
+```text
+gamepad = ds5-edge
+```
+
+When selected, Apollo starts a local USB/IP server on `127.0.0.1:3240` and
+serves one virtual DualSense Edge device at busid `1-1`. A Windows host still
+needs `usbip-win2` attached to that busid so the signed virtual USB host
+controller enumerates the device. The backend is separate from ViGEm, so the
+existing `auto`, `x360`, and `ds4` paths remain unchanged.
+
+The first implementation forwards standard buttons, sticks, triggers, and the
+four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive
+trigger state are intentionally left for follow-up hardware testing. Host
+output reports are parsed for rumble and lightbar feedback and forwarded
+through Apollo's existing feedback queue.
+
 ## Preferred Architecture
 
 Add a Windows virtual DualSense/Edge backend beside the current ViGEm backend.
 
 The backend should:
 
-1. Be opt-in at first, behind an experimental `gamepad = ds5` or equivalent
+1. Be opt-in at first, behind an experimental `gamepad = ds5-edge` or equivalent
    Windows-only setting.
 2. Keep X360 and DS4 behavior unchanged.
 3. Create a virtual USB/HID controller through a signed, redistributable layer

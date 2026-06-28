@@ -331,10 +331,15 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="6">Choices</td>
+        <td rowspan="7">Choices</td>
         <td>ds4</td>
         <td>DualShock 4 controller (PS4)
             @note{This option applies to Windows only.}</td>
+    </tr>
+    <tr>
+        <td>ds5-edge</td>
+        <td>DualSense Edge controller over USB/IP
+            @note{This experimental option applies to Windows only and requires usbip-win2 to attach to 127.0.0.1 busid 1-1.}</td>
     </tr>
     <tr>
         <td>ds5</td>

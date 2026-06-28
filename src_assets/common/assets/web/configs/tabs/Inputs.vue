@@ -36,6 +36,7 @@ const config = ref(props.config)
 
           <template #windows>
             <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
+            <option value="ds5-edge">DualSense Edge (USB/IP)</option>
             <option value="x360">{{ $t('config.gamepad_x360') }}</option>
           </template>
         </PlatformLayout>
