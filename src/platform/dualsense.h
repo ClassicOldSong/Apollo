@@ -23,8 +23,11 @@ namespace platf::dualsense {
   constexpr std::uint16_t PRODUCT_ID_DUALSENSE_EDGE = 0x0DF2;
 
   constexpr std::uint8_t INPUT_REPORT_USB = 0x01;
+  constexpr std::uint8_t OUTPUT_REPORT_USB = 0x02;
   constexpr std::size_t INPUT_REPORT_USB_SIZE = 64;
   constexpr std::size_t INPUT_REPORT_BODY_SIZE = INPUT_REPORT_USB_SIZE - 1;
+  constexpr std::size_t OUTPUT_REPORT_USB_SIZE = 64;
+  constexpr std::size_t OUTPUT_REPORT_BODY_SIZE = OUTPUT_REPORT_USB_SIZE - 1;
   constexpr std::size_t DUALSENSE_HID_REPORT_DESCRIPTOR_SIZE = 273;
   constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
   constexpr std::uint8_t USB_ENDPOINT_IN = 0x84;
