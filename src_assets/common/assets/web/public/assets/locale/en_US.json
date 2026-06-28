@@ -209,6 +209,7 @@
     "gamepad_ds4": "DS4 (PS4)",
     "gamepad_ds4_manual": "DS4 selection options",
     "gamepad_ds5": "DS5 (PS5)",
+    "gamepad_ds5_edge": "DualSense Edge (USB/IP)",
     "gamepad_switch": "Nintendo Pro (Switch)",
     "gamepad_manual": "Manual DS4 options",
     "gamepad_x360": "X360 (Xbox 360)",

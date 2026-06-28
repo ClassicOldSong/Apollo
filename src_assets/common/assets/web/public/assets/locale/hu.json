@@ -215,6 +215,7 @@
     "gamepad_ds4": "DS4 (PS4)",
     "gamepad_ds4_manual": "DS4 kiválasztási lehetőségek",
     "gamepad_ds5": "DS5 (PS5)",
+    "gamepad_ds5_edge": "DualSense Edge (USB/IP)",
     "gamepad_ds5_manual": "DS5 kiválasztási lehetőségek",
     "gamepad_switch": "Nintendo Pro (Switch)",
     "gamepad_manual": "Kézi DS4 opciók",

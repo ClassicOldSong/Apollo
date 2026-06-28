@@ -215,6 +215,7 @@
     "gamepad_ds4": "DS4 (PS4)",
     "gamepad_ds4_manual": "Možnosti výběru DS4",
     "gamepad_ds5": "DS5 (PS5)",
+    "gamepad_ds5_edge": "DualSense Edge (USB/IP)",
     "gamepad_ds5_manual": "Možnosti výběru DS5",
     "gamepad_switch": "Nintendo Pro (Switch)",
     "gamepad_manual": "Možnosti manuálního ovládání DS4",
