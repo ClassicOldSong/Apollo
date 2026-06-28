@@ -133,8 +133,8 @@ function Test-HostInputSummary {
   param(
     [Parameter(Mandatory = $true)][string] $Name,
     [Parameter(Mandatory = $true)][string[]] $Lines,
-    [Parameter(Mandatory = $true)][string[]] $Patterns,
-    [Parameter(Mandatory = $true)][string[]] $StopPatterns,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]] $Patterns,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]] $StopPatterns,
     [Parameter(Mandatory = $true)][string] $ExpectedOverall,
     [string[]] $ExpectedSummaryLines = @()
   )
@@ -150,6 +150,42 @@ function Test-HostInputSummary {
       -Patterns $Patterns `
       -StopPatterns $StopPatterns `
       -Required $true
+
+    $summaryPath = Join-Path $outputDir 'host-input-evidence-summary.txt'
+    $summary = Get-Content -LiteralPath $summaryPath -Raw
+    $overall = Get-EvidenceSummaryOverall -Path $summaryPath
+    if ($overall -ne $ExpectedOverall) {
+      Write-Host $summary
+      throw "$Name expected overall=$ExpectedOverall, got overall=$overall"
+    }
+
+    foreach ($line in $ExpectedSummaryLines) {
+      Assert-Contains -Content $summary -Needle $line -CaseName $Name
+    }
+  } finally {
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
+function Test-MissingHostInputSummary {
+  param(
+    [Parameter(Mandatory = $true)][string] $Name,
+    [Parameter(Mandatory = $true)][bool] $Required,
+    [Parameter(Mandatory = $true)][string] $ExpectedOverall,
+    [string[]] $ExpectedSummaryLines = @()
+  )
+
+  $outputDir = New-TestOutputDir -Name $Name
+  try {
+    New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
+    Write-HostInputEvidenceSummary `
+      -OutputDir $outputDir `
+      -Patterns @() `
+      -StopPatterns @() `
+      -Required $Required
 
     $summaryPath = Join-Path $outputDir 'host-input-evidence-summary.txt'
     $summary = Get-Content -LiteralPath $summaryPath -Raw
@@ -275,6 +311,20 @@ Test-HostInputSummary `
   )
 
 Test-HostInputSummary `
+  -Name 'host-input-missing-pattern-fail' `
+  -Lines @(
+    'PADDLE1 right rear 0x80',
+    'PADDLE2 left rear 0x40'
+  ) `
+  -Patterns @('PADDLE1', 'PADDLE2', 'PADDLE3', 'PADDLE4') `
+  -StopPatterns @() `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'MISSING: host input pattern[2] PADDLE3',
+    'MISSING: host input pattern[3] PADDLE4'
+  )
+
+Test-HostInputSummary `
   -Name 'host-input-stop-fail' `
   -Lines @(
     'PADDLE1 right rear 0x80',
@@ -288,6 +338,22 @@ Test-HostInputSummary `
   -ExpectedOverall 'FAIL' `
   -ExpectedSummaryLines @(
     'STOP_MATCH: host input stop pattern[0] same event.*left.*right|same event.*right.*left'
+  )
+
+Test-MissingHostInputSummary `
+  -Name 'host-input-required-missing-fail' `
+  -Required $true `
+  -ExpectedOverall 'FAIL' `
+  -ExpectedSummaryLines @(
+    'No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.'
+  )
+
+Test-MissingHostInputSummary `
+  -Name 'host-input-optional-missing-skipped' `
+  -Required $false `
+  -ExpectedOverall 'SKIPPED' `
+  -ExpectedSummaryLines @(
+    'No copied host input evidence found. Pass -HostInputEvidencePath with HID/gamepad inspector exports, logs, or screenshots.'
   )
 
 Write-Host 'DualSense Edge evidence verification passed.'
