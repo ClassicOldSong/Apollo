@@ -76,6 +76,20 @@ namespace {
     };
   }
 
+  std::array<std::uint8_t, 8> set_report_setup(std::uint8_t report_type, std::uint8_t report_id, std::uint16_t length) {
+    return {
+      static_cast<std::uint8_t>((platf::usb::REQUEST_TYPE_CLASS << 5) |
+                                platf::usb::RECIPIENT_INTERFACE),
+      platf::usb::HID_REQUEST_SET_REPORT,
+      report_id,
+      report_type,
+      0x00,
+      0x00,
+      static_cast<std::uint8_t>(length & 0xFF),
+      static_cast<std::uint8_t>((length >> 8) & 0xFF),
+    };
+  }
+
   std::vector<std::uint8_t> submit_payload(const std::vector<std::uint8_t> &reply) {
     return {reply.begin() + platf::usbip::SUBMIT_HEADER_SIZE, reply.end()};
   }
@@ -402,6 +416,61 @@ TEST(DualSenseUsbIpTests, DeviceHandlesInterruptOutSubmitWithParsedFeedback) {
   EXPECT_EQ(result.output_report.lightbar_red, 0xAA);
   EXPECT_EQ(result.output_report.lightbar_green, 0xBB);
   EXPECT_EQ(result.output_report.lightbar_blue, 0xCC);
+}
+
+TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithParsedFeedback) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    24,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_USB_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_USB_SIZE
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[3] = 0x10;
+  report[4] = 0x30;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 24);
+  EXPECT_TRUE(result.has_output_report);
+  EXPECT_TRUE(result.output_report.has_rumble);
+  EXPECT_EQ(result.output_report.motor_left, 0x30);
+  EXPECT_EQ(result.output_report.motor_right, 0x10);
+}
+
+TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithoutReportIdPrefix) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    25,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_BODY_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_BODY_SIZE
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_BODY_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[2] = 0x20;
+  report[3] = 0x40;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_TRUE(result.has_output_report);
+  EXPECT_TRUE(result.output_report.has_rumble);
+  EXPECT_EQ(result.output_report.motor_left, 0x40);
+  EXPECT_EQ(result.output_report.motor_right, 0x20);
 }
 
 TEST(DualSenseUsbIpTests, DeviceReturnsErrorForUnsupportedSubmitEndpoint) {

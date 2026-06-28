@@ -171,6 +171,52 @@ namespace platf::dualsense_usbip {
            payload.front() == dualsense::OUTPUT_REPORT_USB;
   }
 
+  inline bool is_output_set_report(const usbip::submit_request_t &request) {
+    const auto setup = usb::parse_setup_packet(request.setup);
+    return is_control_submit(request) &&
+           !usb::setup_is_in(setup.request_type) &&
+           usb::setup_type(setup.request_type) == usb::REQUEST_TYPE_CLASS &&
+           usb::setup_recipient(setup.request_type) == usb::RECIPIENT_INTERFACE &&
+           setup.request == usb::HID_REQUEST_SET_REPORT &&
+           usb::hid_report_type(setup.value) == usb::HID_REPORT_TYPE_OUTPUT &&
+           usb::hid_report_id(setup.value) == dualsense::OUTPUT_REPORT_USB;
+  }
+
+  inline dualsense::output_report_state_t parse_output_report_body(std::span<const std::uint8_t> payload) {
+    std::array<std::uint8_t, dualsense::OUTPUT_REPORT_USB_SIZE> report {};
+    report[0] = dualsense::OUTPUT_REPORT_USB;
+    std::copy_n(
+      payload.begin(),
+      std::min(payload.size(), dualsense::OUTPUT_REPORT_BODY_SIZE),
+      report.begin() + 1
+    );
+    return dualsense::parse_output_report(report);
+  }
+
+  inline dualsense::output_report_state_t parse_output_set_report(
+    const usbip::submit_request_t &request,
+    std::span<const std::uint8_t> payload
+  ) {
+    if (!is_output_set_report(request)) {
+      return {};
+    }
+
+    if (payload.size() == dualsense::OUTPUT_REPORT_BODY_SIZE ||
+        payload.size() == dualsense::OUTPUT_REPORT_COMMON_SIZE) {
+      return parse_output_report_body(payload);
+    }
+
+    if (is_output_report(payload)) {
+      return dualsense::parse_output_report(payload);
+    }
+
+    if (payload.size() >= dualsense::OUTPUT_REPORT_COMMON_SIZE) {
+      return parse_output_report_body(payload);
+    }
+
+    return {};
+  }
+
   inline std::span<const std::uint8_t> output_report_payload(std::span<const std::uint8_t> payload) {
     if (!is_output_report(payload)) {
       return {};
@@ -201,10 +247,11 @@ namespace platf::dualsense_usbip {
 
     submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
       if (is_control_submit(request)) {
+        const auto output = parse_output_set_report(request, out_payload);
         return {
           .reply = make_control_submit_reply(request),
-          .has_output_report = false,
-          .output_report = {},
+          .has_output_report = output.valid,
+          .output_report = output,
         };
       }
 
