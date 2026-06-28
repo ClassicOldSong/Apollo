@@ -99,7 +99,13 @@ represent those bits.
   buttons.
 - Community experiments exist, especially `CTM-Bridge/CTM-USBIP` and
   `sh00bx/Apollo`, but they should be treated as research inputs rather than a
-  ready-to-merge Apollo patch.
+  ready-to-merge Apollo patch. CTM-USBIP is useful confirmation that
+  `usbip-win2` plus HID reconstruction is a practical direction, but its current
+  public shape is a separate Windows service/direct-TCP TV bridge. It maps
+  `0x054c:0x0df2` through a generic DS5 profile and does not document a
+  draft-ready Edge paddle/Fn proof for Apollo/Moonlight's existing controller
+  protocol path, so this branch still needs the one-at-a-time Edge button
+  evidence below.
 
 ## DualSense Edge Report Bits
 
