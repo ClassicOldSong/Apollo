@@ -606,6 +606,61 @@ TEST(DualSenseUsbIpTests, DeviceIgnoresFullLengthControlOutputSetReportWithWrong
   EXPECT_FALSE(result.has_output_report);
 }
 
+TEST(DualSenseUsbIpTests, DeviceHandlesMinimumPrefixedControlOutputSetReport) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    41,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE> report {};
+  report[0] = platf::dualsense::OUTPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[3] = 0x10;
+  report[4] = 0x30;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 41);
+  EXPECT_TRUE(result.has_output_report);
+  EXPECT_TRUE(result.output_report.has_rumble);
+  EXPECT_EQ(result.output_report.motor_left, 0x30);
+  EXPECT_EQ(result.output_report.motor_right, 0x10);
+}
+
+TEST(DualSenseUsbIpTests, DeviceIgnoresAmbiguousControlOutputSetReportWithWrongPayloadReportId) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    42,
+    platf::usbip::direction::out,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE,
+    set_report_setup(
+      platf::usb::HID_REPORT_TYPE_OUTPUT,
+      platf::dualsense::OUTPUT_REPORT_USB,
+      platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE
+    )
+  );
+  std::array<std::uint8_t, platf::dualsense::OUTPUT_REPORT_USB_MIN_SIZE> report {};
+  report[0] = platf::dualsense::INPUT_REPORT_USB;
+  report[1] = platf::dualsense::OUTPUT_VALID_FLAG0_HAPTICS_SELECT;
+  report[3] = 0x10;
+  report[4] = 0x30;
+
+  const auto result = device.handle_submit(request, report);
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 42);
+  EXPECT_FALSE(result.has_output_report);
+}
+
 TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithoutReportIdPrefix) {
   platf::dualsense_usbip::device_t device;
   const auto request = submit_request(
