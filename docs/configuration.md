@@ -339,7 +339,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>ds5-edge</td>
         <td>DualSense Edge controller over USB/IP
-            @note{This experimental option applies to Windows only and requires usbip-win2 to attach to 127.0.0.1 busid 1-1.}</td>
+            @note{This experimental option applies to Windows only and requires usbip-win2 to attach to 127.0.0.1 busid 1-1. The client must send controller arrival support with all four Edge paddle/Fn buttons, such as the companion Moonlight DualSense Edge branch.}</td>
     </tr>
     <tr>
         <td>ds5</td>

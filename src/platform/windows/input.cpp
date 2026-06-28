@@ -1338,7 +1338,8 @@ namespace platf {
           << "Gamepad " << id.globalIndex
           << " is using DualSense Edge mode, but the client did not report all Edge paddle/Fn buttons ["sv
           << util::hex(metadata.supportedButtons & EDGE_PADDLE_BUTTONS).to_string_view()
-          << "]; refusing to allocate virtual Edge controller"sv;
+          << "]; refusing to allocate virtual Edge controller. "
+          << "Use a client that sends controller arrival support with all four Edge paddle/Fn buttons."sv;
         return -1;
       }
       return alloc_edge_gamepad(raw, id, std::move(feedback_queue));
