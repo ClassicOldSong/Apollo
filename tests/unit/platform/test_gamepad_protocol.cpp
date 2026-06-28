@@ -86,7 +86,17 @@ TEST(GamepadProtocolTests, EdgeModeRequiresPlayStationArrivalWithCompletePaddleM
   ));
 
   EXPECT_FALSE(platf::has_all_edge_paddle_buttons(0));
-  EXPECT_FALSE(platf::has_all_edge_paddle_buttons(platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3));
+
+  constexpr std::uint32_t incomplete_paddle_masks[] {
+    platf::PADDLE2 | platf::PADDLE3 | platf::PADDLE4,
+    platf::PADDLE1 | platf::PADDLE3 | platf::PADDLE4,
+    platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE4,
+    platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3,
+  };
+  for (const auto buttons : incomplete_paddle_masks) {
+    EXPECT_FALSE(platf::has_all_edge_paddle_buttons(buttons));
+    EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_PS, buttons));
+  }
 
   EXPECT_TRUE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_PS, platf::EDGE_PADDLE_BUTTONS));
   EXPECT_TRUE(platf::has_dualsense_edge_arrival_support(
@@ -95,10 +105,6 @@ TEST(GamepadProtocolTests, EdgeModeRequiresPlayStationArrivalWithCompletePaddleM
   ));
 
   EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_PS, 0));
-  EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(
-    LI_CTYPE_PS,
-    platf::PADDLE1 | platf::PADDLE2 | platf::PADDLE3
-  ));
   EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_UNKNOWN, platf::EDGE_PADDLE_BUTTONS));
   EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_XBOX, platf::EDGE_PADDLE_BUTTONS));
   EXPECT_FALSE(platf::has_dualsense_edge_arrival_support(LI_CTYPE_NINTENDO, platf::EDGE_PADDLE_BUTTONS));
