@@ -273,6 +273,10 @@ namespace platf::dualsense_usbip {
       return {};
     }
 
+    if (payload.size() > dualsense::OUTPUT_REPORT_BODY_SIZE && !is_output_report(payload)) {
+      return {};
+    }
+
     if (payload.size() == dualsense::OUTPUT_REPORT_BODY_SIZE ||
         payload.size() == dualsense::OUTPUT_REPORT_COMMON_SIZE) {
       return parse_output_report_body(payload);
