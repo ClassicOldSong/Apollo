@@ -1,0 +1,46 @@
+/**
+ * @file tests/unit/platform/test_gamepad_protocol.cpp
+ * @brief Test Moonlight/Sunshine gamepad protocol button compatibility.
+ */
+#include "../../tests_common.h"
+
+#include <cstdint>
+
+extern "C" {
+#include <moonlight-common-c/src/Input.h>
+#include <moonlight-common-c/src/Limelight.h>
+}
+
+TEST(GamepadProtocolTests, PaddleFlagsMatchMoonlightSunshineProtocol) {
+  EXPECT_EQ(static_cast<std::uint32_t>(PADDLE1_FLAG), platf::PADDLE1);
+  EXPECT_EQ(static_cast<std::uint32_t>(PADDLE2_FLAG), platf::PADDLE2);
+  EXPECT_EQ(static_cast<std::uint32_t>(PADDLE3_FLAG), platf::PADDLE3);
+  EXPECT_EQ(static_cast<std::uint32_t>(PADDLE4_FLAG), platf::PADDLE4);
+}
+
+TEST(GamepadProtocolTests, PaddleFlagsTravelInMultiControllerButtonFlags2) {
+  constexpr std::uint32_t paddles =
+    PADDLE1_FLAG | PADDLE2_FLAG | PADDLE3_FLAG | PADDLE4_FLAG;
+
+  EXPECT_EQ(static_cast<std::uint16_t>(paddles), 0);
+  EXPECT_EQ(static_cast<std::uint16_t>(paddles >> 16), 0x000F);
+
+  NV_MULTI_CONTROLLER_PACKET packet {};
+  packet.buttonFlags = 0;
+  packet.buttonFlags2 = static_cast<short>(paddles >> 16);
+
+  const std::uint16_t low_buttons = packet.buttonFlags;
+  const std::uint32_t high_buttons = static_cast<std::uint16_t>(packet.buttonFlags2);
+
+  EXPECT_EQ(low_buttons | (high_buttons << 16), paddles);
+}
+
+TEST(GamepadProtocolTests, ControllerArrivalCanAdvertiseAllPaddleFlags) {
+  constexpr std::uint32_t paddles =
+    PADDLE1_FLAG | PADDLE2_FLAG | PADDLE3_FLAG | PADDLE4_FLAG;
+
+  SS_CONTROLLER_ARRIVAL_PACKET packet {};
+  packet.supportedButtonFlags = paddles | TOUCHPAD_FLAG | MISC_FLAG;
+
+  EXPECT_EQ(packet.supportedButtonFlags & paddles, paddles);
+}
