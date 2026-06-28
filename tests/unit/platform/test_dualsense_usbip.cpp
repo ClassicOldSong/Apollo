@@ -101,10 +101,12 @@ TEST(DualSenseUsbIpTests, BuildsDualSenseEdgeDeviceListAndImportReplies) {
 
   EXPECT_EQ(platf::usbip::read_be16(devlist, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_devlist));
   EXPECT_EQ(platf::usbip::read_be32(devlist, 8), 1);
+  EXPECT_EQ(platf::usbip::read_be32(devlist, 308), static_cast<std::uint32_t>(platf::usbip::device_speed::high));
   EXPECT_EQ(platf::usbip::read_be16(devlist, 314), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
   EXPECT_EQ(devlist[324], 0x03);
 
   EXPECT_EQ(platf::usbip::read_be16(import, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_import));
+  EXPECT_EQ(platf::usbip::read_be32(import, 304), static_cast<std::uint32_t>(platf::usbip::device_speed::high));
   EXPECT_EQ(platf::usbip::read_be16(import, 308), platf::dualsense::VENDOR_ID_SONY);
   EXPECT_EQ(platf::usbip::read_be16(import, 310), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
 }

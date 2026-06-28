@@ -33,7 +33,7 @@ namespace platf::dualsense_usbip {
     .busid = BUSID,
     .busnum = 1,
     .devnum = 2,
-    .speed = usbip::device_speed::full,
+    .speed = usbip::device_speed::high,
     .vendor_id = dualsense::VENDOR_ID_SONY,
     .product_id = dualsense::PRODUCT_ID_DUALSENSE_EDGE,
     .bcd_device = 0x0100,

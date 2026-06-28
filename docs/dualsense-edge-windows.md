@@ -76,11 +76,15 @@ The Edge HID report descriptor embedded in this branch was checked against the
 same public hardware dump at `hhd-dev/hwinfo@d9508123`: the dump's `R: 389`
 descriptor line matches `DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR` byte-for-byte.
 The companion udev dump also confirms the wired device identity
-`054c:0df2`, product string `DualSense Edge Wireless Controller`, USB 2.00,
-500 mA max power, and four-interface composite layout with the gamepad HID
-function on interface 3. Apollo intentionally serves a minimal HID-only virtual
-Edge instead of the full audio/HID composite device, because the controller
-streaming path only needs the input/output HID interface.
+`054c:0df2`, product string `DualSense Edge Wireless Controller`, USB 2.00
+high-speed operation, 500 mA max power, and four-interface composite layout
+with the gamepad HID function on interface 3. Windows USB tree captures and
+third-party DS5 filter drivers also show the wired HID path as `MI_03`. Apollo
+intentionally serves a minimal HID-only virtual Edge instead of the full
+audio/HID composite device, because the controller streaming path only needs
+the input/output HID interface. Hardware validation should confirm whether
+Windows games and tools accept that minimal HID instance or require moving the
+virtual descriptor to a composite `MI_03` layout.
 
 SDL2's DualSense Edge HIDAPI path exposes these as raw joystick buttons 17-20,
 and its generated controller mapping uses:
@@ -171,6 +175,10 @@ descriptor and return zero-filled payloads with the requested report ID.
    - `DualSense Edge USB/IP: client imported virtual controller`
 7. Check Device Manager, `joy.cpl`, Steam Input, or a HID inspection tool for a
    Sony `054c:0df2` DualSense Edge device.
+   - Record whether the HID instance path includes `MI_03`. The current virtual
+     device is HID-only and may not. If paddle/Fn buttons are present in generic
+     HID/game-controller tools but missing only from DS5-specific filter tools,
+     the next backend iteration should emulate the real composite layout.
 8. Press each Edge-specific control and verify four distinct host-visible
    inputs:
    - `PADDLE1`: right rear paddle

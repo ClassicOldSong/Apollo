@@ -21,7 +21,7 @@ namespace {
       .busid = "1-1",
       .busnum = 1,
       .devnum = 2,
-      .speed = platf::usbip::device_speed::full,
+      .speed = platf::usbip::device_speed::high,
       .vendor_id = platf::dualsense::VENDOR_ID_SONY,
       .product_id = platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE,
       .bcd_device = 0x0100,
@@ -56,7 +56,7 @@ TEST(UsbIpTests, BuildsDualSenseEdgeImportReply) {
   EXPECT_EQ(fixed_string_at(reply, 264, platf::usbip::USB_DEVICE_BUSID_SIZE), "1-1");
   EXPECT_EQ(platf::usbip::read_be32(reply, 296), 1);
   EXPECT_EQ(platf::usbip::read_be32(reply, 300), 2);
-  EXPECT_EQ(platf::usbip::read_be32(reply, 304), static_cast<std::uint32_t>(platf::usbip::device_speed::full));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 304), static_cast<std::uint32_t>(platf::usbip::device_speed::high));
   EXPECT_EQ(platf::usbip::read_be16(reply, 308), platf::dualsense::VENDOR_ID_SONY);
   EXPECT_EQ(platf::usbip::read_be16(reply, 310), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
   EXPECT_EQ(platf::usbip::read_be16(reply, 312), 0x0100);
