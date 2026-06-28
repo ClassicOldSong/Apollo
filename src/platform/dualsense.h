@@ -758,13 +758,17 @@ namespace platf::dualsense {
           return unsupported_control_response();
 
         case usb::HID_REQUEST_GET_IDLE:
-          if (usb::setup_is_in(setup.request_type)) {
+          if (usb::setup_is_in(setup.request_type) &&
+              (setup.value & 0xFF00) == 0 &&
+              setup.length == HID_IDLE_RATE.size()) {
             return handled_control_response(HID_IDLE_RATE, setup.length);
           }
           return unsupported_control_response();
 
         case usb::HID_REQUEST_GET_PROTOCOL:
-          if (usb::setup_is_in(setup.request_type)) {
+          if (usb::setup_is_in(setup.request_type) &&
+              setup.value == 0 &&
+              setup.length == HID_REPORT_PROTOCOL.size()) {
             return handled_control_response(HID_REPORT_PROTOCOL, setup.length);
           }
           return unsupported_control_response();
@@ -777,8 +781,16 @@ namespace platf::dualsense {
           return unsupported_control_response();
 
         case usb::HID_REQUEST_SET_IDLE:
+          if (!usb::setup_is_in(setup.request_type) &&
+              setup.length == 0) {
+            return handled_empty_control_response();
+          }
+          return unsupported_control_response();
+
         case usb::HID_REQUEST_SET_PROTOCOL:
-          if (!usb::setup_is_in(setup.request_type)) {
+          if (!usb::setup_is_in(setup.request_type) &&
+              setup.value <= 1 &&
+              setup.length == 0) {
             return handled_empty_control_response();
           }
           return unsupported_control_response();

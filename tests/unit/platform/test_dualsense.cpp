@@ -857,6 +857,33 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     )),
     (std::vector<std::uint8_t> {1})
   );
+  const auto get_idle_with_duration = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_in,
+    platf::usb::HID_REQUEST_GET_IDLE,
+    0x0100,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(get_idle_with_duration.handled);
+  EXPECT_TRUE(get_idle_with_duration.payload.empty());
+  const auto get_idle_with_zero_length = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_in,
+    platf::usb::HID_REQUEST_GET_IDLE,
+    0,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(get_idle_with_zero_length.handled);
+  EXPECT_TRUE(get_idle_with_zero_length.payload.empty());
+  const auto get_protocol_with_value = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_in,
+    platf::usb::HID_REQUEST_GET_PROTOCOL,
+    1,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(get_protocol_with_value.handled);
+  EXPECT_TRUE(get_protocol_with_value.payload.empty());
   EXPECT_TRUE(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       class_interface_out,
@@ -866,6 +893,33 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
       platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
     )).empty()
   );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(
+      class_interface_out,
+      platf::usb::HID_REQUEST_SET_PROTOCOL,
+      1,
+      0,
+      platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+    )).empty()
+  );
+  const auto set_idle_with_payload = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_IDLE,
+    0,
+    1,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_idle_with_payload.handled);
+  EXPECT_TRUE(set_idle_with_payload.payload.empty());
+  const auto set_protocol_invalid_value = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_PROTOCOL,
+    2,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_protocol_invalid_value.handled);
+  EXPECT_TRUE(set_protocol_invalid_value.payload.empty());
   EXPECT_TRUE(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       class_interface_out,
