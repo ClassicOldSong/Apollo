@@ -72,6 +72,16 @@ The same byte-level order is visible in `hhd-dev/hwinfo`'s public
 `0x10`, `0x20`, `0x40`, `0x80` when left Fn, right Fn, left rear, and right
 rear are pressed.
 
+The Edge HID report descriptor embedded in this branch was checked against the
+same public hardware dump at `hhd-dev/hwinfo@d9508123`: the dump's `R: 389`
+descriptor line matches `DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR` byte-for-byte.
+The companion udev dump also confirms the wired device identity
+`054c:0df2`, product string `DualSense Edge Wireless Controller`, USB 2.00,
+500 mA max power, and four-interface composite layout with the gamepad HID
+function on interface 3. Apollo intentionally serves a minimal HID-only virtual
+Edge instead of the full audio/HID composite device, because the controller
+streaming path only needs the input/output HID interface.
+
 SDL2's DualSense Edge HIDAPI path exposes these as raw joystick buttons 17-20,
 and its generated controller mapping uses:
 
@@ -105,10 +115,10 @@ gamepad = ds5-edge
 ```
 
 When selected, Apollo starts a local USB/IP server on `127.0.0.1:3240` and
-serves one virtual DualSense Edge device at busid `1-1`. A Windows host still
-needs `usbip-win2` attached to that busid so the signed virtual USB host
-controller enumerates the device. The backend is separate from ViGEm, so the
-existing `auto`, `x360`, and `ds4` paths remain unchanged.
+serves one minimal HID-only virtual DualSense Edge device at busid `1-1`. A
+Windows host still needs `usbip-win2` attached to that busid so the signed
+virtual USB host controller enumerates the device. The backend is separate from
+ViGEm, so the existing `auto`, `x360`, and `ds4` paths remain unchanged.
 
 The first implementation forwards standard buttons, sticks, triggers, and the
 four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive

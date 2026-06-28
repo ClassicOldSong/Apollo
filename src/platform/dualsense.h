@@ -60,6 +60,9 @@ namespace platf::dualsense {
     0x01,  // bNumConfigurations
   };
 
+  // Minimal HID-only configuration for the virtual Edge. The real wired Edge
+  // is a composite USB device with the gamepad HID interface at interface 3;
+  // Apollo exposes only the input interface needed for controller streaming.
   inline constexpr std::array<std::uint8_t, 41> DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR {
     0x09,  // bLength
     0x02,  // bDescriptorType: configuration
