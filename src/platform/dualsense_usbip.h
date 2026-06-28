@@ -23,6 +23,7 @@ namespace platf::dualsense_usbip {
   constexpr std::uint32_t ENDPOINT_CONTROL = 0;
   constexpr std::uint32_t ENDPOINT_INTERRUPT_OUT = dualsense::USB_ENDPOINT_OUT & 0x0F;
   constexpr std::uint32_t ENDPOINT_INTERRUPT_IN = dualsense::USB_ENDPOINT_IN & 0x0F;
+  constexpr std::size_t MAX_PENDING_INTERRUPT_IN = 32;
   constexpr std::string_view DEVICE_PATH = "/sys/devices/platform/apollo-dualsense-edge";
   constexpr std::string_view BUSID = "1-1";
 
@@ -245,6 +246,10 @@ namespace platf::dualsense_usbip {
 
     submit_result_t handle_submit(const usbip::submit_request_t &request, std::span<const std::uint8_t> out_payload = {}) {
       if (is_interrupt_in_submit(request)) {
+        if (pending_interrupt_in_.size() >= MAX_PENDING_INTERRUPT_IN) {
+          return device_.handle_submit(request);
+        }
+
         pending_interrupt_in_.push_back(request);
         return {};
       }

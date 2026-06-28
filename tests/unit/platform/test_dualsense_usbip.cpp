@@ -414,6 +414,34 @@ TEST(DualSenseUsbIpTests, SessionQueuesInterruptInSubmitsUntilTaken) {
   EXPECT_EQ(payload[10], platf::dualsense::BUTTONS2_EDGE_RIGHT_PADDLE);
 }
 
+TEST(DualSenseUsbIpTests, SessionBoundsPendingInterruptInSubmits) {
+  platf::dualsense_usbip::session_t session;
+
+  for (std::size_t i = 0; i < platf::dualsense_usbip::MAX_PENDING_INTERRUPT_IN; ++i) {
+    const auto result = session.handle_submit(submit_request(
+      static_cast<std::uint32_t>(40 + i),
+      platf::usbip::direction::in,
+      platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+      platf::dualsense::INPUT_REPORT_USB_SIZE
+    ));
+    EXPECT_TRUE(result.reply.empty());
+  }
+
+  ASSERT_EQ(session.pending_interrupt_in_count(), platf::dualsense_usbip::MAX_PENDING_INTERRUPT_IN);
+
+  const auto overflow = session.handle_submit(submit_request(
+    100,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
+    platf::dualsense::INPUT_REPORT_USB_SIZE
+  ));
+
+  EXPECT_FALSE(overflow.reply.empty());
+  EXPECT_EQ(session.pending_interrupt_in_count(), platf::dualsense_usbip::MAX_PENDING_INTERRUPT_IN);
+  EXPECT_EQ(platf::usbip::read_be32(overflow.reply, 4), 100);
+  EXPECT_EQ(submit_payload(overflow.reply).size(), platf::dualsense::INPUT_REPORT_USB_SIZE);
+}
+
 TEST(DualSenseUsbIpTests, SessionUnlinksQueuedInterruptInSubmit) {
   platf::dualsense_usbip::session_t session;
   session.handle_submit(submit_request(
