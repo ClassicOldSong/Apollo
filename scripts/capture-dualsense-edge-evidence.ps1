@@ -82,13 +82,18 @@ function Copy-RequestedLogs {
   )
 
   $manifest = New-Object System.Collections.Generic.List[string]
+  $logDir = Join-Path $OutputDir 'logs'
+  if (Test-Path -LiteralPath $logDir) {
+    Remove-Item -LiteralPath $logDir -Recurse -Force -ErrorAction Stop
+    $manifest.Add("cleared_existing_logs_dir=$logDir")
+  }
+
   if ($Paths.Count -eq 0) {
     $manifest.Add('No log paths provided. Pass -LogPath to copy Apollo/Moonlight logs into this evidence bundle.')
     Write-TextFile -Path (Join-Path $OutputDir 'logs-manifest.txt') -Lines $manifest.ToArray()
     return
   }
 
-  $logDir = Join-Path $OutputDir 'logs'
   New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
   for ($i = 0; $i -lt $Paths.Count; $i++) {

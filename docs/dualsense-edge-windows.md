@@ -253,7 +253,9 @@ environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
 `Win32_PnPEntity` rows, and selected PnP properties. Pass Apollo and Moonlight
 log files with `-LogPath` to copy them into the same evidence bundle; the log
 manifest records each copied path's source path, destination path, type, last
-write time, and file size when available. For draft-ready validation, include
+write time, and file size when available. If an existing `-OutputDir` is reused,
+the helper clears the previous copied `logs` directory before summarizing logs,
+so stale logs cannot satisfy `-RequirePass`. For draft-ready validation, include
 both logs because the helper requires Moonlight mapping, arrival, press, and
 release evidence plus Apollo arrival, import, and state-change evidence. The
 helper writes
