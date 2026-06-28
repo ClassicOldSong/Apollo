@@ -94,6 +94,9 @@ function Copy-RequestedLogs {
 
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
+$EdgeDevicePattern = 'VID_054C&PID_0DF2'
+$EdgeHidInterfacePattern = 'VID_054C&PID_0DF2.*MI_03'
+
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
@@ -181,16 +184,23 @@ Invoke-NativeCapture `
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge.txt') -Script {
   Get-PnpDevice -PresentOnly -ErrorAction Stop |
-    Where-Object { $_.InstanceId -match 'VID_054C&PID_0DF2' } |
+    Where-Object { $_.InstanceId -match $EdgeDevicePattern } |
     Sort-Object Class,FriendlyName,InstanceId |
     Format-List Class,FriendlyName,InstanceId,Status
 }
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-mi03.txt') -Script {
   Get-PnpDevice -PresentOnly -ErrorAction Stop |
+    Where-Object { $_.InstanceId -match $EdgeHidInterfacePattern } |
+    Sort-Object Class,FriendlyName,InstanceId |
+    Format-List Class,FriendlyName,InstanceId,Status
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-hidclass.txt') -Script {
+  Get-PnpDevice -PresentOnly -Class HIDClass -ErrorAction Stop |
     Where-Object {
-      $_.InstanceId -match 'VID_054C&PID_0DF2' -and
-      $_.InstanceId -match 'MI_03'
+      $_.InstanceId -match $EdgeDevicePattern -or
+      $_.FriendlyName -match 'DualSense Edge'
     } |
     Sort-Object Class,FriendlyName,InstanceId |
     Format-List Class,FriendlyName,InstanceId,Status
@@ -198,7 +208,7 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-mi03.txt') -Scrip
 
 Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-properties.txt') -Script {
   Get-PnpDevice -PresentOnly -ErrorAction Stop |
-    Where-Object { $_.InstanceId -match 'VID_054C&PID_0DF2' } |
+    Where-Object { $_.InstanceId -match $EdgeDevicePattern } |
     ForEach-Object {
       "### $($_.InstanceId)"
       Get-PnpDeviceProperty -InstanceId $_.InstanceId -ErrorAction Continue |
@@ -208,6 +218,14 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-properties.txt') 
         Format-Table KeyName,Data -AutoSize
       ''
     }
+}
+
+Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-cim.txt') -Script {
+  Get-CimInstance Win32_PnPEntity -ErrorAction Stop |
+    Where-Object { $_.PNPDeviceID -match $EdgeDevicePattern } |
+    Sort-Object PNPClass,Name,PNPDeviceID |
+    Select-Object Name,PNPClass,Status,Service,Manufacturer,PNPDeviceID |
+    Format-List
 }
 
 Write-Host "Evidence written to $OutputDir"
