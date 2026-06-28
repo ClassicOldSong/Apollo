@@ -227,14 +227,19 @@ That follows SDL2's generated mapping order:
 2. Backend proof:
    - Experimental Windows DS5 backend enumerates as a DualSense-compatible
      device without replacing DS4/X360.
-   - Standard buttons, sticks, triggers, motion, and touchpad still work.
+   - Standard buttons, sticks, and triggers work through the virtual Edge input
+     report.
+   - Touch, motion, battery, and adaptive trigger input are tracked as follow-up
+     work; they are not required to prove the Edge paddle/Fn transport path.
 3. Edge proof:
    - The virtual device enumerates as Edge-compatible or exposes the Edge
      extra-button bits in a way games and input tools can observe separately.
    - Each Fn/rear paddle toggles a distinct host-visible input.
 4. Feedback proof:
-   - Host output reports still drive rumble, lightbar, and adaptive trigger
-     feedback where the client can apply them.
+   - Host output reports still drive rumble and lightbar feedback where the
+     client can apply them.
+   - Adaptive trigger feedback remains follow-up work until the Windows Edge
+     backend parses and forwards the relevant output report fields.
 
 ## Non-Goals
 
