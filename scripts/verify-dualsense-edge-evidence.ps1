@@ -466,21 +466,28 @@ function Test-CopiedEvidenceManifestHashes {
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
     $logPath = Join-Path $outputDir 'apollo.log'
     $hostInputPath = Join-Path $outputDir 'host-input.txt'
+    $usbipDriverLogPath = Join-Path $outputDir 'usbip-ude.txt'
     $logDirPath = Join-Path $outputDir 'apollo-log-dir'
     $hostInputDirPath = Join-Path $outputDir 'host-input-dir'
+    $usbipDriverLogDirPath = Join-Path $outputDir 'usbip-driver-log-dir'
     Set-Content -LiteralPath $logPath -Encoding utf8 -Value 'apollo edge log'
     Set-Content -LiteralPath $hostInputPath -Encoding utf8 -Value 'host input evidence'
+    Set-Content -LiteralPath $usbipDriverLogPath -Encoding utf8 -Value 'usbip2_ude attach trace'
     New-Item -ItemType Directory -Force -Path (Join-Path $logDirPath 'nested') | Out-Null
     New-Item -ItemType Directory -Force -Path $hostInputDirPath | Out-Null
+    New-Item -ItemType Directory -Force -Path $usbipDriverLogDirPath | Out-Null
     Set-Content -LiteralPath (Join-Path $logDirPath 'apollo-dir.log') -Encoding utf8 -Value 'apollo directory log'
     Set-Content -LiteralPath (Join-Path $logDirPath 'nested/moonlight-dir.log') -Encoding utf8 -Value 'moonlight directory log'
     Set-Content -LiteralPath (Join-Path $hostInputDirPath 'host-dir.txt') -Encoding utf8 -Value 'host input directory evidence'
+    Set-Content -LiteralPath (Join-Path $usbipDriverLogDirPath 'usbip-flt.txt') -Encoding utf8 -Value 'usbip2_filter attach trace'
 
     Copy-RequestedLogs -OutputDir $outputDir -Paths @($logPath, $logDirPath)
     Copy-RequestedHostInputEvidence -OutputDir $outputDir -Paths @($hostInputPath, $hostInputDirPath)
+    Copy-RequestedUsbipDriverLogs -OutputDir $outputDir -Paths @($usbipDriverLogPath, $usbipDriverLogDirPath)
 
     $logManifest = Get-Content -LiteralPath (Join-Path $outputDir 'logs-manifest.txt') -Raw
     $hostInputManifest = Get-Content -LiteralPath (Join-Path $outputDir 'host-input-manifest.txt') -Raw
+    $usbipDriverLogManifest = Get-Content -LiteralPath (Join-Path $outputDir 'usbip-driver-logs-manifest.txt') -Raw
     Assert-Matches `
       -Content $logManifest `
       -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
@@ -489,6 +496,10 @@ function Test-CopiedEvidenceManifestHashes {
       -Content $hostInputManifest `
       -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
       -CaseName 'manifest-hashes host-input'
+    Assert-Matches `
+      -Content $usbipDriverLogManifest `
+      -Pattern 'copied\[0\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes usbip-driver-log'
     Assert-Contains `
       -Content $logManifest `
       -Needle 'copied[1].file_count=2' `
@@ -509,6 +520,14 @@ function Test-CopiedEvidenceManifestHashes {
       -Content $hostInputManifest `
       -Pattern 'copied\[1\]\.file\[0\]\.sha256=[0-9a-f]{64}' `
       -CaseName 'manifest-hashes host-input directory hash'
+    Assert-Contains `
+      -Content $usbipDriverLogManifest `
+      -Needle 'copied[1].file_count=1' `
+      -CaseName 'manifest-hashes usbip-driver-log directory count'
+    Assert-Matches `
+      -Content $usbipDriverLogManifest `
+      -Pattern 'copied\[1\]\.file\[0\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'manifest-hashes usbip-driver-log directory hash'
   } finally {
     if (Test-Path -LiteralPath $outputDir) {
       Remove-Item -LiteralPath $outputDir -Recurse -Force

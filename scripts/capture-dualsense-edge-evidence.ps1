@@ -19,6 +19,7 @@ param(
   [string]$ArchivePath = '',
   [string[]]$LogPath = @(),
   [string[]]$HostInputEvidencePath = @(),
+  [string[]]$UsbipDriverLogPath = @(),
   [string[]]$HostInputEvidencePattern = @(),
   [string[]]$HostInputStopPattern = @(),
   [switch]$SkipAttach,
@@ -248,6 +249,49 @@ function Copy-RequestedLogs {
   }
 
   Write-TextFile -Path (Join-Path $OutputDir 'logs-manifest.txt') -Lines $manifest.ToArray()
+}
+
+function Copy-RequestedUsbipDriverLogs {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir,
+    [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Paths
+  )
+
+  $manifest = New-Object System.Collections.Generic.List[string]
+  $driverLogDir = Join-Path $OutputDir 'usbip-driver-logs'
+  if (Test-Path -LiteralPath $driverLogDir) {
+    Remove-Item -LiteralPath $driverLogDir -Recurse -Force -ErrorAction Stop
+    $manifest.Add("cleared_existing_usbip_driver_logs_dir=$driverLogDir")
+  }
+
+  if ($Paths.Count -eq 0) {
+    $manifest.Add('No USB/IP driver log paths provided. Pass -UsbipDriverLogPath with usbip-win2 WPP .etl or tracefmt .txt logs when attach/enumeration is unstable.')
+    Write-TextFile -Path (Join-Path $OutputDir 'usbip-driver-logs-manifest.txt') -Lines $manifest.ToArray()
+    return
+  }
+
+  New-Item -ItemType Directory -Force -Path $driverLogDir | Out-Null
+
+  for ($i = 0; $i -lt $Paths.Count; $i++) {
+    $source = $Paths[$i]
+    try {
+      $item = Get-Item -LiteralPath $source -ErrorAction Stop
+      $destination = Join-Path $driverLogDir ("{0:D2}-{1}" -f $i, $item.Name)
+      Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force -ErrorAction Stop
+      $manifest.Add("copied[$i]=$($item.FullName) -> $destination")
+      $manifest.Add("copied[$i].type=$(if ($item.PSIsContainer) { 'directory' } else { 'file' })")
+      $manifest.Add("copied[$i].last_write_utc=$($item.LastWriteTimeUtc.ToString('o'))")
+      if (-not $item.PSIsContainer) {
+        $manifest.Add("copied[$i].size_bytes=$($item.Length)")
+      }
+      Add-CopiedPathHashes -Manifest $manifest -Index $i -Path $destination
+    } catch {
+      $manifest.Add("failed[$i]=$source")
+      $manifest.Add("error[$i]=$($_.Exception.Message)")
+    }
+  }
+
+  Write-TextFile -Path (Join-Path $OutputDir 'usbip-driver-logs-manifest.txt') -Lines $manifest.ToArray()
 }
 
 function Get-EvidenceSummaryOverall {
@@ -710,6 +754,7 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
   "archive_path=$ArchivePath",
   "log_path_count=$($LogPath.Count)",
   "host_input_evidence_path_count=$($HostInputEvidencePath.Count)",
+  "usbip_driver_log_path_count=$($UsbipDriverLogPath.Count)",
   "host_input_evidence_pattern_count=$($HostInputEvidencePattern.Count)",
   "host_input_stop_pattern_count=$($HostInputStopPattern.Count)",
   "skip_attach=$SkipAttach",
@@ -720,6 +765,7 @@ Write-TextFile -Path (Join-Path $OutputDir 'environment.txt') -Lines @(
 
 Copy-RequestedLogs -OutputDir $OutputDir -Paths $LogPath
 Copy-RequestedHostInputEvidence -OutputDir $OutputDir -Paths $HostInputEvidencePath
+Copy-RequestedUsbipDriverLogs -OutputDir $OutputDir -Paths $UsbipDriverLogPath
 Write-LogEvidenceSummary -OutputDir $OutputDir
 Write-HostInputEvidenceSummary -OutputDir $OutputDir -Patterns $HostInputEvidencePattern -StopPatterns $HostInputStopPattern -Required ([bool]$RequireHostInputEvidence)
 

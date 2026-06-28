@@ -133,6 +133,11 @@ represent those bits.
   draft-ready Edge paddle/Fn proof for Apollo/Moonlight's existing controller
   protocol path, so this branch still needs the one-at-a-time Edge button
   evidence below.
+- `vadimgrn/usbip-win2#113`: a public DualSense Edge attach report only worked
+  cleanly when the USBip client was run as Administrator, and the maintainer
+  requested usbip-win2 driver logs for unstable attach or reboot behavior. The
+  evidence helper therefore records elevated-shell status and can bundle WPP
+  driver traces with the rest of the validation artifacts.
 
 ## DualSense Edge Report Bits
 
@@ -278,6 +283,11 @@ Before installing or updating `usbip-win2`, create a Windows restore point as
 recommended by the project. The signed release should not require Windows test
 signing mode.
 
+Run `usbip.exe` and the evidence helper from an elevated shell. A public
+DualSense Edge usbip-win2 report attached only when the USBip client was run as
+Administrator, so `system-evidence-summary.txt` treats `is_admin=True` as
+required evidence rather than a convenience detail.
+
 The key evidence to capture during validation is:
 
 - Apollo log lines for the USB/IP listener, import, and Edge paddle/Fn state.
@@ -315,11 +325,16 @@ relative paths, sizes, and SHA-256 hashes. Pass HID/gamepad inspector exports,
 logs, or screenshots with
 `-HostInputEvidencePath` to keep the host-visible button proof in the same
 evidence bundle; the host-input manifest records the same file metadata and
-recursive hashes. The helper also writes `evidence-artifacts-manifest.txt`,
-which records relative paths, sizes, and SHA-256 hashes for every generated and
-copied artifact in the captured bundle except the manifest itself. Pass
-`-ArchivePath` to also write a zip archive outside the evidence directory. The
-zip contains that captured evidence bundle and `evidence-artifacts-manifest.txt`.
+recursive hashes. Pass usbip-win2 WPP `.etl` files or decoded `tracefmt`
+`.txt` files with
+`-UsbipDriverLogPath` when attach, enumeration, or reboot behavior is unstable;
+the helper copies them into `usbip-driver-logs` and writes
+`usbip-driver-logs-manifest.txt` with the same metadata and SHA-256 hashes.
+The helper also writes `evidence-artifacts-manifest.txt`, which records relative
+paths, sizes, and SHA-256 hashes for every generated and copied artifact in the
+captured bundle except the manifest itself. Pass `-ArchivePath` to also write a
+zip archive outside the evidence directory. The zip contains that captured
+evidence bundle and `evidence-artifacts-manifest.txt`.
 After creating the zip, the helper writes `archive-summary.txt` in the evidence
 directory with the archive path, size, SHA-256 hash, and `overall=PASS`; this
 summary is intentionally outside the zip because it records the final zip hash.
@@ -370,11 +385,32 @@ checked without Windows hardware:
 pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
 ```
 
+If `usbip.exe attach` fails, Windows reboots, or the device enumerates
+inconsistently, collect usbip-win2 driver traces as described in the
+`vadimgrn/usbip-win2` README. Install the USBip program database files, enable
+verbose WDF logging with:
+
+```cmd
+%WINDIR%\system32\reg.exe add HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters\Wdf /v VerboseOn /t REG_DWORD /d 1 /f
+```
+
+Reboot, start `usbip2_filter` and `usbip2_ude` WPP tracing with WDK
+`tracelog.exe`, reproduce the attach, stop the trace, and decode it with
+`tracefmt.exe`. Then pass the generated `usbip-*.etl` or `usbip-*.txt` files
+with `-UsbipDriverLogPath` so reviewers can tell whether the failure is in
+Apollo's USB/IP device responses or the Windows virtual host controller stack.
+When finished, remove the verbose logging flag:
+
+```cmd
+%WINDIR%\system32\reg.exe delete HKLM\SYSTEM\CurrentControlSet\Services\usbip2_ude\Parameters\Wdf /v VerboseOn /f
+```
+
 ```powershell
 .\scripts\capture-dualsense-edge-evidence.ps1 `
   -OutputDir "$env:TEMP\apollo-edge-final" `
   -ArchivePath "$env:TEMP\apollo-edge-final.zip" `
   -LogPath 'C:\path\to\apollo.log','C:\path\to\Moonlight.log' `
+  -UsbipDriverLogPath 'C:\path\to\usbip-flt.txt','C:\path\to\usbip-ude.txt' `
   -HostInputEvidencePath 'C:\path\to\hid-inspector-output.txt','C:\path\to\joy-cpl-screenshot.png' `
   -HostInputEvidencePattern 'PADDLE1|right rear|right paddle|0x80' `
   -HostInputEvidencePattern 'PADDLE2|left rear|left paddle|0x40' `
