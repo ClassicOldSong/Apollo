@@ -238,14 +238,19 @@ namespace platf {
 
   class vigem_t {
   public:
-    int init() {
+    int init(bool required = true) {
       // Probe ViGEm during startup to see if we can successfully attach gamepads. This will allow us to
       // immediately display the error message in the web UI even before the user tries to stream.
       client_t client {vigem_alloc()};
       VIGEM_ERROR status = vigem_connect(client.get());
       if (!VIGEM_SUCCESS(status)) {
-        // Log a special fatal message for this case to show the error in the web UI
-        BOOST_LOG(fatal) << "ViGEmBus is not installed or running. You must install ViGEmBus for gamepad support!"sv;
+        if (required) {
+          // Log a special fatal message for this case to show the error in the web UI
+          BOOST_LOG(fatal) << "ViGEmBus is not installed or running. You must install ViGEmBus for gamepad support!"sv;
+        } else {
+          BOOST_LOG(warning) << "ViGEmBus is not installed or running. Xbox 360 and DualShock 4 emulation will be unavailable."sv;
+        }
+        return -1;
       } else {
         vigem_disconnect(client.get());
       }
@@ -599,12 +604,10 @@ namespace platf {
     input_t result {new input_raw_t {}};
     auto &raw = *(input_raw_t *) result.get();
 
-    if (config::input.gamepad != "ds5-edge"sv) {
-      raw.vigem = new vigem_t {};
-      if (raw.vigem->init()) {
-        delete raw.vigem;
-        raw.vigem = nullptr;
-      }
+    raw.vigem = new vigem_t {};
+    if (raw.vigem->init(config::input.gamepad != "ds5-edge"sv)) {
+      delete raw.vigem;
+      raw.vigem = nullptr;
     }
 
     // Get pointers to virtual touch/pen input functions (Win10 1809+)
