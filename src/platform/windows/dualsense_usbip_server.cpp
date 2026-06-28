@@ -256,7 +256,9 @@ namespace platf::dualsense_usbip {
           if (!dualsense_usbip::is_valid_out_payload_length(request)) {
             BOOST_LOG(warning)
               << "DualSense Edge USB/IP: rejecting oversized OUT payload length "sv
-              << request.transfer_buffer_length;
+              << request.transfer_buffer_length
+              << " on endpoint "sv
+              << request.header.endpoint;
             break;
           }
 

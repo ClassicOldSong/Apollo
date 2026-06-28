@@ -349,6 +349,20 @@ TEST(DualSenseUsbIpTests, BoundsOutPayloadLength) {
 
   EXPECT_TRUE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
     23,
+    platf::usbip::direction::out,
+    1,
+    392
+  )));
+
+  EXPECT_FALSE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
+    24,
+    platf::usbip::direction::out,
+    1,
+    platf::dualsense_usbip::MAX_UNSUPPORTED_OUT_PAYLOAD_SIZE + 1
+  )));
+
+  EXPECT_TRUE(platf::dualsense_usbip::is_valid_out_payload_length(submit_request(
+    25,
     platf::usbip::direction::in,
     platf::dualsense_usbip::ENDPOINT_INTERRUPT_IN,
     platf::dualsense_usbip::MAX_OUT_PAYLOAD_SIZE + 1
@@ -488,6 +502,19 @@ TEST(DualSenseUsbIpTests, DeviceReturnsErrorForUnsupportedSubmitEndpoint) {
 
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 23);
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
+  EXPECT_FALSE(result.has_output_report);
+}
+
+TEST(DualSenseUsbIpTests, DeviceRejectsUnsupportedOutEndpointAfterPayloadIsRead) {
+  platf::dualsense_usbip::device_t device;
+  const auto result = device.handle_submit(
+    submit_request(24, platf::usbip::direction::out, 1, 392),
+    std::vector<std::uint8_t>(392)
+  );
+
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 0), static_cast<std::uint32_t>(platf::usbip::command::ret_submit));
+  EXPECT_EQ(platf::usbip::read_be32(result.reply, 4), 24);
   EXPECT_EQ(platf::usbip::read_be32(result.reply, 20), static_cast<std::uint32_t>(-1));
   EXPECT_FALSE(result.has_output_report);
 }

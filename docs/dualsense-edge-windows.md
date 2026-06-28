@@ -120,10 +120,12 @@ gamepad = ds5-edge
 When selected, Apollo starts a local USB/IP server on `127.0.0.1:3240` and
 serves one virtual DualSense Edge device at busid `1-1`. It advertises the
 captured composite USB configuration so the gamepad HID interface appears as
-`MI_03`, while unsupported audio interfaces are descriptor-only. A Windows host
-still needs `usbip-win2` attached to that busid so the signed virtual USB host
-controller enumerates the device. The backend is separate from ViGEm, so the
-existing `auto`, `x360`, and `ds4` paths remain unchanged.
+`MI_03`, while unsupported audio interfaces are descriptor-only. Unsupported
+non-HID endpoint submissions are bounded and rejected without tearing down the
+HID controller session. A Windows host still needs `usbip-win2` attached to
+that busid so the signed virtual USB host controller enumerates the device.
+The backend is separate from ViGEm, so the existing `auto`, `x360`, and `ds4`
+paths remain unchanged.
 
 The first implementation forwards standard buttons, sticks, triggers, and the
 four Edge-specific `PADDLE1..4` bits. Touch, motion, battery, and adaptive
