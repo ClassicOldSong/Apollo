@@ -592,6 +592,23 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_in, platf::usb::REQUEST_GET_STATUS, 0, 2)),
     (std::vector<std::uint8_t> {1, 0})
   );
+  const auto get_status_with_value = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_device_in,
+    platf::usb::REQUEST_GET_STATUS,
+    1,
+    2
+  ));
+  EXPECT_FALSE(get_status_with_value.handled);
+  EXPECT_TRUE(get_status_with_value.payload.empty());
+  const auto get_device_status_with_index = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    standard_device_in,
+    platf::usb::REQUEST_GET_STATUS,
+    0,
+    2,
+    1
+  ));
+  EXPECT_FALSE(get_device_status_with_index.handled);
+  EXPECT_TRUE(get_device_status_with_index.payload.empty());
   EXPECT_EQ(
     platf::dualsense::dualsense_edge_control_response(control_setup(
       standard_interface_in,
@@ -672,6 +689,9 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
   EXPECT_TRUE(set_address.payload.empty());
   EXPECT_TRUE(
     platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_out, platf::usb::REQUEST_SET_CONFIGURATION, 1, 0)).empty()
+  );
+  EXPECT_TRUE(
+    platf::dualsense::dualsense_edge_control_response(control_setup(standard_device_out, platf::usb::REQUEST_SET_CONFIGURATION, 0, 0)).empty()
   );
   const auto set_unknown_configuration = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
     standard_device_out,
