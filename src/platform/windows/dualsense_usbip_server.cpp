@@ -77,15 +77,16 @@ namespace platf::dualsense_usbip {
       output_cb = std::move(cb);
 
       WSADATA wsa {};
-      if (::WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-        BOOST_LOG(error) << "DualSense Edge USB/IP: WSAStartup failed"sv;
+      const auto wsa_status = ::WSAStartup(MAKEWORD(2, 2), &wsa);
+      if (wsa_status != 0) {
+        BOOST_LOG(error) << "DualSense Edge USB/IP: WSAStartup failed ["sv << wsa_status << ']';
         return false;
       }
       wsa_started = true;
 
       SOCKET socket = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
       if (socket == INVALID_SOCKET) {
-        BOOST_LOG(error) << "DualSense Edge USB/IP: socket() failed"sv;
+        BOOST_LOG(error) << "DualSense Edge USB/IP: socket() failed ["sv << ::WSAGetLastError() << ']';
         cleanup_winsock();
         return false;
       }
@@ -98,9 +99,17 @@ namespace platf::dualsense_usbip {
       address.sin_port = htons(port);
       address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-      if (::bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0 ||
-          ::listen(socket, 2) != 0) {
-        BOOST_LOG(error) << "DualSense Edge USB/IP: bind/listen failed on 127.0.0.1:"sv << port;
+      if (::bind(socket, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0) {
+        BOOST_LOG(error) << "DualSense Edge USB/IP: bind failed on 127.0.0.1:"sv << port
+                         << " ["sv << ::WSAGetLastError() << ']';
+        ::closesocket(socket);
+        cleanup_winsock();
+        return false;
+      }
+
+      if (::listen(socket, 2) != 0) {
+        BOOST_LOG(error) << "DualSense Edge USB/IP: listen failed on 127.0.0.1:"sv << port
+                         << " ["sv << ::WSAGetLastError() << ']';
         ::closesocket(socket);
         cleanup_winsock();
         return false;
