@@ -9,9 +9,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <span>
+#include <string_view>
+#include <vector>
 
 // local includes
 #include "src/platform/common.h"
+#include "src/platform/usb.h"
 
 namespace platf::dualsense {
   constexpr std::uint16_t VENDOR_ID_SONY = 0x054C;
@@ -25,6 +29,8 @@ namespace platf::dualsense {
   constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
   constexpr std::uint8_t USB_ENDPOINT_IN = 0x84;
   constexpr std::uint8_t USB_ENDPOINT_OUT = 0x03;
+  constexpr std::string_view DUALSENSE_EDGE_MANUFACTURER = "Sony Interactive Entertainment";
+  constexpr std::string_view DUALSENSE_EDGE_PRODUCT = "DualSense Edge Wireless Controller";
 
   inline constexpr std::array<std::uint8_t, 18> DUALSENSE_EDGE_DEVICE_DESCRIPTOR {
     0x12,  // bLength
@@ -319,5 +325,54 @@ namespace platf::dualsense {
       .report_id = INPUT_REPORT_USB,
       .body = make_input_report(gamepad_state, sequence_number, dualsense_edge),
     };
+  }
+
+  inline std::span<const std::uint8_t> dualsense_edge_descriptor(std::uint8_t descriptor_type) {
+    switch (descriptor_type) {
+      case usb::DESCRIPTOR_DEVICE:
+        return DUALSENSE_EDGE_DEVICE_DESCRIPTOR;
+
+      case usb::DESCRIPTOR_CONFIGURATION:
+        return DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
+
+      case usb::DESCRIPTOR_HID:
+        return {DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR.data() + 18, 9};
+
+      case usb::DESCRIPTOR_HID_REPORT:
+        return DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
+
+      default:
+        return {};
+    }
+  }
+
+  inline std::vector<std::uint8_t> dualsense_edge_string_descriptor(std::uint8_t descriptor_index) {
+    switch (descriptor_index) {
+      case 0:
+        return usb::make_language_string_descriptor();
+
+      case 1:
+        return usb::make_ascii_string_descriptor(DUALSENSE_EDGE_MANUFACTURER);
+
+      case 2:
+        return usb::make_ascii_string_descriptor(DUALSENSE_EDGE_PRODUCT);
+
+      default:
+        return {};
+    }
+  }
+
+  inline std::vector<std::uint8_t> dualsense_edge_control_response(const usb::setup_packet_t &setup) {
+    if (usb::setup_type(setup.request_type) != usb::REQUEST_TYPE_STANDARD ||
+        setup.request != usb::REQUEST_GET_DESCRIPTOR) {
+      return {};
+    }
+
+    const auto type = usb::descriptor_type(setup.value);
+    if (type == usb::DESCRIPTOR_STRING) {
+      return usb::limited_response(dualsense_edge_string_descriptor(usb::descriptor_index(setup.value)), setup.length);
+    }
+
+    return usb::limited_response(dualsense_edge_descriptor(type), setup.length);
   }
 }  // namespace platf::dualsense

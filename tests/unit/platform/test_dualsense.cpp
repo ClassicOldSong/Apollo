@@ -32,6 +32,16 @@ namespace {
 
     return false;
   }
+
+  platf::usb::setup_packet_t get_descriptor_setup(std::uint8_t descriptor_type, std::uint8_t descriptor_index, std::uint16_t length) {
+    return platf::usb::setup_packet_t {
+      .request_type = 0x80,
+      .request = platf::usb::REQUEST_GET_DESCRIPTOR,
+      .value = static_cast<std::uint16_t>((descriptor_type << 8) | descriptor_index),
+      .index = 0,
+      .length = length,
+    };
+  }
 }  // namespace
 
 TEST(DualSenseReportTests, PacksDpadAndFaceButtons) {
@@ -177,4 +187,55 @@ TEST(DualSenseReportTests, DefinesDualSenseEdgeHidReportDescriptor) {
   EXPECT_TRUE(descriptor_has_report_id(0x60));
   EXPECT_TRUE(descriptor_has_report_id(0x70));
   EXPECT_TRUE(descriptor_has_report_id(0x7B));
+}
+
+TEST(DualSenseReportTests, ProvidesDualSenseEdgeDescriptorsForUsbEnumeration) {
+  const auto device = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_DEVICE, 0, 255)
+  );
+  EXPECT_EQ(device.size(), platf::dualsense::DUALSENSE_EDGE_DEVICE_DESCRIPTOR.size());
+  EXPECT_EQ(device[8] | (device[9] << 8), platf::dualsense::VENDOR_ID_SONY);
+  EXPECT_EQ(device[10] | (device[11] << 8), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
+
+  const auto hid = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_HID, 0, 9)
+  );
+  ASSERT_EQ(hid.size(), 9);
+  EXPECT_EQ(hid[0], 0x09);
+  EXPECT_EQ(hid[1], platf::usb::DESCRIPTOR_HID);
+  EXPECT_EQ(hid[7] | (hid[8] << 8), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+
+  const auto report = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_HID_REPORT, 0, 1024)
+  );
+  EXPECT_EQ(report.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+  EXPECT_EQ(report.front(), 0x05);
+  EXPECT_EQ(report.back(), 0xC0);
+}
+
+TEST(DualSenseReportTests, ProvidesDualSenseEdgeStringDescriptorsForUsbEnumeration) {
+  const auto language = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 0, 255)
+  );
+  EXPECT_EQ(language, platf::usb::make_language_string_descriptor());
+
+  const auto product = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_STRING, 2, 255)
+  );
+  ASSERT_GE(product.size(), 4);
+  EXPECT_EQ(product[1], platf::usb::DESCRIPTOR_STRING);
+  EXPECT_EQ(product[2], 'D');
+  EXPECT_EQ(product[3], 0);
+  EXPECT_EQ(product[4], 'u');
+  EXPECT_EQ(product[5], 0);
+}
+
+TEST(DualSenseReportTests, LimitsDualSenseEdgeDescriptorResponsesToRequestedLength) {
+  const auto response = platf::dualsense::dualsense_edge_control_response(
+    get_descriptor_setup(platf::usb::DESCRIPTOR_DEVICE, 0, 4)
+  );
+
+  EXPECT_EQ(response.size(), 4);
+  EXPECT_EQ(response[0], 0x12);
+  EXPECT_EQ(response[1], platf::usb::DESCRIPTOR_DEVICE);
 }
