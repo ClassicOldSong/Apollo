@@ -66,6 +66,10 @@ represent those bits.
   regression was traced to an application mapping-layer issue, while SDL's own
   test controller behaved correctly. This reinforces normalizing stale app-level
   paddle mappings before trusting them.
+- `Electronicks/JoyShockMapper#155`: users reported right-side Edge extra
+  buttons also firing their left-side counterparts in another mapping layer. The
+  evidence flow therefore requires one-at-a-time testing with no combined
+  paddle/Fn state such as `0x00030000`, `0x00050000`, or `0x00090000`.
 - `libsdl-org/SDL#14581`: Edge motion support can depend on low-level HID access
   on Linux. That does not block the paddle/Fn transport path, but it explains why
   motion remains a follow-up validation item rather than part of the first
@@ -385,6 +389,10 @@ evidence should be refreshed.
    - `PADDLE4`: `DualSense Edge PADDLE4 pressed (paddle/Fn flags: 0x00080000)`
    - Each control also logs a matching `released` line with
      `paddle/Fn flags: 0x00000000` after it is released.
+   - Do not press multiple Edge-specific controls at once during validation. The
+     evidence helper treats combined masks such as `0x00030000`, `0x00050000`,
+     or `0x00090000` as failures because they can indicate duplicate right/left
+     extra-button mapping.
    - Do not continue if pressing an Edge-specific control logs `Ignoring
      DualSense Edge controller button ... bound to raw paddle... as stale Edge
      raw alias`; that means a stale SDL mapping is still binding an Edge-only
@@ -414,6 +422,10 @@ evidence should be refreshed.
      `Gamepad ... DualSense Edge paddle/Fn state changed [00000000]`. The
      evidence summary requires at least four neutral-state matches, one for
      each one-at-a-time release.
+   - Combined Apollo states such as `[00030000]`, `[00050000]`, or `[00090000]`
+     are stop conditions for this validation pass. Rerun the test if multiple
+     controls were accidentally pressed together; otherwise treat the bundle as
+     evidence of duplicated Edge controls.
 
 11. Detach the virtual controller after testing. Use the port number printed by
     `usbip.exe attach`:
@@ -451,7 +463,8 @@ same end-to-end run:
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
   arrival mask, logs a distinct state change for each `PADDLE1..4` bit, and
-  logs at least four returns to `[00000000]` after one-at-a-time release.
+  logs at least four returns to `[00000000]` after one-at-a-time release, with
+  no combined paddle/Fn state while testing one control at a time.
 - `usbip-win2` imports the loopback busid and Windows enumerates
   `VID_054C&PID_0DF2` with a healthy `MI_03` HID child.
 - A host-side gamepad or HID inspection tool observes four separate Edge
