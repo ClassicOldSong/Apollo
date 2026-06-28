@@ -231,8 +231,8 @@ signing mode.
 The key evidence to capture during validation is:
 
 - Apollo log lines for the USB/IP listener, import, and Edge paddle/Fn state.
-- Moonlight log lines for Edge mapping, arrival support, and optionally each
-  per-button debug event.
+- Moonlight log lines for Edge mapping, arrival support, and each per-button
+  debug press/release event.
 - `usbip.exe list` / `attach` output.
 - Windows PnP device instance IDs showing `VID_054C&PID_0DF2` and the HID child
   path containing `MI_03`.
@@ -251,11 +251,15 @@ matching USB/IP-related Windows services, Apollo's loopback TCP listener state,
 environment details, all present `VID_054C&PID_0DF2` PnP devices, the expected
 `MI_03` child, PnP health/status details, present HIDClass nodes, matching CIM
 `Win32_PnPEntity` rows, and selected PnP properties. Pass Apollo and Moonlight
-log files with `-LogPath` to
-copy them into the same evidence bundle. When logs are provided, the helper also
-writes `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
+log files with `-LogPath` to copy them into the same evidence bundle; the log
+manifest records each copied path's source path, destination path, type, last
+write time, and file size when available. For draft-ready validation, include
+both logs because the helper requires Moonlight mapping, arrival, press, and
+release evidence plus Apollo arrival, import, and state-change evidence. The
+helper writes
+`log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
-allocation failures. The helper always writes `system-evidence-summary.txt`
+allocation failures. The helper also writes `system-evidence-summary.txt`
 with `MATCH`/`MISSING` lines for elevated-shell status, the USB/IP listener,
 `usbip.exe`, requested busid, attach result, and Windows PnP
 `VID_054C&PID_0DF2` / `MI_03` evidence, including healthy PnP status checks and

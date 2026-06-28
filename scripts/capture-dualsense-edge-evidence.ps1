@@ -98,6 +98,11 @@ function Copy-RequestedLogs {
       $destination = Join-Path $logDir ("{0:D2}-{1}" -f $i, $item.Name)
       Copy-Item -LiteralPath $item.FullName -Destination $destination -Recurse -Force -ErrorAction Stop
       $manifest.Add("copied[$i]=$($item.FullName) -> $destination")
+      $manifest.Add("copied[$i].type=$(if ($item.PSIsContainer) { 'directory' } else { 'file' })")
+      $manifest.Add("copied[$i].last_write_utc=$($item.LastWriteTimeUtc.ToString('o'))")
+      if (-not $item.PSIsContainer) {
+        $manifest.Add("copied[$i].size_bytes=$($item.Length)")
+      }
     } catch {
       $manifest.Add("failed[$i]=$source")
       $manifest.Add("error[$i]=$($_.Exception.Message)")
@@ -183,7 +188,7 @@ function Write-LogEvidenceSummary {
   $hasFailure = $false
   $summary.Add("log_count=$($logs.Count)")
   foreach ($log in $logs) {
-    $summary.Add("log=$($log.FullName)")
+    $summary.Add("log=$($log.FullName) last_write_utc=$($log.LastWriteTimeUtc.ToString('o')) size_bytes=$($log.Length)")
   }
   $summary.Add('')
 
