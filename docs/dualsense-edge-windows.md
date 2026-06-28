@@ -145,7 +145,9 @@ USB enumeration requests such as `SET_ADDRESS`, endpoint `GET_STATUS`, endpoint
 `GET_REPORT` requests used by host drivers for calibration (`0x05`), pairing
 info (`0x09`), and firmware info (`0x20`). Other advertised Edge feature
 reports are sized according to the Edge HID descriptor and return zero-filled
-payloads with the requested report ID.
+payloads with the requested report ID. HID control `SET_REPORT` is only accepted
+for the Edge output report (`type=output`, report ID `0x02`); unsupported HID
+input/feature writes still stall instead of being acknowledged as handled.
 
 ## Manual Windows Test Flow
 

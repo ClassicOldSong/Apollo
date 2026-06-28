@@ -789,4 +789,31 @@ TEST(DualSenseReportTests, HandlesDualSenseEdgeCommonControlRequests) {
       platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
     )).empty()
   );
+  const auto set_input_report = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_REPORT,
+    (platf::usb::HID_REPORT_TYPE_INPUT << 8) | platf::dualsense::INPUT_REPORT_USB,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_input_report.handled);
+  EXPECT_TRUE(set_input_report.payload.empty());
+  const auto set_feature_report = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_REPORT,
+    (platf::usb::HID_REPORT_TYPE_FEATURE << 8) | platf::dualsense::FEATURE_REPORT_CALIBRATION,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_feature_report.handled);
+  EXPECT_TRUE(set_feature_report.payload.empty());
+  const auto set_unknown_output_report = platf::dualsense::dualsense_edge_control_transfer_response(control_setup(
+    class_interface_out,
+    platf::usb::HID_REQUEST_SET_REPORT,
+    (platf::usb::HID_REPORT_TYPE_OUTPUT << 8) | 0x7F,
+    0,
+    platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID
+  ));
+  EXPECT_FALSE(set_unknown_output_report.handled);
+  EXPECT_TRUE(set_unknown_output_report.payload.empty());
 }
