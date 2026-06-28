@@ -125,6 +125,10 @@ represent those bits.
   and plans to limit gamepad enumeration without breaking navigation. Capture
   GameInput/Gaming Services context when testing affected games, but triage
   duplicate game input separately from the raw Edge button transport proof.
+- `w3c/gamepad#191`: browser Gamepad API discussion is moving toward semantic
+  names for extra buttons rather than fixed Standard Gamepad indices. Browser
+  testers are useful evidence, but do not treat a generic button index alone as
+  the canonical Edge paddle/Fn identity.
 - `ValveSoftware/steam-for-linux#9256`, `ValveSoftware/steam-for-linux#12489`,
   and `ValveSoftware/steam-devices#48`: Steam's Edge feature path depends on
   `054c:0df2` HID access and the correct udev/hidraw rules; when those rules are
@@ -145,6 +149,19 @@ represent those bits.
   draft-ready Edge paddle/Fn proof for Apollo/Moonlight's existing controller
   protocol path, so this branch still needs the one-at-a-time Edge button
   evidence below.
+- `Alia5/SISR#21`: SISR's Steam Input redirection work now calls out back/aux
+  button passthrough to DualSense Edge as separate from full DualSense
+  passthrough. That supports this branch's narrower first milestone: preserve
+  the Edge-specific button bits now, while treating full gyro/touchpad/audio
+  passthrough as later virtual-device work.
+- `hifihedgehog/PadForge#6` and `hifihedgehog/HIDMaestro#21`: HIDMaestro/PadForge
+  are relevant Windows research because they aim to expose profile-defined
+  virtual DualSense/Edge devices across DirectInput, SDL, browser Gamepad,
+  WGI/GameInput, and output reports. Their issue history also shows the failure
+  modes this PR must guard against: stale shared report state, off-by-one Sony
+  report byte positions, feature-report arming differences, polling stalls, and
+  app-layer WGI/GameInput behavior. Treat them as future backend research, not
+  as a dependency for this Apollo draft.
 - `vadimgrn/usbip-win2#113`: a public DualSense Edge attach report only worked
   cleanly when the USBip client was run as Administrator, and the maintainer
   requested usbip-win2 driver logs for unstable attach or reboot behavior. The
