@@ -21,6 +21,17 @@ namespace {
       .rsY = 0,
     };
   }
+
+  bool descriptor_has_report_id(std::uint8_t report_id) {
+    const auto &descriptor = platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
+    for (std::size_t i = 1; i < descriptor.size(); ++i) {
+      if (descriptor[i - 1] == 0x85 && descriptor[i] == report_id) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }  // namespace
 
 TEST(DualSenseReportTests, PacksDpadAndFaceButtons) {
@@ -152,4 +163,18 @@ TEST(DualSenseReportTests, DefinesMinimalDualSenseEdgeHidConfiguration) {
   EXPECT_EQ(report_descriptor_size, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
   EXPECT_EQ(config[29], platf::dualsense::USB_ENDPOINT_IN);
   EXPECT_EQ(config[36], platf::dualsense::USB_ENDPOINT_OUT);
+}
+
+TEST(DualSenseReportTests, DefinesDualSenseEdgeHidReportDescriptor) {
+  const auto &descriptor = platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
+
+  EXPECT_EQ(descriptor.size(), platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
+  EXPECT_EQ(descriptor.front(), 0x05);
+  EXPECT_EQ(descriptor.back(), 0xC0);
+
+  EXPECT_TRUE(descriptor_has_report_id(0x01));
+  EXPECT_TRUE(descriptor_has_report_id(0x02));
+  EXPECT_TRUE(descriptor_has_report_id(0x60));
+  EXPECT_TRUE(descriptor_has_report_id(0x70));
+  EXPECT_TRUE(descriptor_has_report_id(0x7B));
 }
