@@ -274,6 +274,39 @@ function Test-CopiedEvidenceManifestHashes {
   }
 }
 
+function Test-EvidenceBundleManifest {
+  $outputDir = New-TestOutputDir -Name 'bundle-manifest'
+  try {
+    New-Item -ItemType Directory -Force -Path (Join-Path $outputDir 'logs') | Out-Null
+    Set-Content -LiteralPath (Join-Path $outputDir 'environment.txt') -Encoding utf8 -Value 'is_admin=True'
+    Set-Content -LiteralPath (Join-Path $outputDir 'logs/edge.log') -Encoding utf8 -Value 'edge log'
+
+    Write-EvidenceBundleManifest -OutputDir $outputDir
+
+    $manifest = Get-Content -LiteralPath (Join-Path $outputDir 'evidence-artifacts-manifest.txt') -Raw
+    Assert-Contains `
+      -Content $manifest `
+      -Needle 'artifact_count=2' `
+      -CaseName 'bundle-manifest count'
+    Assert-Contains `
+      -Content $manifest `
+      -Needle 'excluded=evidence-artifacts-manifest.txt' `
+      -CaseName 'bundle-manifest self exclusion'
+    Assert-Matches `
+      -Content $manifest `
+      -Pattern 'artifact\[[0-9]+\]\.relative_path=logs[/\\]edge\.log' `
+      -CaseName 'bundle-manifest nested path'
+    Assert-Matches `
+      -Content $manifest `
+      -Pattern 'artifact\[[0-9]+\]\.sha256=[0-9a-f]{64}' `
+      -CaseName 'bundle-manifest hash'
+  } finally {
+    if (Test-Path -LiteralPath $outputDir) {
+      Remove-Item -LiteralPath $outputDir -Recurse -Force
+    }
+  }
+}
+
 function Write-TestSystemEvidenceFiles {
   param(
     [Parameter(Mandatory = $true)][string] $OutputDir,
@@ -579,6 +612,7 @@ Test-MissingHostInputSummary `
   )
 
 Test-CopiedEvidenceManifestHashes
+Test-EvidenceBundleManifest
 
 Test-SystemSummary `
   -Name 'system-pass' `

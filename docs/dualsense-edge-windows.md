@@ -276,7 +276,10 @@ directories include recursive per-file relative paths, sizes, and SHA-256
 hashes. Pass HID/gamepad inspector exports, logs, or screenshots with
 `-HostInputEvidencePath` to keep the host-visible button proof in the same
 evidence bundle; the host-input manifest records the same file metadata and
-recursive hashes. If the inspector can export text,
+recursive hashes. The helper also writes `evidence-artifacts-manifest.txt`,
+which records relative paths, sizes, and SHA-256 hashes for every generated and
+copied artifact in the final bundle except the manifest itself. If the
+inspector can export text,
 `-HostInputEvidencePattern` can be repeated to require specific regex matches in
 those files, and `-HostInputStopPattern` can be repeated to fail on known-bad
 text such as face-button remaps or duplicated right/left controls. Screenshots

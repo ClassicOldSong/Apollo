@@ -110,6 +110,43 @@ function Add-CopiedPathHashes {
   }
 }
 
+function Write-EvidenceBundleManifest {
+  param(
+    [Parameter(Mandatory = $true)][string]$OutputDir
+  )
+
+  $manifestPath = Join-Path $OutputDir 'evidence-artifacts-manifest.txt'
+  $manifest = New-Object System.Collections.Generic.List[string]
+
+  try {
+    $rootItem = Get-Item -LiteralPath $OutputDir -ErrorAction Stop
+    $root = $rootItem.FullName.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $files = @(
+      Get-ChildItem -LiteralPath $rootItem.FullName -Recurse -File -ErrorAction Stop |
+        Where-Object { $_.FullName -ne $manifestPath } |
+        Sort-Object FullName
+    )
+
+    $manifest.Add("root=$($rootItem.FullName)")
+    $manifest.Add("generated_utc=$((Get-Date).ToUniversalTime().ToString('o'))")
+    $manifest.Add("artifact_count=$($files.Count)")
+    $manifest.Add("excluded=evidence-artifacts-manifest.txt")
+
+    for ($i = 0; $i -lt $files.Count; $i++) {
+      $file = $files[$i]
+      $relativePath = $file.FullName.Substring($root.Length).TrimStart([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+      $hash = Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256 -ErrorAction Stop
+      $manifest.Add("artifact[$i].relative_path=$relativePath")
+      $manifest.Add("artifact[$i].size_bytes=$($file.Length)")
+      $manifest.Add("artifact[$i].sha256=$($hash.Hash.ToLowerInvariant())")
+    }
+  } catch {
+    $manifest.Add("manifest_error=$($_.Exception.Message)")
+  }
+
+  Write-TextFile -Path $manifestPath -Lines $manifest.ToArray()
+}
+
 function Copy-RequestedLogs {
   param(
     [Parameter(Mandatory = $true)][string]$OutputDir,
@@ -746,6 +783,7 @@ Invoke-PowerShellCapture -Path (Join-Path $OutputDir 'pnp-edge-cim.txt') -Script
 }
 
 Write-SystemEvidenceSummary -OutputDir $OutputDir -HostAddress $HostAddress -Port $Port -BusId $BusId -SkipAttach ([bool]$SkipAttach)
+Write-EvidenceBundleManifest -OutputDir $OutputDir
 
 $logEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'log-evidence-summary.txt')
 $systemEvidenceOverall = Get-EvidenceSummaryOverall -Path (Join-Path $OutputDir 'system-evidence-summary.txt')
