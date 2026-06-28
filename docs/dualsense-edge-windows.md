@@ -160,7 +160,8 @@ companion Moonlight branch intentionally targets Moonlight's current SDL2
 raw binding set at runtime before advertising or transmitting Edge paddle/Fn
 flags. The `sdl2-compat`/SDL3 raw layout is only valid evidence when Moonlight's
 detection line includes an explicit `SDL3 x.y.z` runtime hint or an
-`SDL 2.x.50+` high-patch sdl2-compat runtime version; an otherwise ambiguous
+`SDL 2.x.50+` high-patch sdl2-compat runtime version, plus a raw-mapping signal
+of `SDL3_VERSION` or `sdl2-compat runtime version`; an otherwise ambiguous
 17-button Edge shape must fail closed.
 
 Apollo should preserve that SDL/Sunshine paddle order unless hardware testing
@@ -370,14 +371,16 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
    diagnostics are captured.
 3. Confirm Moonlight logs:
    - `DualSense Edge detected with ... SDL joystick buttons (need ... for ...
-     Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL x.y.z[, SDL3 x.y.z])`
+     Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL x.y.z[, SDL3 x.y.z])
+     (raw mapping signal: ...)`
      where the count is at least `21` for native SDL2's `b20,b19,b18,b17`
      mapping or at least `17` for `sdl2-compat`/SDL3's `b16,b15,b14,b13`
      mapping. The `sdl2-compat`/SDL3 case must show either `, SDL3 x.y.z` or a
-     high-patch `SDL 2.x.50+` runtime version. The VID/PID proves Moonlight
-     identified the physical Edge, and the SDL version/raw-mapping label matters
-     because Moonlight validates those raw bindings before transmitting Edge
-     flags.
+     high-patch `SDL 2.x.50+` runtime version and a raw-mapping signal of
+     `SDL3_VERSION` or `sdl2-compat runtime version`; native SDL2 should log
+     `native SDL2 runtime`. The VID/PID proves Moonlight identified the physical
+     Edge, and the SDL version/raw-mapping label matters because Moonlight
+     validates those raw bindings before transmitting Edge flags.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
    - If the mapping was `added` rather than `updated`, also expect
