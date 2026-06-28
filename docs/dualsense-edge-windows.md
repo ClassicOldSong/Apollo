@@ -158,7 +158,10 @@ button numbers (`paddle1:b16,paddle2:b15,paddle3:b14,paddle4:b13`). The
 companion Moonlight branch intentionally targets Moonlight's current SDL2
 `SDL_GameController` API while selecting the native SDL2 or `sdl2-compat`/SDL3
 raw binding set at runtime before advertising or transmitting Edge paddle/Fn
-flags.
+flags. The `sdl2-compat`/SDL3 raw layout is only valid evidence when Moonlight's
+detection line includes an explicit `SDL3 x.y.z` runtime hint or an
+`SDL 2.x.50+` high-patch sdl2-compat runtime version; an otherwise ambiguous
+17-button Edge shape must fail closed.
 
 Apollo should preserve that SDL/Sunshine paddle order unless hardware testing
 proves it produces the wrong physical labels.
@@ -306,8 +309,9 @@ complete Apollo host evidence in one copied Apollo log. Partial evidence split
 across multiple logs, stale rotations, or separate runs does not satisfy
 `-RequirePass`. The Moonlight log must include Edge VID/PID, enough SDL joystick
 buttons for the selected raw mapping (`21+` for native SDL2 or `17+` for
-`sdl2-compat`/SDL3), mapping, arrival, press, and release evidence. The Apollo
-log must include arrival, import, and state-change evidence. The helper writes
+`sdl2-compat`/SDL3 with an SDL3 hint or high-patch sdl2-compat runtime signal),
+mapping, arrival, press, and release evidence. The Apollo log must include
+arrival, import, and state-change evidence. The helper writes
 `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
@@ -369,9 +373,11 @@ pwsh -NoProfile -File .\scripts\verify-dualsense-edge-evidence.ps1
      Edge raw mapping) (VID/PID: 0x054c/0x0df2) (SDL x.y.z[, SDL3 x.y.z])`
      where the count is at least `21` for native SDL2's `b20,b19,b18,b17`
      mapping or at least `17` for `sdl2-compat`/SDL3's `b16,b15,b14,b13`
-     mapping. The VID/PID proves Moonlight identified the physical Edge, and
-     the SDL version/raw-mapping label matters because Moonlight validates those
-     raw bindings before transmitting Edge flags.
+     mapping. The `sdl2-compat`/SDL3 case must show either `, SDL3 x.y.z` or a
+     high-patch `SDL 2.x.50+` runtime version. The VID/PID proves Moonlight
+     identified the physical Edge, and the SDL version/raw-mapping label matters
+     because Moonlight validates those raw bindings before transmitting Edge
+     flags.
    - Either `Applied DualSense Edge paddle mappings (...)` or
      `DualSense Edge paddle mappings already present`.
    - If the mapping was `added` rather than `updated`, also expect

@@ -447,12 +447,18 @@ function Write-LogEvidenceSummary {
     return
   }
 
+  $edgeSdl2DetectionPattern =
+    'DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2'
+  $edgeSdl3CompatRuntimePattern =
+    '(?:\(SDL 2\.[0-9]+\.(?:[5-9][0-9]|[1-9][0-9]{2,})(?:, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)|\(SDL 2\.[0-9]+\.[0-9]+, SDL3 [0-9]+\.[0-9]+\.[0-9]+\))'
+  $edgeSdl3CompatDetectionPattern =
+    'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2.*' +
+    $edgeSdl3CompatRuntimePattern
   $edgeRawButtonCountPattern =
-    'DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2|' +
-    'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2'
+    $edgeSdl2DetectionPattern + '|' + $edgeSdl3CompatDetectionPattern
   $edgeMappingVariantPattern =
-    '(?s)(?:(?=.*DualSense Edge detected with (2[1-9]|[3-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 21 for SDL2 Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17)|' +
-    '(?=.*DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need 17 for SDL3/sdl2-compat Edge raw mapping\).*VID/PID: 0x054c/0x0df2)(?=.*DualSense Edge arrival support:.*bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13))'
+    '(?s)(?:(?=.*' + $edgeSdl2DetectionPattern + ')(?=.*DualSense Edge arrival support:.*bindings=paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17)|' +
+    '(?=.*' + $edgeSdl3CompatDetectionPattern + ')(?=.*DualSense Edge arrival support:.*bindings=paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13))'
   $moonlightCompleteLogPattern =
     $edgeMappingVariantPattern +
     '(?=.*DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\))' +
