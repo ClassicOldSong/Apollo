@@ -286,7 +286,7 @@ function Write-LogEvidenceSummary {
   $checks = @(
     @{ Name = 'Moonlight detected DualSense Edge VID/PID'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*VID/PID: 0x054c/0x0df2' },
     @{ Name = 'Moonlight exposed enough Edge raw buttons'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with (1[7-9]|[2-9][0-9]|[1-9][0-9]{2,}) SDL joystick buttons \(need (17|21) for (SDL2|SDL3/sdl2-compat) Edge raw mapping\).*VID/PID: 0x054c/0x0df2' },
-    @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+\)' },
+    @{ Name = 'Moonlight logged runtime SDL version'; Required = $true; Stop = $false; Pattern = 'DualSense Edge detected with.*\(SDL [0-9]+\.[0-9]+\.[0-9]+(, SDL3 [0-9]+\.[0-9]+\.[0-9]+)?\)' },
     @{ Name = 'Moonlight accepted or applied Edge paddle mapping'; Required = $true; Stop = $false; Pattern = 'Applied DualSense Edge paddle mappings|DualSense Edge paddle mappings already present' },
     @{ Name = 'Moonlight advertised PlayStation Edge arrival and full paddle/Fn support'; Required = $true; Stop = $false; Pattern = 'DualSense Edge arrival support:.*arrivalType=0x02.*paddle/Fn=0x000f0000.*bindings=(paddle1=b20,paddle2=b19,paddle3=b18,paddle4=b17|paddle1=b16,paddle2=b15,paddle3=b14,paddle4=b13)' },
     @{ Name = 'Moonlight PADDLE1 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge PADDLE1 pressed \(paddle/Fn flags: 0x00010000\)' },
