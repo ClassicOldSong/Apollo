@@ -339,6 +339,19 @@ descriptor. If `usbip.exe attach` succeeds but Windows does not show the
 `VID_054C&PID_0DF2` device, capture `usbip-win2` UDE/filter logs next; that
 points to USB enumeration or driver behavior rather than Moonlight's mapping.
 
+Do not mark the PR ready until the evidence shows all of the following in the
+same end-to-end run:
+
+- Moonlight advertises the Edge paddle/Fn capability mask as `0x000f0000`.
+- Apollo receives the same `0x000f0000` arrival mask and logs a distinct state
+  change for each `PADDLE1..4` bit.
+- `usbip-win2` imports the loopback busid and Windows enumerates
+  `VID_054C&PID_0DF2` with an `MI_03` HID child.
+- A host-side gamepad or HID inspection tool observes four separate Edge
+  paddle/Fn inputs rather than face-button remaps.
+- Standard buttons, sticks, and triggers still work through the virtual Edge
+  device after the four extra buttons are validated.
+
 ## Preferred Architecture
 
 Add a Windows virtual DualSense/Edge backend beside the current ViGEm backend.
