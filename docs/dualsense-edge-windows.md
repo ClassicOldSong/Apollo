@@ -381,7 +381,9 @@ evidence should be refreshed.
    - `PADDLE3`: `Gamepad ... DualSense Edge paddle/Fn state changed [00040000]`
    - `PADDLE4`: `Gamepad ... DualSense Edge paddle/Fn state changed [00080000]`
    - Releasing each control returns the Apollo Edge state to
-     `Gamepad ... DualSense Edge paddle/Fn state changed [00000000]`.
+     `Gamepad ... DualSense Edge paddle/Fn state changed [00000000]`. The
+     evidence summary requires at least four neutral-state matches, one for
+     each one-at-a-time release.
 
 11. Detach the virtual controller after testing. Use the port number printed by
     `usbip.exe attach`:
@@ -416,7 +418,7 @@ same end-to-end run:
   capability mask as `0x000f0000`.
 - Apollo receives PlayStation arrival type `0x02`, the same `0x000f0000`
   arrival mask, logs a distinct state change for each `PADDLE1..4` bit, and
-  logs a return to `[00000000]` after one-at-a-time release.
+  logs at least four returns to `[00000000]` after one-at-a-time release.
 - `usbip-win2` imports the loopback busid and Windows enumerates
   `VID_054C&PID_0DF2` with a healthy `MI_03` HID child.
 - A host-side gamepad or HID inspection tool observes four separate Edge

@@ -173,7 +173,7 @@ function Write-LogEvidenceSummary {
     @{ Name = 'Apollo PADDLE2 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00020000\]' },
     @{ Name = 'Apollo PADDLE3 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00040000\]' },
     @{ Name = 'Apollo PADDLE4 state observed'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00080000\]' },
-    @{ Name = 'Apollo Edge paddle/Fn state returned to neutral'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00000000\]' },
+    @{ Name = 'Apollo Edge paddle/Fn state returned to neutral after each release'; Required = $true; Stop = $false; Pattern = 'DualSense Edge paddle/Fn state changed \[00000000\]'; Minimum = 4 },
     @{ Name = 'STOP: Moonlight mapping did not expose expected paddle controller bindings'; Required = $false; Stop = $true; Pattern = 'DualSense Edge paddle mappings are present, but SDL did not expose|DualSense Edge paddle mapping update did not expose|DualSense Edge paddle mapping add did not expose' },
     @{ Name = 'STOP: Moonlight stale Edge raw alias suppressed'; Required = $false; Stop = $true; Pattern = 'as stale Edge raw alias' },
     @{ Name = 'STOP: Moonlight capability alias filtered'; Required = $false; Stop = $true; Pattern = 'not advertising it as a normal button' },
@@ -189,6 +189,10 @@ function Write-LogEvidenceSummary {
 
   foreach ($check in $checks) {
     $matches = New-Object System.Collections.Generic.List[string]
+    $minimum = 1
+    if ($check.ContainsKey('Minimum')) {
+      $minimum = [int]$check['Minimum']
+    }
 
     foreach ($log in $logs) {
       try {
@@ -210,11 +214,11 @@ function Write-LogEvidenceSummary {
         $summary.Add("OK_NO_STOP_MATCH: $($check['Name'])")
       }
     } elseif ($check['Required']) {
-      if ($matches.Count -gt 0) {
+      if ($matches.Count -ge $minimum) {
         $summary.Add("MATCH: $($check['Name'])")
       } else {
         $hasFailure = $true
-        $summary.Add("MISSING: $($check['Name'])")
+        $summary.Add("MISSING: $($check['Name']) (matched $($matches.Count), required $minimum)")
       }
     } else {
       if ($matches.Count -gt 0) {
