@@ -256,9 +256,9 @@ manifest records each copied path's source path, destination path, type, last
 write time, and file size when available. If an existing `-OutputDir` is reused,
 the helper clears the previous copied `logs` directory before summarizing logs,
 so stale logs cannot satisfy `-RequirePass`. For draft-ready validation, include
-both logs because the helper requires Moonlight mapping, arrival, press, and
-release evidence plus Apollo arrival, import, and state-change evidence. The
-helper writes
+both logs because the helper requires Moonlight Edge VID/PID, at least `21`
+SDL joystick buttons, mapping, arrival, press, and release evidence plus Apollo
+arrival, import, and state-change evidence. The helper writes
 `log-evidence-summary.txt` with `MATCH`/`MISSING` lines for the expected
 Moonlight/Apollo evidence and `STOP_MATCH` lines for stale SDL mapping or Apollo
 allocation failures. The helper also writes `system-evidence-summary.txt`
