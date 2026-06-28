@@ -526,6 +526,29 @@ TEST(DualSenseUsbIpTests, DeviceRejectsControlSubmitWithMismatchedSetupDirection
   );
 }
 
+TEST(DualSenseUsbIpTests, DeviceRejectsControlInputWithMismatchedSetupLength) {
+  platf::dualsense_usbip::device_t device;
+  const auto request = submit_request(
+    30,
+    platf::usbip::direction::in,
+    platf::dualsense_usbip::ENDPOINT_CONTROL,
+    4,
+    get_descriptor_setup(
+      platf::usb::DESCRIPTOR_HID_REPORT,
+      platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE
+    )
+  );
+
+  const auto result = device.handle_submit(request);
+
+  EXPECT_FALSE(result.has_output_report);
+  EXPECT_TRUE(submit_payload(result.reply).empty());
+  EXPECT_EQ(
+    platf::usbip::read_be32(result.reply, 20),
+    static_cast<std::uint32_t>(platf::dualsense_usbip::CONTROL_STALL_STATUS)
+  );
+}
+
 TEST(DualSenseUsbIpTests, DeviceHandlesControlOutputSetReportWithParsedFeedback) {
   platf::dualsense_usbip::device_t device;
   const auto request = submit_request(
