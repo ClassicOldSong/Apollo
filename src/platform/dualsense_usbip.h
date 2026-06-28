@@ -42,10 +42,25 @@ namespace platf::dualsense_usbip {
     .device_protocol = 0,
     .configuration_value = 1,
     .configuration_count = 1,
-    .interface_count = 1,
+    .interface_count = 4,
   };
 
-  inline constexpr std::array<usbip::interface_identity_t, 1> INTERFACES {
+  inline constexpr std::array<usbip::interface_identity_t, 4> INTERFACES {
+    usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x01,
+      .interface_protocol = 0x00,
+    },
+    usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x02,
+      .interface_protocol = 0x00,
+    },
+    usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x02,
+      .interface_protocol = 0x00,
+    },
     usbip::interface_identity_t {
       .interface_class = 0x03,
       .interface_subclass = 0x00,

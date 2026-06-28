@@ -286,20 +286,26 @@ TEST(DualSenseReportTests, DefinesDualSenseEdgeUsbIdentity) {
   EXPECT_EQ(device[10] | (device[11] << 8), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
 }
 
-TEST(DualSenseReportTests, DefinesMinimalDualSenseEdgeHidConfiguration) {
+TEST(DualSenseReportTests, DefinesCapturedDualSenseEdgeCompositeConfiguration) {
   const auto &config = platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
-  const auto report_descriptor_size = config[25] | (config[26] << 8);
+  const auto hid_offset = platf::dualsense::DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET;
+  const auto report_descriptor_size = config[hid_offset + 7] | (config[hid_offset + 8] << 8);
 
-  EXPECT_EQ(config.size(), 41);
+  EXPECT_EQ(config.size(), platf::dualsense::DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE);
   EXPECT_EQ(config[0], 0x09);
   EXPECT_EQ(config[1], 0x02);
   EXPECT_EQ(config[2] | (config[3] << 8), config.size());
-  EXPECT_EQ(config[18], 0x09);
-  EXPECT_EQ(config[19], 0x21);
-  EXPECT_EQ(config[24], 0x22);
+  EXPECT_EQ(config[4], 4);
+  EXPECT_EQ(config[195], 0x09);
+  EXPECT_EQ(config[196], 0x04);
+  EXPECT_EQ(config[197], platf::dualsense::DUALSENSE_EDGE_INTERFACE_HID);
+  EXPECT_EQ(config[200], 0x03);
+  EXPECT_EQ(config[hid_offset], 0x09);
+  EXPECT_EQ(config[hid_offset + 1], 0x21);
+  EXPECT_EQ(config[hid_offset + 6], 0x22);
   EXPECT_EQ(report_descriptor_size, platf::dualsense::DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE);
-  EXPECT_EQ(config[29], platf::dualsense::USB_ENDPOINT_IN);
-  EXPECT_EQ(config[36], platf::dualsense::USB_ENDPOINT_OUT);
+  EXPECT_EQ(config[215], platf::dualsense::USB_ENDPOINT_IN);
+  EXPECT_EQ(config[222], platf::dualsense::USB_ENDPOINT_OUT);
 }
 
 TEST(DualSenseReportTests, DefinesDualSenseEdgeHidReportDescriptor) {

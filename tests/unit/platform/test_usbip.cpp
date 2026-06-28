@@ -30,7 +30,7 @@ namespace {
       .device_protocol = 0,
       .configuration_value = 1,
       .configuration_count = 1,
-      .interface_count = 1,
+      .interface_count = 4,
     };
   }
 
@@ -63,7 +63,7 @@ TEST(UsbIpTests, BuildsDualSenseEdgeImportReply) {
   EXPECT_EQ(reply[314], 0);
   EXPECT_EQ(reply[317], 1);
   EXPECT_EQ(reply[318], 1);
-  EXPECT_EQ(reply[319], 1);
+  EXPECT_EQ(reply[319], 4);
 }
 
 TEST(UsbIpTests, ParsesUsbIpOpCommonHeader) {
@@ -112,8 +112,23 @@ TEST(UsbIpTests, BuildsImportErrorReply) {
   EXPECT_EQ(platf::usbip::read_be32(reply, 4), 1);
 }
 
-TEST(UsbIpTests, BuildsDeviceListReplyWithHidInterface) {
+TEST(UsbIpTests, BuildsDeviceListReplyWithCompositeEdgeInterfaces) {
   const std::array interfaces {
+    platf::usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x01,
+      .interface_protocol = 0x00,
+    },
+    platf::usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x02,
+      .interface_protocol = 0x00,
+    },
+    platf::usbip::interface_identity_t {
+      .interface_class = 0x01,
+      .interface_subclass = 0x02,
+      .interface_protocol = 0x00,
+    },
     platf::usbip::interface_identity_t {
       .interface_class = 0x03,
       .interface_subclass = 0x00,
@@ -124,15 +139,20 @@ TEST(UsbIpTests, BuildsDeviceListReplyWithHidInterface) {
   const auto reply = platf::usbip::make_devlist_reply(edge_device(), interfaces);
   const auto interface_offset = platf::usbip::OP_COMMON_SIZE + sizeof(std::uint32_t) + platf::usbip::USB_DEVICE_RECORD_SIZE;
 
-  EXPECT_EQ(reply.size(), interface_offset + platf::usbip::USB_INTERFACE_RECORD_SIZE);
+  EXPECT_EQ(reply.size(), interface_offset + interfaces.size() * platf::usbip::USB_INTERFACE_RECORD_SIZE);
   EXPECT_EQ(platf::usbip::read_be16(reply, 0), platf::usbip::VERSION);
   EXPECT_EQ(platf::usbip::read_be16(reply, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_devlist));
   EXPECT_EQ(platf::usbip::read_be32(reply, 8), 1);
   EXPECT_EQ(platf::usbip::read_be16(reply, 314), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
-  EXPECT_EQ(reply[interface_offset], 0x03);
-  EXPECT_EQ(reply[interface_offset + 1], 0x00);
-  EXPECT_EQ(reply[interface_offset + 2], 0x00);
-  EXPECT_EQ(reply[interface_offset + 3], 0x00);
+  EXPECT_EQ(reply[323], 4);
+  EXPECT_EQ(reply[interface_offset], 0x01);
+  EXPECT_EQ(reply[interface_offset + 1], 0x01);
+  EXPECT_EQ(reply[interface_offset + platf::usbip::USB_INTERFACE_RECORD_SIZE], 0x01);
+  EXPECT_EQ(reply[interface_offset + 2 * platf::usbip::USB_INTERFACE_RECORD_SIZE], 0x01);
+  EXPECT_EQ(reply[interface_offset + 3 * platf::usbip::USB_INTERFACE_RECORD_SIZE], 0x03);
+  EXPECT_EQ(reply[interface_offset + 3 * platf::usbip::USB_INTERFACE_RECORD_SIZE + 1], 0x00);
+  EXPECT_EQ(reply[interface_offset + 3 * platf::usbip::USB_INTERFACE_RECORD_SIZE + 2], 0x00);
+  EXPECT_EQ(reply[interface_offset + 3 * platf::usbip::USB_INTERFACE_RECORD_SIZE + 3], 0x00);
 }
 
 TEST(UsbIpTests, BuildsSubmitReplyWithPayload) {

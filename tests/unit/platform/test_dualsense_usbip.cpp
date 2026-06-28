@@ -103,7 +103,9 @@ TEST(DualSenseUsbIpTests, BuildsDualSenseEdgeDeviceListAndImportReplies) {
   EXPECT_EQ(platf::usbip::read_be32(devlist, 8), 1);
   EXPECT_EQ(platf::usbip::read_be32(devlist, 308), static_cast<std::uint32_t>(platf::usbip::device_speed::high));
   EXPECT_EQ(platf::usbip::read_be16(devlist, 314), platf::dualsense::PRODUCT_ID_DUALSENSE_EDGE);
-  EXPECT_EQ(devlist[324], 0x03);
+  EXPECT_EQ(devlist[323], 4);
+  EXPECT_EQ(devlist[324], 0x01);
+  EXPECT_EQ(devlist[336], 0x03);
 
   EXPECT_EQ(platf::usbip::read_be16(import, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_import));
   EXPECT_EQ(platf::usbip::read_be32(import, 304), static_cast<std::uint32_t>(platf::usbip::device_speed::high));

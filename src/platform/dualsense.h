@@ -32,6 +32,12 @@ namespace platf::dualsense {
   constexpr std::size_t OUTPUT_REPORT_USB_MIN_SIZE = 1 + OUTPUT_REPORT_COMMON_SIZE;
   constexpr std::size_t DUALSENSE_HID_REPORT_DESCRIPTOR_SIZE = 273;
   constexpr std::size_t DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR_SIZE = 389;
+  constexpr std::size_t DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE = 227;
+  constexpr std::size_t DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET = 204;
+  constexpr std::uint8_t DUALSENSE_EDGE_INTERFACE_AUDIO_CONTROL = 0;
+  constexpr std::uint8_t DUALSENSE_EDGE_INTERFACE_AUDIO_OUT = 1;
+  constexpr std::uint8_t DUALSENSE_EDGE_INTERFACE_AUDIO_IN = 2;
+  constexpr std::uint8_t DUALSENSE_EDGE_INTERFACE_HID = 3;
   constexpr std::uint8_t USB_ENDPOINT_IN = 0x84;
   constexpr std::uint8_t USB_ENDPOINT_OUT = 0x03;
   constexpr std::string_view DUALSENSE_EDGE_MANUFACTURER = "Sony Interactive Entertainment";
@@ -60,47 +66,50 @@ namespace platf::dualsense {
     0x01,  // bNumConfigurations
   };
 
-  // Minimal HID-only configuration for the virtual Edge. The real wired Edge
-  // is a composite USB device with the gamepad HID interface at interface 3;
-  // Apollo exposes only the input interface needed for controller streaming.
-  inline constexpr std::array<std::uint8_t, 41> DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR {
+  // Captured from the wired DualSense Edge configuration descriptor in
+  // hhd-dev/hwinfo's ps5_edge_sample.pcapng USB dump. Keeping the real
+  // composite layout gives Windows the same MI_03 HID instance path used by
+  // DS5-aware tooling, while Apollo still implements only the HID interface.
+  inline constexpr std::array<std::uint8_t, DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE> DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR {
     0x09,  // bLength
     0x02,  // bDescriptorType: configuration
-    0x29, 0x00,  // wTotalLength
-    0x01,  // bNumInterfaces
+    0xE3, 0x00,  // wTotalLength
+    0x04,  // bNumInterfaces
     0x01,  // bConfigurationValue
     0x00,  // iConfiguration
     0xC0,  // bmAttributes: self-powered
     0xFA,  // bMaxPower: 500 mA
-    0x09,  // bLength
-    0x04,  // bDescriptorType: interface
-    0x00,  // bInterfaceNumber
-    0x00,  // bAlternateSetting
-    0x02,  // bNumEndpoints
-    0x03,  // bInterfaceClass: HID
-    0x00,  // bInterfaceSubClass
-    0x00,  // bInterfaceProtocol
-    0x00,  // iInterface
-    0x09,  // bLength
-    0x21,  // bDescriptorType: HID
-    0x11, 0x01,  // bcdHID 1.11
-    0x00,  // bCountryCode
-    0x01,  // bNumDescriptors
-    0x22,  // bDescriptorType: report
-    0x85, 0x01,  // wDescriptorLength: DualSense Edge report descriptor
-    0x07,  // bLength
-    0x05,  // bDescriptorType: endpoint
-    USB_ENDPOINT_IN,
-    0x03,  // bmAttributes: interrupt
-    0x40, 0x00,  // wMaxPacketSize
-    0x06,  // bInterval
-    0x07,  // bLength
-    0x05,  // bDescriptorType: endpoint
-    USB_ENDPOINT_OUT,
-    0x03,  // bmAttributes: interrupt
-    0x40, 0x00,  // wMaxPacketSize
-    0x06,  // bInterval
+    0x09, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x00, 0x00,
+    0x0A, 0x24, 0x01, 0x00, 0x01, 0x49, 0x00, 0x02, 0x01, 0x02,
+    0x0C, 0x24, 0x02, 0x01, 0x01, 0x01, 0x06, 0x04, 0x33, 0x00, 0x00, 0x00,
+    0x0C, 0x24, 0x06, 0x02, 0x01, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x09, 0x24, 0x03, 0x03, 0x01, 0x03, 0x04, 0x02, 0x00,
+    0x0C, 0x24, 0x02, 0x04, 0x02, 0x04, 0x03, 0x02, 0x03, 0x00, 0x00, 0x00,
+    0x09, 0x24, 0x06, 0x05, 0x04, 0x01, 0x03, 0x00, 0x00,
+    0x09, 0x24, 0x03, 0x06, 0x01, 0x01, 0x01, 0x05, 0x00,
+    0x09, 0x04, 0x01, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00,
+    0x09, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x00, 0x00,
+    0x07, 0x24, 0x01, 0x01, 0x01, 0x01, 0x00,
+    0x0B, 0x24, 0x02, 0x01, 0x04, 0x02, 0x10, 0x01, 0x80, 0xBB, 0x00,
+    0x09, 0x05, 0x01, 0x09, 0x88, 0x01, 0x04, 0x00, 0x00,
+    0x07, 0x25, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x09, 0x04, 0x02, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00,
+    0x09, 0x04, 0x02, 0x01, 0x01, 0x01, 0x02, 0x00, 0x00,
+    0x07, 0x24, 0x01, 0x06, 0x01, 0x01, 0x00,
+    0x0B, 0x24, 0x02, 0x01, 0x02, 0x02, 0x10, 0x01, 0x80, 0xBB, 0x00,
+    0x09, 0x05, 0x82, 0x05, 0xC4, 0x00, 0x04, 0x00, 0x00,
+    0x07, 0x25, 0x01, 0x00, 0x00, 0x00, 0x00,
+    0x09, 0x04, 0x03, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00,
+    0x09, 0x21, 0x11, 0x01, 0x00, 0x01, 0x22, 0x85, 0x01,
+    0x07, 0x05, USB_ENDPOINT_IN, 0x03, 0x40, 0x00, 0x04,
+    0x07, 0x05, USB_ENDPOINT_OUT, 0x03, 0x40, 0x00, 0x06,
   };
+
+  static_assert(DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR[2] == (DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE & 0xFF));
+  static_assert(DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR[3] == (DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR_SIZE >> 8));
+  static_assert(DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR[4] == 4);
+  static_assert(DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR[DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET] == 0x09);
+  static_assert(DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR[DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET + 1] == 0x21);
 
   // Captured from a wired DualSense Edge (054c:0df2) in hhd-dev/hwinfo's
   // ps5edge_LFnRFnLBRB.txt hardware dump.
@@ -392,7 +401,7 @@ namespace platf::dualsense {
         return DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR;
 
       case usb::DESCRIPTOR_HID:
-        return {DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR.data() + 18, 9};
+        return {DUALSENSE_EDGE_CONFIGURATION_DESCRIPTOR.data() + DUALSENSE_EDGE_HID_DESCRIPTOR_OFFSET, 9};
 
       case usb::DESCRIPTOR_HID_REPORT:
         return DUALSENSE_EDGE_HID_REPORT_DESCRIPTOR;
