@@ -40,6 +40,10 @@ represent those bits.
   battery, and touchpads. Full device-specific Steam Input style behavior needs a
   larger HID passthrough feature, but paddles are already in scope for the
   existing controller protocol.
+- `moonlight-stream/moonlight-qt#1329`: full PlayStation feature parity is larger
+  than this button-preservation path. Maintainer comments describe most standard
+  controller features as already present, while sound and adaptive triggers remain
+  separate SDL/protocol work.
 - `libsdl-org/SDL#13835`: SDL maintainers recommend probing the specific
   controller buttons an app needs with `SDL_GamepadHasButton()`/
   `SDL_GameControllerHasButton()`, which is why raw Edge button count is treated
@@ -53,6 +57,14 @@ represent those bits.
   on Linux. That does not block the paddle/Fn transport path, but it explains why
   motion remains a follow-up validation item rather than part of the first
   Windows button-preservation proof.
+- Sony's PC/Mac/mobile DualSense Edge support page documents that feature
+  availability varies by device and connection type. That supports keeping audio,
+  headset, haptics, and adaptive trigger behavior outside this first proof while
+  still preserving the controller's independent button inputs.
+- Steam Input reports show a real user-facing problem when Edge expanded buttons
+  default to face-button behavior globally. The clean streaming fix should
+  preserve distinct Edge inputs rather than remap them to A/B/X/Y, DS4, or X360
+  buttons.
 - Community experiments exist, especially `CTM-Bridge/CTM-USBIP` and
   `sh00bx/Apollo`, but they should be treated as research inputs rather than a
   ready-to-merge Apollo patch.
