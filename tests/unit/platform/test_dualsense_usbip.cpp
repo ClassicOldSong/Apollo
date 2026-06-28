@@ -116,7 +116,11 @@ TEST(DualSenseUsbIpTests, RejectsUsbIpImportRequestForDifferentBusId) {
   platf::usbip::append_be32(request, 0);
   platf::usbip::append_fixed_string(request, "2-1", platf::usbip::USB_DEVICE_BUSID_SIZE);
 
-  EXPECT_TRUE(platf::dualsense_usbip::handle_op_request(request).empty());
+  const auto reply = platf::dualsense_usbip::handle_op_request(request);
+
+  ASSERT_EQ(reply.size(), platf::usbip::OP_COMMON_SIZE);
+  EXPECT_EQ(platf::usbip::read_be16(reply, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_import));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 4), 1);
 }
 
 TEST(DualSenseUsbIpTests, BuildsControlSubmitReplyForEdgeReportDescriptor) {

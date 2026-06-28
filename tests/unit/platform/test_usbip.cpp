@@ -93,6 +93,15 @@ TEST(UsbIpTests, ParsesUsbIpImportRequestBusId) {
   EXPECT_EQ(import.busid, "1-1");
 }
 
+TEST(UsbIpTests, BuildsImportErrorReply) {
+  const auto reply = platf::usbip::make_import_error_reply(1);
+
+  EXPECT_EQ(reply.size(), platf::usbip::OP_COMMON_SIZE);
+  EXPECT_EQ(platf::usbip::read_be16(reply, 0), platf::usbip::VERSION);
+  EXPECT_EQ(platf::usbip::read_be16(reply, 2), static_cast<std::uint16_t>(platf::usbip::op_code::rep_import));
+  EXPECT_EQ(platf::usbip::read_be32(reply, 4), 1);
+}
+
 TEST(UsbIpTests, BuildsDeviceListReplyWithHidInterface) {
   const std::array interfaces {
     platf::usbip::interface_identity_t {

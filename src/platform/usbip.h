@@ -241,6 +241,15 @@ namespace platf::usbip {
     return out;
   }
 
+  inline std::vector<std::uint8_t> make_import_error_reply(std::uint32_t status) {
+    std::vector<std::uint8_t> out;
+    out.reserve(OP_COMMON_SIZE);
+
+    append_op_common(out, op_code::rep_import, status);
+
+    return out;
+  }
+
   inline std::vector<std::uint8_t> make_devlist_reply(const device_identity_t &device, std::span<const interface_identity_t> interfaces) {
     std::vector<std::uint8_t> out;
     out.reserve(OP_COMMON_SIZE + sizeof(std::uint32_t) + USB_DEVICE_RECORD_SIZE + interfaces.size() * USB_INTERFACE_RECORD_SIZE);

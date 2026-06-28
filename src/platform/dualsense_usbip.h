@@ -85,7 +85,7 @@ namespace platf::dualsense_usbip {
         if (usbip::parse_import_request(request).busid == BUSID) {
           return make_import_reply();
         }
-        return {};
+        return usbip::make_import_error_reply(1);
 
       default:
         return {};
