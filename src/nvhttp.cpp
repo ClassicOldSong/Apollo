@@ -6,8 +6,11 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 
 // standard includes
+#include <array>
+#include <cstdio>
 #include <filesystem>
 #include <format>
+#include <fstream>
 #include <string>
 #include <utility>
 #include <string>
@@ -1523,6 +1526,142 @@ namespace nvhttp {
     response->close_connection_after_response = true;
   }
 
+  /**
+   * @brief Run a shell command and capture its stdout.
+   *
+   * @param cmd Command line passed to the shell.
+   * @return Captured stdout (empty on failure to launch).
+   */
+  std::string run_and_capture(const std::string &cmd) {
+    std::string result;
+    FILE *pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+      BOOST_LOG(error) << "Couldn't run command: " << cmd;
+      return result;
+    }
+    std::array<char, 4096> buffer;
+    size_t n;
+    while ((n = fread(buffer.data(), 1, buffer.size(), pipe)) > 0) {
+      result.append(buffer.data(), n);
+    }
+    pclose(pipe);
+    return result;
+  }
+
+  /**
+   * @brief Extract the first balanced JSON value (array or object) from text.
+   *
+   * The somewm-client tool prints a status line ("OK") before the JSON result,
+   * so trim to the JSON span.
+   *
+   * @param text Raw command output.
+   * @param open Opening bracket ('[' or '{').
+   * @param close Matching closing bracket.
+   * @return The JSON substring, or empty when not found.
+   */
+  std::string extract_json(const std::string &text, char open, char close) {
+    auto start = text.find(open);
+    auto end = text.rfind(close);
+    if (start == std::string::npos || end == std::string::npos || end < start) {
+      return {};
+    }
+    return text.substr(start, end - start + 1);
+  }
+
+  /**
+   * @brief Return the compositor window list to the client (Server Commands UI).
+   *
+   * Runs the somewm android_api.get_windows_list() query and returns its JSON
+   * array so the client can present the windows for selection.
+   */
+  void getWindows(resp_https_t response, req_https_t request) {
+    print_req<SunshineHTTPS>(request);
+
+    auto named_cert_p = get_verified_cert(request);
+    if (!(named_cert_p->perm & PERM::server_cmd)) {
+      BOOST_LOG(debug) << "Permission Get Windows denied for [" << named_cert_p->name << "] (" << (uint32_t) named_cert_p->perm << ")";
+      response->write(SimpleWeb::StatusCode::client_error_forbidden);
+      response->close_connection_after_response = true;
+      return;
+    }
+
+    auto output = run_and_capture("somewm-client eval 'return android_api.get_windows_list()'");
+    auto json = extract_json(output, '[', ']');
+    if (json.empty()) {
+      BOOST_LOG(error) << "get_windows_list returned no JSON array: " << output;
+      response->write(SimpleWeb::StatusCode::server_error_internal_server_error);
+      response->close_connection_after_response = true;
+      return;
+    }
+
+    SimpleWeb::CaseInsensitiveMultimap headers;
+    headers.emplace("Content-Type", "application/json");
+    response->write(SimpleWeb::StatusCode::success_ok, json, headers);
+  }
+
+  /**
+   * @brief Activate a compositor window and switch capture to its region.
+   *
+   * Query args: id, x, y, width, height. Activates the window via somewm, then
+   * writes the region to /tmp/region.txt (the KMS capture backend polls that
+   * file and reinitializes, clamping to the monitor).
+   */
+  void activateWindow(resp_https_t response, req_https_t request) {
+    print_req<SunshineHTTPS>(request);
+
+    auto named_cert_p = get_verified_cert(request);
+    if (!(named_cert_p->perm & PERM::server_cmd)) {
+      BOOST_LOG(debug) << "Permission Activate Window denied for [" << named_cert_p->name << "] (" << (uint32_t) named_cert_p->perm << ")";
+      response->write(SimpleWeb::StatusCode::client_error_forbidden);
+      response->close_connection_after_response = true;
+      return;
+    }
+
+    auto args = request->parse_query_string();
+    int id, x, y, width, height;
+    try {
+      id = (int) util::from_view(get_arg(args, "id", nullptr));
+      x = (int) util::from_view(get_arg(args, "x", "0"));
+      y = (int) util::from_view(get_arg(args, "y", "0"));
+      width = (int) util::from_view(get_arg(args, "width", "0"));
+      height = (int) util::from_view(get_arg(args, "height", "0"));
+    } catch (std::out_of_range &) {
+      response->write(SimpleWeb::StatusCode::client_error_bad_request);
+      response->close_connection_after_response = true;
+      return;
+    }
+
+    // Activate the window. id is an integer we parsed, so the command is safe.
+    auto output = run_and_capture("somewm-client eval 'return android_api.activate_window(" + std::to_string(id) + ")'");
+    auto json = extract_json(output, '{', '}');
+
+    bool ok = json.find("\"code\":true") != std::string::npos;
+    if (!ok) {
+      BOOST_LOG(warning) << "activate_window(" << id << ") failed: " << output;
+      SimpleWeb::CaseInsensitiveMultimap headers;
+      headers.emplace("Content-Type", "application/json");
+      response->write(SimpleWeb::StatusCode::success_ok, json.empty() ? "{\"code\":false}" : json, headers);
+      return;
+    }
+
+    // Switch capture to the window's region. The KMS backend clamps the region
+    // to the monitor, so out-of-range values are handled there.
+    if (width > 0 && height > 0) {
+      std::ofstream region_file("/tmp/region.txt", std::ios::trunc);
+      if (region_file) {
+        region_file << x << ' ' << y << ' ' << width << ' ' << height << '\n';
+        BOOST_LOG(info) << "Activated window " << id << ", capture region set to "
+                        << width << 'x' << height << " at (" << x << ',' << y << ')';
+      } else {
+        BOOST_LOG(error) << "Couldn't write /tmp/region.txt";
+      }
+    }
+
+    SimpleWeb::CaseInsensitiveMultimap headers;
+    headers.emplace("Content-Type", "application/json");
+    response->write(SimpleWeb::StatusCode::success_ok, "{\"code\":true}", headers);
+  }
+
   void getClipboard(resp_https_t response, req_https_t request) {
     print_req<SunshineHTTPS>(request);
 
@@ -1728,6 +1867,8 @@ namespace nvhttp {
     https_server.resource["^/cancel$"]["GET"] = cancel;
     https_server.resource["^/actions/clipboard$"]["GET"] = getClipboard;
     https_server.resource["^/actions/clipboard$"]["POST"] = setClipboard;
+    https_server.resource["^/actions/windows$"]["GET"] = getWindows;
+    https_server.resource["^/actions/activatewindow$"]["GET"] = activateWindow;
 
     https_server.config.reuse_address = true;
     https_server.config.address = net::af_to_any_address_string(address_family);
