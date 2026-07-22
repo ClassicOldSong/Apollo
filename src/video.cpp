@@ -1062,6 +1062,7 @@ namespace video {
   int active_hevc_mode;
   int active_av1_mode;
   bool last_encoder_probe_supported_ref_frames_invalidation = false;
+  std::atomic<bool> stretch_region {false};
   std::array<bool, 3> last_encoder_probe_supported_yuv444_for_codec = {
     true,
     true,
@@ -2069,6 +2070,26 @@ namespace video {
 
     float wt = config.width;
     float ht = config.height;
+
+    // When the region is stretched to fill the frame (no letterbox), the client
+    // sends coordinates relative to the region itself (its view is region-shaped),
+    // so map them straight into the region: no letterbox offset, unit scale, and
+    // the touch-port dimensions are the region dimensions.
+    if (stretch_region) {
+      return input::touch_port_t {
+        {
+          display->offset_x,
+          display->offset_y,
+          (int) wd,
+          (int) hd,
+        },
+        display->env_width,
+        display->env_height,
+        0.0f,
+        0.0f,
+        1.0f,
+      };
+    }
 
     auto scalar = std::fminf(wt / wd, ht / hd);
 

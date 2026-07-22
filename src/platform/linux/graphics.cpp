@@ -728,6 +728,15 @@ namespace egl {
     auto offsetX_f = (out_width - out_width_f) / 2;
     auto offsetY_f = (out_height - out_height_f) / 2;
 
+    // For region capture, stretch to fill the whole frame (no letterbox); the
+    // client undoes the stretch by sizing its view to the region's aspect ratio.
+    if (video::stretch_region) {
+      out_width_f = out_width;
+      out_height_f = out_height;
+      offsetX_f = 0;
+      offsetY_f = 0;
+    }
+
     sws.out_width = out_width_f;
     sws.out_height = out_height_f;
 

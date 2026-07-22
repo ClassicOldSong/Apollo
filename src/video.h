@@ -4,6 +4,9 @@
  */
 #pragma once
 
+// standard includes
+#include <atomic>
+
 // local includes
 #include "input.h"
 #include "platform/common.h"
@@ -339,6 +342,12 @@ namespace video {
   extern int active_hevc_mode;
   extern int active_av1_mode;
   extern bool last_encoder_probe_supported_ref_frames_invalidation;
+
+  // When true, KMS region capture stretches the region to fill the encoded frame
+  // (no letterbox) instead of preserving aspect. The client sizes its view to the
+  // region's aspect ratio to undo the stretch, so the region uses the whole
+  // screen. Set by the KMS backend when an offset region is active.
+  extern std::atomic<bool> stretch_region;
   extern std::array<bool, 3> last_encoder_probe_supported_yuv444_for_codec;  // 0 - H.264, 1 - HEVC, 2 - AV1
 
   void capture(

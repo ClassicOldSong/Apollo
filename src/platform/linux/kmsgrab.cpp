@@ -978,6 +978,8 @@ namespace platf {
       void apply_region() {
         region_mtime = region_file_mtime();
         capture_region = std::nullopt;
+        // Default to no stretch; enabled below only when a region is applied.
+        video::stretch_region = false;
 
         auto region = parse_region_file();
         if (!region) {
@@ -1007,6 +1009,7 @@ namespace platf {
         height = region->h;
 
         capture_region = *region;
+        video::stretch_region = true;
 
         BOOST_LOG(info) << "KMS capture region: "sv << region->w << 'x' << region->h
                         << " at ("sv << region->x << ',' << region->y << ") of "sv
