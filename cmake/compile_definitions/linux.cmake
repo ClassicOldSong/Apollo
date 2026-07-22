@@ -111,8 +111,14 @@ if(LIBDRM_FOUND AND LIBCAP_FOUND)
     include_directories(SYSTEM ${LIBCAP_INCLUDE_DIRS})
     list(APPEND PLATFORM_LIBRARIES ${LIBCAP_LIBRARIES})
     list(APPEND PLATFORM_TARGET_FILES
-            "${CMAKE_SOURCE_DIR}/src/platform/linux/kmsgrab.cpp")
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/kmsgrab.cpp"
+            "${CMAKE_SOURCE_DIR}/src/platform/linux/kms_proxy.cpp")
     list(APPEND SUNSHINE_DEFINITIONS EGL_NO_X11=1)
+
+    # Privileged KMS capture helper, launched via pkexec when Sunshine lacks
+    # CAP_SYS_ADMIN (mirrors gpu-screen-recorder's gsr-kms-server). Built as a
+    # standalone binary depending only on libdrm.
+    set(SUNSHINE_BUILD_KMS_PROXY ON)
 endif()
 
 # evdev

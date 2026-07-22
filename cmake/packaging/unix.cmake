@@ -13,3 +13,9 @@ if(NOT CMAKE_INSTALL_PREFIX)
 endif()
 
 install(TARGETS sunshine RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+# The KMS capture helper must live next to the sunshine binary; the client
+# resolves it relative to its own executable path.
+if(SUNSHINE_BUILD_KMS_PROXY AND TARGET kms-server-proxy)
+    install(TARGETS kms-server-proxy RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()

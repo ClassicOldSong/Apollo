@@ -20,6 +20,7 @@
 // local includes
 #include "cuda.h"
 #include "graphics.h"
+#include "kms_proxy.h"
 #include "src/config.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
@@ -87,6 +88,28 @@ namespace platf {
         memcpy(offsets, fb2->offsets, sizeof(offsets));
       }
 
+      /**
+       * @brief Wrap a framebuffer whose planes were exported as DMA-BUF fds by
+       *        the kms-server-proxy helper (no local GEM handles available).
+       *
+       * @param reply Framebuffer metadata returned by the helper.
+       * @param exported DMA-BUF fds for each plane; ownership is moved in.
+       */
+      wrapper_fb(const kmsp::fb_reply_t &reply, file_t exported[4]):
+          fb_id {reply.fb_id},
+          width {reply.width},
+          height {reply.height} {
+        pixel_format = reply.pixel_format;
+        modifier = reply.modifier;
+        std::fill_n(handles, 4, 0);
+        memcpy(pitches, reply.pitches, sizeof(pitches));
+        memcpy(offsets, reply.offsets, sizeof(offsets));
+        has_fds = true;
+        for (int i = 0; i < 4; i++) {
+          fds[i] = std::move(exported[i]);
+        }
+      }
+
       ~wrapper_fb() {
         if (fb) {
           drmModeFreeFB(fb);
@@ -105,6 +128,11 @@ namespace platf {
       uint32_t handles[4];
       uint32_t pitches[4];
       uint32_t offsets[4];
+
+      // Set when the framebuffer was exported by the privileged helper; in that
+      // case fds[] hold the plane DMA-BUFs directly and handles[] are all zero.
+      bool has_fds = false;
+      file_t fds[4];
     };
 
     using plane_res_t = util::safe_ptr<drmModePlaneRes, drmModeFreePlaneResources>;
@@ -305,6 +333,8 @@ namespace platf {
           return -1;
         }
 
+        card_path = path;
+
         version_t ver {drmGetVersion(fd.el)};
         BOOST_LOG(info) << path << " -> "sv << ((ver && ver->name) ? ver->name : "UNKNOWN");
 
@@ -351,17 +381,55 @@ namespace platf {
         return 0;
       }
 
-      fb_t fb(plane_t::pointer plane) {
-        cap_sys_admin admin;
+      /**
+       * @brief Return (or lazily spawn) the privileged KMS helper for this card.
+       *
+       * Used as a fallback when the process lacks CAP_SYS_ADMIN so DRM
+       * framebuffer handles can't be obtained directly. Returns nullptr when the
+       * helper is unavailable (not installed, or pkexec/polkit denied it).
+       */
+      std::shared_ptr<kmsp::client_t> get_proxy() {
+        if (!proxy && !proxy_failed) {
+          proxy = kmsp::client_t::get(card_path);
+          if (!proxy) {
+            proxy_failed = true;
+          }
+        }
+        return proxy;
+      }
 
-        auto fb2 = drmModeGetFB2(fd.el, plane->fb_id);
-        if (fb2) {
-          return std::make_unique<wrapper_fb>(fb2);
+      fb_t fb(plane_t::pointer plane) {
+        // Preferred path: read the framebuffer handles directly. This needs
+        // CAP_SYS_ADMIN (or DRM master); without it drmModeGetFB2 succeeds but
+        // returns no handles.
+        {
+          cap_sys_admin admin;
+
+          auto fb2 = drmModeGetFB2(fd.el, plane->fb_id);
+          if (fb2 && fb2->handles[0]) {
+            return std::make_unique<wrapper_fb>(fb2);
+          }
+          if (fb2) {
+            drmModeFreeFB2(fb2);
+          }
+
+          auto fb = drmModeGetFB(fd.el, plane->fb_id);
+          if (fb && fb->handle) {
+            return std::make_unique<wrapper_fb>(fb);
+          }
+          if (fb) {
+            drmModeFreeFB(fb);
+          }
         }
 
-        auto fb = drmModeGetFB(fd.el, plane->fb_id);
-        if (fb) {
-          return std::make_unique<wrapper_fb>(fb);
+        // Fallback path: ask the privileged helper to export the framebuffer as
+        // DMA-BUF fds (same mechanism gpu-screen-recorder uses).
+        if (auto p = get_proxy()) {
+          kmsp::fb_reply_t reply;
+          file_t fds[4];
+          if (p->get_fb(plane->plane_id, reply, fds)) {
+            return std::make_unique<wrapper_fb>(reply, fds);
+          }
         }
 
         return nullptr;
@@ -525,6 +593,10 @@ namespace platf {
       file_t fd;
       file_t render_fd;
       plane_res_t plane_res;
+
+      std::string card_path;  ///< DRM card node path, for spawning the KMS helper.
+      std::shared_ptr<kmsp::client_t> proxy;  ///< Privileged KMS helper, if in use.
+      bool proxy_failed = false;  ///< Set once the helper has failed to start, to avoid retrying.
     };
 
     std::map<std::uint32_t, monitor_t> map_crtc_to_monitor(const std::vector<connector_t> &connectors) {
@@ -637,20 +709,24 @@ namespace platf {
               return -1;
             }
 
-            if (!fb->handles[0]) {
+            if (!fb->has_fds && !fb->handles[0]) {
               BOOST_LOG(error) << "Couldn't get handle for DRM Framebuffer ["sv << plane->fb_id << "]: Probably not permitted"sv;
               return -1;
             }
 
-            for (int i = 0; i < 4; ++i) {
-              if (!fb->handles[i]) {
-                break;
-              }
+            // Validate that the framebuffer planes can be exported. On the proxy
+            // path the helper already exported them, so there's nothing to check.
+            if (!fb->has_fds) {
+              for (int i = 0; i < 4; ++i) {
+                if (!fb->handles[i]) {
+                  break;
+                }
 
-              auto fb_fd = card.handleFD(fb->handles[i]);
-              if (fb_fd.el < 0) {
-                BOOST_LOG(error) << "Couldn't get primary file descriptor for Framebuffer ["sv << fb->fb_id << "]: "sv << strerror(errno);
-                continue;
+                auto fb_fd = card.handleFD(fb->handles[i]);
+                if (fb_fd.el < 0) {
+                  BOOST_LOG(error) << "Couldn't get primary file descriptor for Framebuffer ["sv << fb->fb_id << "]: "sv << strerror(errno);
+                  continue;
+                }
               }
             }
 
@@ -936,7 +1012,7 @@ namespace platf {
         // If the cursor is dirty, map it so we can download the new image
         if (cursor_dirty) {
           auto fb = card.fb(plane.get());
-          if (!fb || !fb->handles[0]) {
+          if (!fb || (!fb->has_fds && !fb->handles[0])) {
             // This means the cursor is not currently visible
             captured_cursor.visible = false;
             return;
@@ -971,58 +1047,69 @@ namespace platf {
             return;
           }
 
-          file_t plane_fd = card.handleFD(fb->handles[0]);
-          if (plane_fd.el < 0) {
-            captured_cursor.visible = false;
-            return;
-          }
-
-          // We will map the entire region, but only copy what the source rectangle specifies
-          size_t mapped_size = ((size_t) fb->pitches[0]) * fb->height;
-          void *mapped_data = mmap(nullptr, mapped_size, PROT_READ, MAP_SHARED, plane_fd.el, fb->offsets[0]);
-
-          // If we got ENOSYS back, let's try to map it as a dumb buffer instead (required for Nvidia GPUs)
-          if (mapped_data == MAP_FAILED && errno == ENOSYS) {
-            drm_mode_map_dumb map = {};
-            map.handle = fb->handles[0];
-            if (drmIoctl(card.fd.el, DRM_IOCTL_MODE_MAP_DUMB, &map) < 0) {
-              BOOST_LOG(error) << "Failed to map cursor FB as dumb buffer: "sv << strerror(errno);
+          if (fb->has_fds) {
+            // Proxy path: the helper reads the cursor pixels for us (it can do
+            // the NVIDIA dumb-buffer mmap, which needs root).
+            auto p = card.get_proxy();
+            kmsp::cursor_reply_t creply;
+            if (!p || !p->get_cursor(cursor_plane_id, src_x, src_y, src_w, src_h, creply, captured_cursor.pixels)) {
+              captured_cursor.visible = false;
+              return;
+            }
+          } else {
+            file_t plane_fd = card.handleFD(fb->handles[0]);
+            if (plane_fd.el < 0) {
               captured_cursor.visible = false;
               return;
             }
 
-            mapped_data = mmap(nullptr, mapped_size, PROT_READ, MAP_SHARED, card.fd.el, map.offset);
-          }
+            // We will map the entire region, but only copy what the source rectangle specifies
+            size_t mapped_size = ((size_t) fb->pitches[0]) * fb->height;
+            void *mapped_data = mmap(nullptr, mapped_size, PROT_READ, MAP_SHARED, plane_fd.el, fb->offsets[0]);
 
-          if (mapped_data == MAP_FAILED) {
-            BOOST_LOG(error) << "Failed to mmap cursor FB: "sv << strerror(errno);
-            captured_cursor.visible = false;
-            return;
-          }
+            // If we got ENOSYS back, let's try to map it as a dumb buffer instead (required for Nvidia GPUs)
+            if (mapped_data == MAP_FAILED && errno == ENOSYS) {
+              drm_mode_map_dumb map = {};
+              map.handle = fb->handles[0];
+              if (drmIoctl(card.fd.el, DRM_IOCTL_MODE_MAP_DUMB, &map) < 0) {
+                BOOST_LOG(error) << "Failed to map cursor FB as dumb buffer: "sv << strerror(errno);
+                captured_cursor.visible = false;
+                return;
+              }
 
-          captured_cursor.pixels.resize(src_w * src_h * 4);
-
-          // Prepare to read the dmabuf from the CPU
-          struct dma_buf_sync sync;
-          sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
-          drmIoctl(plane_fd.el, DMA_BUF_IOCTL_SYNC, &sync);
-
-          // If the image is tightly packed, copy it in one shot
-          if (fb->pitches[0] == src_w * 4 && src_x == 0) {
-            memcpy(captured_cursor.pixels.data(), &((std::uint8_t *) mapped_data)[src_y * fb->pitches[0]], src_h * fb->pitches[0]);
-          } else {
-            // Copy row by row to deal with mismatched pitch or an X offset
-            auto pixel_dst = captured_cursor.pixels.data();
-            for (int y = 0; y < src_h; y++) {
-              memcpy(&pixel_dst[y * (src_w * 4)], &((std::uint8_t *) mapped_data)[(y + src_y) * fb->pitches[0] + (src_x * 4)], src_w * 4);
+              mapped_data = mmap(nullptr, mapped_size, PROT_READ, MAP_SHARED, card.fd.el, map.offset);
             }
+
+            if (mapped_data == MAP_FAILED) {
+              BOOST_LOG(error) << "Failed to mmap cursor FB: "sv << strerror(errno);
+              captured_cursor.visible = false;
+              return;
+            }
+
+            captured_cursor.pixels.resize(src_w * src_h * 4);
+
+            // Prepare to read the dmabuf from the CPU
+            struct dma_buf_sync sync;
+            sync.flags = DMA_BUF_SYNC_START | DMA_BUF_SYNC_READ;
+            drmIoctl(plane_fd.el, DMA_BUF_IOCTL_SYNC, &sync);
+
+            // If the image is tightly packed, copy it in one shot
+            if (fb->pitches[0] == src_w * 4 && src_x == 0) {
+              memcpy(captured_cursor.pixels.data(), &((std::uint8_t *) mapped_data)[src_y * fb->pitches[0]], src_h * fb->pitches[0]);
+            } else {
+              // Copy row by row to deal with mismatched pitch or an X offset
+              auto pixel_dst = captured_cursor.pixels.data();
+              for (int y = 0; y < src_h; y++) {
+                memcpy(&pixel_dst[y * (src_w * 4)], &((std::uint8_t *) mapped_data)[(y + src_y) * fb->pitches[0] + (src_x * 4)], src_w * 4);
+              }
+            }
+
+            // End the CPU read and unmap the dmabuf
+            sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
+            drmIoctl(plane_fd.el, DMA_BUF_IOCTL_SYNC, &sync);
+
+            munmap(mapped_data, mapped_size);
           }
-
-          // End the CPU read and unmap the dmabuf
-          sync.flags = DMA_BUF_SYNC_END | DMA_BUF_SYNC_READ;
-          drmIoctl(plane_fd.el, DMA_BUF_IOCTL_SYNC, &sync);
-
-          munmap(mapped_data, mapped_size);
 
           captured_cursor.visible = true;
           captured_cursor.src_w = src_w;
@@ -1056,13 +1143,16 @@ namespace platf {
           return capture_e::timeout;
         }
 
-        if (!fb->handles[0]) {
+        if (!fb->has_fds && !fb->handles[0]) {
           BOOST_LOG(error) << "Couldn't get handle for DRM Framebuffer ["sv << plane->fb_id << "]: Probably not permitted"sv;
           return capture_e::error;
         }
 
         for (int y = 0; y < 4; ++y) {
-          if (!fb->handles[y]) {
+          // On the proxy path the fds were exported directly; otherwise convert
+          // the GEM handle to a DMA-BUF fd here.
+          bool have_plane = fb->has_fds ? (fb->fds[y].el >= 0) : (fb->handles[y] != 0);
+          if (!have_plane) {
             // setting sd->fds[y] to a negative value indicates that sd->offsets[y] and sd->pitches[y]
             // are uninitialized and contain invalid values.
             sd->fds[y] = -1;
@@ -1072,10 +1162,14 @@ namespace platf {
             continue;
           }
 
-          file[y] = card.handleFD(fb->handles[y]);
-          if (file[y].el < 0) {
-            BOOST_LOG(error) << "Couldn't get primary file descriptor for Framebuffer ["sv << fb->fb_id << "]: "sv << strerror(errno);
-            return capture_e::error;
+          if (fb->has_fds) {
+            file[y] = std::move(fb->fds[y]);
+          } else {
+            file[y] = card.handleFD(fb->handles[y]);
+            if (file[y].el < 0) {
+              BOOST_LOG(error) << "Couldn't get primary file descriptor for Framebuffer ["sv << fb->fb_id << "]: "sv << strerror(errno);
+              return capture_e::error;
+            }
           }
 
           sd->fds[y] = file[y].el;
@@ -1631,10 +1725,11 @@ namespace platf {
           continue;
         }
 
-        if (!fb->handles[0]) {
+        if (!fb->has_fds && !fb->handles[0]) {
           BOOST_LOG(error) << "Couldn't get handle for DRM Framebuffer ["sv << plane->fb_id << "]: Probably not permitted"sv;
           BOOST_LOG((window_system != window_system_e::X11 || config::video.capture == "kms") ? fatal : error)
             << "You must run [sudo setcap cap_sys_admin+p $(readlink -f $(which sunshine))] for KMS display capture to work!\n"sv
+            << "Alternatively, install the kms-server-proxy polkit rule so Sunshine can use the privileged KMS helper (like gpu-screen-recorder).\n"sv
             << "If you installed from AppImage or Flatpak, please refer to the official documentation:\n"sv
             << "https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2getting__started.html#linux"sv;
           break;

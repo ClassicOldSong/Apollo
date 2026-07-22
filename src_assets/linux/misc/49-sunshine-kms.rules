@@ -1,0 +1,26 @@
+// polkit rule allowing Sunshine's KMS capture helper to run without a password.
+//
+// When Sunshine lacks CAP_SYS_ADMIN it falls back to launching the
+// kms-server-proxy helper via `pkexec` to perform privileged DRM framebuffer
+// exports (the same approach gpu-screen-recorder uses). This rule lets that
+// automatic pkexec succeed without an interactive prompt.
+//
+// Install to /etc/polkit-1/rules.d/49-sunshine-kms.rules and replace
+// YOUR_USERNAME with the user that runs Sunshine. polkitd hot-reloads it.
+//
+// The match is on the program's basename because pkexec canonicalizes the
+// path, which may differ from the one Sunshine invoked (e.g. when the home
+// directory is a symlink).
+//
+// The alternative, if you prefer not to install a polkit rule, is to grant the
+// capability directly:
+//   sudo setcap cap_sys_admin,cap_sys_nice+p $(readlink -f $(which sunshine))
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        subject.user == "YOUR_USERNAME") {
+        var prog = action.lookup("program") || "";
+        if (prog.substr(-17) == "/kms-server-proxy") {
+            return polkit.Result.YES;
+        }
+    }
+});
