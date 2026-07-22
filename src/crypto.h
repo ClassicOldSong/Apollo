@@ -68,7 +68,7 @@ namespace crypto {
     _allow_view      = view | launch,    // If no view permission is granted, disconnect the device upon permission update
     _all_actions     = list | view | launch,
 
-    _default         = _all_inputs | _all_actions | server_cmd,  // Default for new clients: input + list/view/launch + run server commands
+    _default         = _all_inputs | _all_actions | clipboard_set | clipboard_read | server_cmd,  // Default for new clients: input + list/view/launch + clipboard + run server commands
     _no              = 0,                // No permissions are granted
     _all             = _all_inputs | _all_opeiations | _all_actions, // All current permissions
   };
