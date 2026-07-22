@@ -68,7 +68,7 @@ namespace crypto {
     _allow_view      = view | launch,    // If no view permission is granted, disconnect the device upon permission update
     _all_actions     = list | view | launch,
 
-    _default         = view | list,      // Default permissions for new clients
+    _default         = _all_inputs | view | list,  // Default permissions for new clients (allow input like upstream Sunshine)
     _no              = 0,                // No permissions are granted
     _all             = _all_inputs | _all_opeiations | _all_actions, // All current permissions
   };
