@@ -8,6 +8,23 @@ if(${SUNSHINE_BUILD_APPIMAGE})
     string(REPLACE "${CMAKE_INSTALL_PREFIX}" ".${CMAKE_INSTALL_PREFIX}" SUNSHINE_ASSETS_DIR_DEF ${SUNSHINE_ASSETS_DIR})
 endif()
 
+# Local (non-installed) builds are run straight from the build tree. By default
+# SUNSHINE_ASSETS_DIR resolves to an absolute install path (e.g.
+# /usr/share/sunshine) that is empty in a fresh build, so the web UI serves blank
+# pages until `make install` is run. When enabled (default), compile the asset
+# path to the build tree so the binary works in place. Package builds should pass
+# -DSUNSHINE_ASSETS_FROM_BUILD_TREE=OFF; AppImage/Flatpak set their own path above
+# and are skipped here.
+option(SUNSHINE_ASSETS_FROM_BUILD_TREE
+        "Compile the asset path to the build tree so the binary runs without installing" ON)
+if(SUNSHINE_ASSETS_FROM_BUILD_TREE
+        AND NOT SUNSHINE_BUILD_APPIMAGE
+        AND NOT SUNSHINE_BUILD_FLATPAK
+        AND NOT SUNSHINE_ASSETS_DIR_DEF)
+    set(SUNSHINE_ASSETS_DIR_DEF "${CMAKE_BINARY_DIR}/assets")
+    message(STATUS "Serving assets from build tree: ${SUNSHINE_ASSETS_DIR_DEF}")
+endif()
+
 # cuda
 set(CUDA_FOUND OFF)
 if(${SUNSHINE_ENABLE_CUDA})
