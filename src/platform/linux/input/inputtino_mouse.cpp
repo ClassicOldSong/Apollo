@@ -27,7 +27,11 @@ namespace platf::mouse {
 
   void move_abs(input_raw_t *raw, const touch_port_t &touch_port, float x, float y) {
     if (raw->mouse) {
-      (*raw->mouse).move_abs(x, y, touch_port.width, touch_port.height);
+      // x/y are relative to the captured area's origin; add the touch port's
+      // offset so the cursor lands in the right place on the full desktop.
+      // This matters for capture of an offset region (or a non-origin monitor):
+      // without it the cursor is placed as if the region started at (0,0).
+      (*raw->mouse).move_abs(x + touch_port.offset_x, y + touch_port.offset_y, touch_port.width, touch_port.height);
     }
   }
 
