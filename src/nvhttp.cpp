@@ -1631,6 +1631,19 @@ namespace nvhttp {
       return;
     }
 
+    SimpleWeb::CaseInsensitiveMultimap json_headers;
+    json_headers.emplace("Content-Type", "application/json");
+
+    // id 0 (or no region) means "full desktop": clear the region file so KMS
+    // capture reverts to the whole monitor.
+    if (id == 0) {
+      std::error_code ec;
+      std::filesystem::remove("/tmp/region.txt", ec);
+      BOOST_LOG(info) << "Cleared capture region (full desktop)";
+      response->write(SimpleWeb::StatusCode::success_ok, "{\"code\":true}", json_headers);
+      return;
+    }
+
     // Activate the window. id is an integer we parsed, so the command is safe.
     auto output = run_and_capture("somewm-client eval 'return android_api.activate_window(" + std::to_string(id) + ")'");
     auto json = extract_json(output, '{', '}');
