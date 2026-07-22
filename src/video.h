@@ -122,6 +122,35 @@ namespace video {
     }
   };
 
+  /**
+   * @brief Native AMF-specific pixel formats supported by a platform.
+   */
+  struct encoder_platform_formats_amf: encoder_platform_formats_t {
+    /**
+     * @brief Construct native AMF platform format mappings.
+     *
+     * @param dev_type Platform memory type.
+     * @param pix_fmt_8bit Platform 8-bit pixel format.
+     * @param pix_fmt_10bit Platform 10-bit pixel format.
+     * @param pix_fmt_yuv444_8bit Platform 8-bit YUV444 pixel format.
+     * @param pix_fmt_yuv444_10bit Platform 10-bit YUV444 pixel format.
+     */
+    encoder_platform_formats_amf(
+      const platf::mem_type_e &dev_type,
+      const platf::pix_fmt_e &pix_fmt_8bit,
+      const platf::pix_fmt_e &pix_fmt_10bit,
+      const platf::pix_fmt_e &pix_fmt_yuv444_8bit,
+      const platf::pix_fmt_e &pix_fmt_yuv444_10bit
+    ) {
+      encoder_platform_formats_t::dev_type = dev_type;
+      encoder_platform_formats_t::pix_fmt_8bit = pix_fmt_8bit;
+      encoder_platform_formats_t::pix_fmt_10bit = pix_fmt_10bit;
+      encoder_platform_formats_t::pix_fmt_yuv444_8bit = pix_fmt_yuv444_8bit;
+      encoder_platform_formats_t::pix_fmt_yuv444_10bit = pix_fmt_yuv444_10bit;
+    }
+  };
+
+
   struct encoder_t {
     std::string_view name;
 
@@ -224,6 +253,7 @@ namespace video {
 
 #ifdef _WIN32
   extern encoder_t amdvce;
+  extern encoder_t amdvce_legacy;
   extern encoder_t quicksync;
 #endif
 

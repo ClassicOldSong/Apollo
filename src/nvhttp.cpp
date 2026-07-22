@@ -742,7 +742,10 @@ namespace nvhttp {
           deviceName = "Legacy Moonlight Client";
         }
 
-        sess.client.uniqueID = std::move(uniqID);
+        // Keep uniqID valid until this request has completed. The synchronous
+        // PIN path responds below, while later pairing phases use it to look up
+        // the session created here.
+        sess.client.uniqueID = uniqID;
         sess.client.name = std::move(deviceName);
         sess.client.cert = util::from_hex_vec(get_arg(args, "clientcert"), true);
 
@@ -789,6 +792,10 @@ namespace nvhttp {
           std::getline(std::cin, pin);
 
           getservercert(ptr->second, tree, pin);
+          // Respond with the certificate we just produced. Falling through
+          // would clobber this response with 'Invalid uniqueid' via the
+          // moved-from lookup below and break stdin-driven pairing.
+          return;
         } else {
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
           system_tray::update_tray_require_pin();

@@ -71,6 +71,10 @@ namespace nvenc {
   class nvenc_base;
 }
 
+namespace amf {
+  class amf_encoder;
+}
+
 namespace platf {
   // Limited by bits in activeGamepadMask
   constexpr auto MAX_GAMEPADS = 16;
@@ -454,6 +458,19 @@ namespace platf {
     nvenc::nvenc_base *nvenc = nullptr;
   };
 
+  struct amf_encode_device_t: encode_device_t {
+    /**
+     * @brief Initialize native AMF for the negotiated stream.
+     *
+     * @param client_config Client stream configuration.
+     * @param colorspace Colorimetry used for conversion and bitstream metadata.
+     * @return True when AMF initialized successfully.
+     */
+    virtual bool init_encoder(const video::config_t &client_config, const video::sunshine_colorspace_t &colorspace) = 0;
+
+    amf::amf_encoder *amf = nullptr;
+  };
+
   enum class capture_e : int {
     ok,  ///< Success
     reinit,  ///< Need to reinitialize
@@ -510,6 +527,10 @@ namespace platf {
     }
 
     virtual std::unique_ptr<nvenc_encode_device_t> make_nvenc_encode_device(pix_fmt_e pix_fmt) {
+      return nullptr;
+    }
+
+    virtual std::unique_ptr<amf_encode_device_t> make_amf_encode_device(pix_fmt_e pix_fmt) {
       return nullptr;
     }
 

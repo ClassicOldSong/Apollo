@@ -5,7 +5,9 @@
 // standard includes
 #include <atomic>
 #include <bitset>
+#include <future>
 #include <list>
+#include <map>
 #include <thread>
 
 // lib includes
@@ -23,6 +25,8 @@ extern "C" {
 #include "cbs.h"
 #include "config.h"
 #include "display_device.h"
+#include "amf/amf_encoder.h"
+#include "amf/amf_lifecycle.h"
 #include "globals.h"
 #include "input.h"
 #include "logging.h"
@@ -435,6 +439,101 @@ namespace video {
     bool force_idr = false;
   };
 
+  /**
+   * @brief Encode-session adapter for the native asynchronous AMF backend.
+   */
+  class amf_encode_session_t: public encode_session_t {
+  public:
+    explicit amf_encode_session_t(std::unique_ptr<platf::amf_encode_device_t> encode_device):
+        device(std::move(encode_device)) {
+    }
+
+    int convert(platf::img_t &img) override {
+      return device ? device->convert(img) : -1;
+    }
+
+    void request_idr_frame() override {
+      force_idr = true;
+    }
+
+    void request_normal_frame() override {
+      // Keep an IDR request latched until AMF accepts the corresponding input.
+    }
+
+    void invalidate_ref_frames(int64_t first_frame, int64_t last_frame) override {
+      if (!device || !device->amf ||
+          !device->amf->invalidate_ref_frames(first_frame, last_frame)) {
+        force_idr = true;
+      }
+    }
+
+    amf::amf_encode_result encode_frames(uint64_t frame_index) {
+      if (!device || !device->amf) {
+        return {};
+      }
+
+      auto result = device->amf->encode_frame(frame_index, force_idr);
+      last_input_accepted = result.input_accepted;
+      if (result.input_accepted) {
+        force_idr = false;
+      }
+      return result;
+    }
+
+    amf::amf_encode_result drain_frames(std::chrono::milliseconds timeout) {
+      return device && device->amf ? device->amf->drain_output(timeout) : amf::amf_encode_result {};
+    }
+
+    bool begin_drain() {
+      return device && device->amf && device->amf->begin_drain();
+    }
+
+    bool was_last_input_accepted() const {
+      return last_input_accepted;
+    }
+
+    bool note_emitted_index(uint64_t emitted) {
+      const bool monotonic = last_emitted_index < 0 || static_cast<int64_t>(emitted) > last_emitted_index;
+      last_emitted_index = static_cast<int64_t>(emitted);
+      return monotonic;
+    }
+
+    bool has_emitted_frame(uint64_t frame_index) const {
+      return last_emitted_index >= 0 && static_cast<uint64_t>(last_emitted_index) >= frame_index;
+    }
+
+    void store_frame_timestamp(
+      uint64_t frame_index,
+      std::optional<std::chrono::steady_clock::time_point> frame_timestamp) {
+      pending_timestamps[frame_index] = frame_timestamp;
+      while (pending_timestamps.size() > 256) {
+        pending_timestamps.erase(pending_timestamps.begin());
+      }
+    }
+
+    std::optional<std::chrono::steady_clock::time_point> take_frame_timestamp(uint64_t frame_index) {
+      const auto it = pending_timestamps.find(frame_index);
+      if (it == pending_timestamps.end()) {
+        return std::nullopt;
+      }
+      auto timestamp = it->second;
+      pending_timestamps.erase(it);
+      return timestamp;
+    }
+
+    void discard_frame_timestamp(uint64_t frame_index) {
+      pending_timestamps.erase(frame_index);
+    }
+
+  private:
+    std::unique_ptr<platf::amf_encode_device_t> device;
+    bool force_idr = false;
+    bool last_input_accepted = false;
+    int64_t last_emitted_index = -1;
+    std::map<uint64_t, std::optional<std::chrono::steady_clock::time_point>> pending_timestamps;
+  };
+
+
   struct sync_session_ctx_t {
     safe::signal_t *join_event;
     safe::mail_raw_t::event_t<bool> shutdown_event;
@@ -730,8 +829,57 @@ namespace video {
     PARALLEL_ENCODING | CBR_WITH_VBR | RELAXED_COMPLIANCE | NO_RC_BUF_LIMIT | YUV444_SUPPORT
   };
 
+  /**
+   * @brief Native AMD AMF encoder with direct D3D11 input.
+   *
+   * The FFmpeg-backed path remains available as amdvce_legacy and as an
+   * automatic compatibility fallback when native session initialization fails.
+   */
   encoder_t amdvce {
     "amdvce"sv,
+    std::make_unique<encoder_platform_formats_amf>(
+      platf::mem_type_e::dxgi,
+      platf::pix_fmt_e::nv12,
+      platf::pix_fmt_e::p010,
+      platf::pix_fmt_e::unknown,
+      platf::pix_fmt_e::unknown
+    ),
+    {
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      "av1_amf"s,
+    },
+    {
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      "hevc_amf"s,
+    },
+    {
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      "h264_amf"s,
+    },
+    PARALLEL_ENCODING | REF_FRAMES_INVALIDATION | ASYNC_TEARDOWN
+  };
+
+
+  /**
+   * @brief FFmpeg-backed AMD AMF compatibility encoder.
+   */
+  encoder_t amdvce_legacy {
+    "amdvce_legacy"sv,
     std::make_unique<encoder_platform_formats_avcodec>(
       AV_HWDEVICE_TYPE_D3D11VA,
       AV_HWDEVICE_TYPE_NONE,
@@ -753,9 +901,18 @@ namespace video {
         {"log_to_dbg"s, []() {
            return config::sunshine.min_log_level < 2 ? 1 : 0;
          }},
-        {"preencode"s, &config::video.amd.amd_preanalysis},
+        {"preanalysis"s, []() {
+           return amf::lifecycle::resolve_preanalysis(
+                    config::video.amd.amd_rc_av1,
+                    config::video.amd.amd_preanalysis)
+             .enabled ? 1 : 0;
+         }},
         {"quality"s, &config::video.amd.amd_quality_av1},
         {"rc"s, &config::video.amd.amd_rc_av1},
+        {"qvbr_quality_level"s, &config::video.amd.amd_qvbr_quality_level},
+        {"aq_mode"s, []() {
+           return config::video.amd.amd_vbaq.value_or(1) ? 1 : 0;
+         }},
         {"usage"s, &config::video.amd.amd_usage_av1},
         {"enforce_hrd"s, &config::video.amd.amd_enforce_hrd},
       },
@@ -779,11 +936,21 @@ namespace video {
          }},
         {"gops_per_idr"s, 1},
         {"header_insertion_mode"s, "idr"s},
-        {"preencode"s, &config::video.amd.amd_preanalysis},
+        {"preanalysis"s, []() {
+           return amf::lifecycle::resolve_preanalysis(
+                    config::video.amd.amd_rc_hevc,
+                    config::video.amd.amd_preanalysis)
+             .enabled ? 1 : 0;
+         }},
         {"quality"s, &config::video.amd.amd_quality_hevc},
         {"rc"s, &config::video.amd.amd_rc_hevc},
+        {"qvbr_quality_level"s, &config::video.amd.amd_qvbr_quality_level},
         {"usage"s, &config::video.amd.amd_usage_hevc},
-        {"vbaq"s, &config::video.amd.amd_vbaq},
+        {"vbaq"s, []() {
+           return amf::lifecycle::rate_control_supports_adaptive_quantization(config::video.amd.amd_rc_hevc) ?
+                    config::video.amd.amd_vbaq.value_or(0) :
+                    0;
+         }},
         {"enforce_hrd"s, &config::video.amd.amd_enforce_hrd},
         {"level"s, [](const config_t &cfg) {
            auto size = cfg.width * cfg.height;
@@ -816,21 +983,27 @@ namespace video {
         {"log_to_dbg"s, []() {
            return config::sunshine.min_log_level < 2 ? 1 : 0;
          }},
-        {"preencode"s, &config::video.amd.amd_preanalysis},
+        {"preanalysis"s, []() {
+           return amf::lifecycle::resolve_preanalysis(
+                    config::video.amd.amd_rc_h264,
+                    config::video.amd.amd_preanalysis)
+             .enabled ? 1 : 0;
+         }},
         {"quality"s, &config::video.amd.amd_quality_h264},
         {"rc"s, &config::video.amd.amd_rc_h264},
-        {"usage"s, &config::video.amd.amd_usage_h264},
-        {"vbaq"s, &config::video.amd.amd_vbaq},
+        {"qvbr_quality_level"s, &config::video.amd.amd_qvbr_quality_level},
         {"coder"s, &config::video.amd.amd_coder},
+        {"usage"s, &config::video.amd.amd_usage_h264},
+        {"vbaq"s, []() {
+           return amf::lifecycle::rate_control_supports_adaptive_quantization(config::video.amd.amd_rc_h264) ?
+                    config::video.amd.amd_vbaq.value_or(0) :
+                    0;
+         }},
         {"enforce_hrd"s, &config::video.amd.amd_enforce_hrd},
       },
       {
         // SDR-specific options
-        {"profile"s, [](const config_t &cfg) {
-           if (cfg.profile == 66) return "baseline"s;
-           if (cfg.profile == 77) return "main"s;
-           return "high"s;
-         }},
+        {"profile"s, "high"s},
       },
       {},  // HDR-specific options
       {},  // YUV444 SDR-specific options
@@ -1048,6 +1221,7 @@ namespace video {
 #ifdef _WIN32
     &quicksync,
     &amdvce,
+    &amdvce_legacy,
 #endif
 #ifdef __linux__
     &vaapi,
@@ -1505,11 +1679,84 @@ namespace video {
     return 0;
   }
 
+  /**
+   * @brief Convert ready native AMF frames into Apollo packets.
+   *
+   * @param submitted_frame_nr Frame index associated with the current encode call.
+   * @param session Active native AMF session.
+   * @param encoded_frames Ready AMF frames in presentation order.
+   * @param packets Output packet queue.
+   * @param channel_data Protocol state attached to packets.
+   * @return Zero when every frame was delivered.
+   */
+  int deliver_amf_frames(
+    int64_t submitted_frame_nr,
+    amf_encode_session_t &session,
+    std::vector<amf::amf_encoded_frame> &encoded_frames,
+    safe::mail_raw_t::queue_t<packet_t> &packets,
+    void *channel_data
+  ) {
+    for (auto &encoded_frame : encoded_frames) {
+      if (encoded_frame.fatal || encoded_frame.data.empty()) {
+        BOOST_LOG(error) << "AMF returned an invalid encoded frame";
+        return -1;
+      }
+      if (!session.note_emitted_index(encoded_frame.frame_index)) {
+        BOOST_LOG(error) << "AMF output frame index regressed or repeated: submitted="
+                         << submitted_frame_nr << " emitted=" << encoded_frame.frame_index;
+        return -1;
+      }
+
+      auto packet = std::make_unique<packet_raw_generic>(
+        std::move(encoded_frame.data),
+        encoded_frame.frame_index,
+        encoded_frame.idr);
+      packet->channel_data = channel_data;
+      packet->after_ref_frame_invalidation = encoded_frame.after_ref_frame_invalidation;
+      packet->frame_timestamp = session.take_frame_timestamp(encoded_frame.frame_index);
+      packets->raise(std::move(packet));
+    }
+    return 0;
+  }
+
+  /**
+   * @brief Submit one frame to native AMF and deliver every ready output.
+   *
+   * @param frame_nr Input frame index.
+   * @param session Active native AMF session.
+   * @param packets Output packet queue.
+   * @param channel_data Protocol state attached to packets.
+   * @param frame_timestamp Capture timestamp.
+   * @return Zero on success.
+   */
+  int encode_amf(
+    int64_t frame_nr,
+    amf_encode_session_t &session,
+    safe::mail_raw_t::queue_t<packet_t> &packets,
+    void *channel_data,
+    std::optional<std::chrono::steady_clock::time_point> frame_timestamp
+  ) {
+    session.store_frame_timestamp(frame_nr, frame_timestamp);
+    auto result = session.encode_frames(static_cast<uint64_t>(frame_nr));
+    if (!result.input_accepted) {
+      session.discard_frame_timestamp(frame_nr);
+    }
+    if (result.fatal ||
+        std::any_of(result.frames.begin(), result.frames.end(), [](const auto &frame) { return frame.fatal; })) {
+      BOOST_LOG(error) << "AMF entered an unrecoverable state";
+      return -1;
+    }
+    return deliver_amf_frames(frame_nr, session, result.frames, packets, channel_data);
+  }
+
+
   int encode(int64_t frame_nr, encode_session_t &session, safe::mail_raw_t::queue_t<packet_t> &packets, void *channel_data, std::optional<std::chrono::steady_clock::time_point> frame_timestamp) {
     if (auto avcodec_session = dynamic_cast<avcodec_encode_session_t *>(&session)) {
       return encode_avcodec(frame_nr, *avcodec_session, packets, channel_data, frame_timestamp);
     } else if (auto nvenc_session = dynamic_cast<nvenc_encode_session_t *>(&session)) {
       return encode_nvenc(frame_nr, *nvenc_session, packets, channel_data, frame_timestamp);
+    } else if (auto amf_session = dynamic_cast<amf_encode_session_t *>(&session)) {
+      return encode_amf(frame_nr, *amf_session, packets, channel_data, frame_timestamp);
     }
 
     return -1;
@@ -1895,6 +2142,85 @@ namespace video {
     return std::make_unique<nvenc_encode_session_t>(std::move(encode_device));
   }
 
+  /**
+   * @brief Initialize a native AMF session behind a bounded driver watchdog.
+   *
+   * @param disp Active display used to obtain HDR metadata.
+   * @param client_config Negotiated stream configuration.
+   * @param encode_device Platform AMF device.
+   * @return Initialized native AMF session, or nullptr on failure or timeout.
+   */
+  std::unique_ptr<amf_encode_session_t> make_amf_encode_session(
+    platf::display_t *disp,
+    const config_t &client_config,
+    std::unique_ptr<platf::amf_encode_device_t> encode_device
+  ) {
+    std::promise<std::unique_ptr<platf::amf_encode_device_t>> initialized_promise;
+    auto initialized_future = initialized_promise.get_future();
+    const auto colorspace = encode_device->colorspace;
+    std::thread initialization_thread {
+      [encode_device = std::move(encode_device),
+       client_config,
+       colorspace,
+       initialized_promise = std::move(initialized_promise)]() mutable {
+        try {
+          if (!encode_device->init_encoder(client_config, colorspace)) {
+            initialized_promise.set_value(nullptr);
+            return;
+          }
+          initialized_promise.set_value(std::move(encode_device));
+        } catch (...) {
+          try {
+            initialized_promise.set_value(nullptr);
+          } catch (...) {
+          }
+        }
+      }
+    };
+
+    if (initialized_future.wait_for(5s) != std::future_status::ready) {
+      BOOST_LOG(error) << "AMF: native encoder initialization exceeded 5 seconds; abandoning it"sv;
+      initialization_thread.detach();
+      return nullptr;
+    }
+
+    try {
+      encode_device = initialized_future.get();
+    } catch (...) {
+      BOOST_LOG(error) << "AMF: native encoder initialization worker failed unexpectedly"sv;
+      initialization_thread.detach();
+      return nullptr;
+    }
+    if (!encode_device) {
+      initialization_thread.detach();
+      return nullptr;
+    }
+    initialization_thread.join();
+
+    if (colorspace_is_hdr(encode_device->colorspace) && encode_device->amf) {
+      SS_HDR_METADATA hdr_metadata;
+      if (disp->get_hdr_metadata(hdr_metadata)) {
+        amf::amf_hdr_metadata amf_metadata;
+        for (int i = 0; i < 3; ++i) {
+          amf_metadata.displayPrimaries[i].x = hdr_metadata.displayPrimaries[i].x;
+          amf_metadata.displayPrimaries[i].y = hdr_metadata.displayPrimaries[i].y;
+        }
+        amf_metadata.whitePoint.x = hdr_metadata.whitePoint.x;
+        amf_metadata.whitePoint.y = hdr_metadata.whitePoint.y;
+        amf_metadata.maxDisplayLuminance = hdr_metadata.maxDisplayLuminance;
+        amf_metadata.minDisplayLuminance = hdr_metadata.minDisplayLuminance;
+        amf_metadata.maxContentLightLevel = hdr_metadata.maxContentLightLevel;
+        amf_metadata.maxFrameAverageLightLevel = hdr_metadata.maxFrameAverageLightLevel;
+        if (!encode_device->amf->set_hdr_metadata(amf_metadata)) {
+          BOOST_LOG(warning) << "AMF: HDR stream will continue without mastering metadata"sv;
+        }
+      }
+    }
+
+    return std::make_unique<amf_encode_session_t>(std::move(encode_device));
+  }
+
+
   std::unique_ptr<encode_session_t> make_encode_session(platf::display_t *disp, const encoder_t &encoder, const config_t &config, int width, int height, std::unique_ptr<platf::encode_device_t> encode_device) {
     if (dynamic_cast<platf::avcodec_encode_device_t *>(encode_device.get())) {
       auto avcodec_encode_device = boost::dynamic_pointer_cast<platf::avcodec_encode_device_t>(std::move(encode_device));
@@ -1902,12 +2228,49 @@ namespace video {
     } else if (dynamic_cast<platf::nvenc_encode_device_t *>(encode_device.get())) {
       auto nvenc_encode_device = boost::dynamic_pointer_cast<platf::nvenc_encode_device_t>(std::move(encode_device));
       return make_nvenc_encode_session(config, std::move(nvenc_encode_device));
+    } else if (dynamic_cast<platf::amf_encode_device_t *>(encode_device.get())) {
+      auto amf_encode_device = boost::dynamic_pointer_cast<platf::amf_encode_device_t>(std::move(encode_device));
+      return make_amf_encode_session(disp, config, std::move(amf_encode_device));
     }
 
     return nullptr;
   }
 
-  void encode_run(
+  /**
+   * @brief Destroy native AMF sessions behind a bounded driver watchdog.
+   *
+   * @param session Session to destroy.
+   * @param reason Diagnostic teardown context.
+   * @return True when teardown completed within the timeout.
+   */
+  bool destroy_encode_session_bounded(std::unique_ptr<encode_session_t> &session, std::string_view reason) {
+    if (!session) {
+      return true;
+    }
+    if (!dynamic_cast<amf_encode_session_t *>(session.get())) {
+      session.reset();
+      return true;
+    }
+
+    auto owned_session = std::move(session);
+    const bool completed = amf::lifecycle::run_with_timeout(
+      [owned_session = std::move(owned_session)]() mutable {
+        owned_session.reset();
+      },
+      5s);
+    if (!completed) {
+      BOOST_LOG(error) << "AMF: native " << reason << " teardown exceeded 5 seconds; abandoning that session"sv;
+    }
+    return completed;
+  }
+
+
+  std::unique_ptr<platf::encode_device_t> make_encode_device(
+    platf::display_t &disp,
+    const encoder_t &encoder,
+    const config_t &config);
+
+  bool encode_run(
     int &frame_nr,  // Store progress of the frame number
     safe::mail_t mail,
     img_event_t images,
@@ -1918,10 +2281,28 @@ namespace video {
     const encoder_t &encoder,
     void *channel_data
   ) {
+    const encoder_t *session_encoder = &encoder;
+    bool native_amf_init_fallback_used = false;
     auto session = make_encode_session(disp.get(), encoder, config, disp->width, disp->height, std::move(encode_device));
-    if (!session) {
-      return;
+#ifdef _WIN32
+    if (!session && &encoder == &amdvce && config::video.encoder.empty()) {
+      BOOST_LOG(warning) << "AMF: native session failed; retrying with amdvce_legacy"sv;
+      auto legacy_device = make_encode_device(*disp, amdvce_legacy, config);
+      if (legacy_device) {
+        session = make_encode_session(disp.get(), amdvce_legacy, config, disp->width, disp->height, std::move(legacy_device));
+        if (session) {
+          session_encoder = &amdvce_legacy;
+          native_amf_init_fallback_used = true;
+          BOOST_LOG(info) << "AMF: real-session fallback to amdvce_legacy succeeded"sv;
+        }
+      }
     }
+#endif
+    if (!session) {
+      return false;
+    }
+    const bool native_amf_session = dynamic_cast<amf_encode_session_t *>(session.get()) != nullptr;
+    bool native_amf_runtime_failed = false;
 
     // As a workaround for NVENC hangs and to generally speed up encoder reinit,
     // we will complete the encoder teardown in a separate thread if supported.
@@ -1929,8 +2310,17 @@ namespace video {
     // to restart encoding as soon as possible. For cases where the NVENC driver
     // hang occurs, this thread may probably never exit, but it will allow
     // streaming to continue without requiring a full restart of Sunshine.
-    auto fail_guard = util::fail_guard([&encoder, &session] {
-      if (encoder.flags & ASYNC_TEARDOWN) {
+    auto fail_guard = util::fail_guard([session_encoder, native_amf_session, &session, &native_amf_runtime_failed] {
+      // Keep native AMF teardown ordered with this encode loop. Its existing
+      // watchdog already moves driver destruction to a bounded worker; another
+      // detached layer lets the next stream race the old AMF session.
+      if (native_amf_session) {
+        destroy_encode_session_bounded(
+          session,
+          native_amf_runtime_failed ? "runtime failure"sv : "session end"sv);
+        return;
+      }
+      if (session_encoder->flags & ASYNC_TEARDOWN) {
         std::thread encoder_teardown_thread {[session = std::move(session)]() mutable {
           BOOST_LOG(info) << "Starting async encoder teardown";
           session.reset();
@@ -1939,6 +2329,17 @@ namespace video {
         encoder_teardown_thread.detach();
       }
     });
+
+    auto native_amf_failure = [&]() {
+      native_amf_runtime_failed = native_amf_session;
+      return native_amf_session;
+    };
+
+    if (config.encodingFramerate <= 0) {
+      const int fallback_fps = config.framerate > 0 ? config.framerate * 1000 : 60000;
+      BOOST_LOG(warning) << "Encoding framerate missing; falling back to " << fallback_fps;
+      config.encodingFramerate = fallback_fps;
+    }
 
     // set max frame time based on client-requested target framerate.
     double minimum_fps_target = (config::video.minimum_fps_target > 0.0) ? config::video.minimum_fps_target * 1000 : std::max(config.encodingFramerate / 5, 10000);
@@ -1961,22 +2362,59 @@ namespace video {
       // in a separate scope.
       auto dummy_img = disp->alloc_img();
       if (!dummy_img || disp->dummy_img(dummy_img.get()) || session->convert(*dummy_img)) {
-        return;
+        return native_amf_failure();
       }
     }
 
     if (config.input_only) {
       BOOST_LOG(info) << "Input only session, video will not be captured."sv;
 
-      // Encode the dummy img only once
-      if (encode(frame_nr++, *session, packets, channel_data, std::chrono::steady_clock::now())) {
+      const auto dummy_timestamp = std::chrono::steady_clock::now();
+      const auto dummy_frame_index = static_cast<uint64_t>(frame_nr++);
+      if (encode(dummy_frame_index, *session, packets, channel_data, dummy_timestamp)) {
         BOOST_LOG(error) << "Could not encode dummy video packet"sv;
-        return;
+        return native_amf_failure();
+      }
+
+      if (auto *amf_session = dynamic_cast<amf_encode_session_t *>(session.get())) {
+        const auto deadline = std::chrono::steady_clock::now() + 2s;
+        bool dummy_accepted = amf_session->was_last_input_accepted();
+        while (!dummy_accepted && std::chrono::steady_clock::now() < deadline) {
+          auto delayed = amf_session->drain_frames(10ms);
+          if (delayed.fatal || deliver_amf_frames(dummy_frame_index, *amf_session, delayed.frames, packets, channel_data)) {
+            BOOST_LOG(error) << "AMF failed while accepting the input-only dummy packet"sv;
+            return native_amf_failure();
+          }
+          if (encode(dummy_frame_index, *session, packets, channel_data, dummy_timestamp)) {
+            BOOST_LOG(error) << "Could not resubmit the AMF input-only dummy packet"sv;
+            return native_amf_failure();
+          }
+          dummy_accepted = amf_session->was_last_input_accepted();
+        }
+        if (!dummy_accepted) {
+          BOOST_LOG(error) << "AMF did not accept the input-only dummy packet within 2 seconds"sv;
+          return native_amf_failure();
+        }
+        if (!amf_session->begin_drain()) {
+          BOOST_LOG(error) << "Could not begin draining the AMF input-only session"sv;
+          return native_amf_failure();
+        }
+        while (!amf_session->has_emitted_frame(dummy_frame_index) && std::chrono::steady_clock::now() < deadline) {
+          auto delayed = amf_session->drain_frames(50ms);
+          if (delayed.fatal || deliver_amf_frames(dummy_frame_index, *amf_session, delayed.frames, packets, channel_data)) {
+            BOOST_LOG(error) << "AMF failed while draining the input-only dummy packet"sv;
+            return native_amf_failure();
+          }
+        }
+        if (!amf_session->has_emitted_frame(dummy_frame_index)) {
+          BOOST_LOG(error) << "AMF did not emit the input-only dummy packet within 2 seconds"sv;
+          return native_amf_failure();
+        }
       }
 
       while (true) {
         if (shutdown_event->peek() || !images->running() || (reinit_event.peek())) {
-          return;
+          return native_amf_init_fallback_used;
         } else {
           std::this_thread::sleep_for(300ms);
         }
@@ -2039,6 +2477,7 @@ namespace video {
 
           if (session->convert(*img)) {
             BOOST_LOG(error) << "Could not convert image"sv;
+            native_amf_runtime_failed = native_amf_session;
             break;
           }
 
@@ -2056,11 +2495,13 @@ namespace video {
 
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp)) {
         BOOST_LOG(error) << "Could not encode video packet"sv;
+        native_amf_runtime_failed = native_amf_session;
         break;
       }
 
       session->request_normal_frame();
     }
+    return native_amf_init_fallback_used || native_amf_runtime_failed;
   }
 
   input::touch_port_t make_port(platf::display_t *display, const config_t &config) {
@@ -2135,6 +2576,8 @@ namespace video {
       result = disp.make_avcodec_encode_device(pix_fmt);
     } else if (dynamic_cast<const encoder_platform_formats_nvenc *>(encoder.platform_formats.get())) {
       result = disp.make_nvenc_encode_device(pix_fmt);
+    } else if (dynamic_cast<const encoder_platform_formats_amf *>(encoder.platform_formats.get())) {
+      result = disp.make_amf_encode_device(pix_fmt);
     }
 
     if (result) {
@@ -2391,6 +2834,10 @@ namespace video {
 
     auto touch_port_event = mail->event<input::touch_port_t>(mail::touch_port);
     auto hdr_event = mail->event<hdr_info_t>(mail::hdr);
+    auto idr_event = mail->event<bool>(mail::idr);
+#ifdef _WIN32
+    bool use_legacy_amf_for_remainder_of_session = false;
+#endif
 
     // Encoding takes place on this thread
     platf::adjust_thread_priority(platf::thread_priority_e::high);
@@ -2412,12 +2859,33 @@ namespace video {
         display = ref->display_wp->lock();
       }
 
-      auto &encoder = *chosen_encoder;
+      auto *enc_ptr = chosen_encoder;
+#ifdef _WIN32
+      if (use_legacy_amf_for_remainder_of_session && enc_ptr == &amdvce) {
+        enc_ptr = &amdvce_legacy;
+      }
+#endif
+      if (!enc_ptr) {
+        BOOST_LOG(error) << "No encoder available for async capture"sv;
+        return;
+      }
+      auto &encoder = *enc_ptr;
 
       auto encode_device = make_encode_device(*display, encoder, config);
+#ifdef _WIN32
+      if (!encode_device && &encoder == &amdvce && config::video.encoder.empty()) {
+        BOOST_LOG(warning) << "AMF: native device creation failed for the requested stream; retrying with amdvce_legacy"sv;
+        enc_ptr = &amdvce_legacy;
+        encode_device = make_encode_device(*display, *enc_ptr, config);
+        if (encode_device) {
+          use_legacy_amf_for_remainder_of_session = true;
+        }
+      }
+#endif
       if (!encode_device) {
         return;
       }
+      auto &session_encoder = *enc_ptr;
 
       // absolute mouse coordinates require that the dimensions of the screen are known
       touch_port_event->raise(make_port(display.get(), config));
@@ -2433,7 +2901,7 @@ namespace video {
       }
       hdr_event->raise(std::move(hdr_info));
 
-      encode_run(
+      [[maybe_unused]] const bool native_amf_runtime_failed = encode_run(
         frame_nr,
         mail,
         images,
@@ -2441,9 +2909,16 @@ namespace video {
         display,
         std::move(encode_device),
         ref->reinit_event,
-        *ref->encoder_p,
+        session_encoder,
         channel_data
       );
+#ifdef _WIN32
+      if (native_amf_runtime_failed && &session_encoder == &amdvce && config::video.encoder.empty()) {
+        use_legacy_amf_for_remainder_of_session = true;
+        idr_event->raise(true);
+        BOOST_LOG(error) << "AMF: native runtime failed; switching this stream to amdvce_legacy"sv;
+      }
+#endif
     }
   }
 
@@ -2491,20 +2966,31 @@ namespace video {
     if (!session) {
       return -1;
     }
+    auto bounded_teardown = util::fail_guard([&]() {
+      destroy_encode_session_bounded(session, "probe"sv);
+    });
 
-    {
-      // Image buffers are large, so we use a separate scope to free it immediately after convert()
-      auto img = disp->alloc_img();
-      if (!img || disp->dummy_img(img.get()) || session->convert(*img)) {
-        return -1;
-      }
+    // Keep the image alive while a PreAnalysis encoder primes its lookahead.
+    auto img = disp->alloc_img();
+    if (!img || disp->dummy_img(img.get()) || session->convert(*img)) {
+      return -1;
     }
 
     session->request_idr_frame();
 
-    auto packets = mail::man->queue<packet_t>(mail::video_packets);
-    while (!packets->peek()) {
-      if (encode(1, *session, packets, nullptr, {})) {
+    auto probe_mail = std::make_shared<safe::mail_raw_t>();
+    auto packets = probe_mail->queue<packet_t>(mail::video_packets);
+    const auto deadline = std::chrono::steady_clock::now() + 5s;
+    constexpr int max_probe_submissions = 64;
+    for (int attempt = 0; !packets->peek(); ++attempt) {
+      if (attempt >= max_probe_submissions || std::chrono::steady_clock::now() >= deadline) {
+        BOOST_LOG(error) << "Encoder probe produced no packet within its bounded submission window"sv;
+        return -1;
+      }
+      if (attempt > 0 && dynamic_cast<amf_encode_session_t *>(session.get()) && session->convert(*img)) {
+        return -1;
+      }
+      if (encode(static_cast<int64_t>(attempt) + 1, *session, packets, nullptr, {})) {
         return -1;
       }
     }

@@ -2499,6 +2499,10 @@ editing the `conf` file in a text editor. Use the examples as reference.
 
 ## AMD AMF Encoder
 
+On Windows, `amdvce` uses AMD AMF directly with D3D11 input surfaces. The previous
+FFmpeg-backed implementation remains available as `amdvce_legacy` and is also used
+as a compatibility fallback when a native session cannot initialize.
+
 ### amd_usage
 
 <table>
@@ -2555,8 +2559,9 @@ editing the `conf` file in a text editor. Use the examples as reference.
             The encoder rate control.
             @note{This option only applies when using amdvce [encoder](#encoder).}
             @warning{The `vbr_latency` option generally works best, but some bitrate overshoots may still occur.
-            Enabling HRD allows all bitrate based rate controls to better constrain peak bitrate, but may result in
-            encoding artifacts depending on your card.}
+            Enabling HRD allows bitrate-based rate controls to better constrain peak bitrate, but may result in
+            encoding artifacts depending on your card. QVBR, HQVBR, and HQCBR automatically enable the one-frame
+            PreAnalysis lookahead required by AMD.}
         </td>
     </tr>
     <tr>
@@ -2572,7 +2577,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="4">Choices</td>
+        <td rowspan="7">Choices</td>
         <td>cqp</td>
         <td>constant qp mode</td>
     </tr>
@@ -2587,6 +2592,42 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>vbr_peak</td>
         <td>variable bitrate, peak constrained</td>
+    </tr>
+    <tr>
+        <td>qvbr</td>
+        <td>quality-defined variable bitrate</td>
+    </tr>
+    <tr>
+        <td>hqvbr</td>
+        <td>high-quality variable bitrate</td>
+    </tr>
+    <tr>
+        <td>hqcbr</td>
+        <td>high-quality constant bitrate</td>
+    </tr>
+</table>
+
+### amd_qvbr_quality_level
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            QVBR quality level from 1 (lowest quality) to 51 (highest quality).
+            This option only affects QVBR. A value of 0 leaves the quality level at the AMD driver default.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            0
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td>@code{}
+            amd_qvbr_quality_level = 18
+            @endcode</td>
     </tr>
 </table>
 
@@ -2658,8 +2699,9 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Description</td>
         <td colspan="2">
-            Preanalysis can increase encoding quality at the cost of latency.
-            @note{This option only applies when using amdvce [encoder](#encoder).}
+            Preanalysis can increase encoding quality at the cost of latency. Native `amdvce` uses a one-frame
+            low-latency lookahead; it is enabled automatically by `qvbr`, `hqvbr`, and `hqcbr`. The setting is
+            also forwarded to `amdvce_legacy`.
         </td>
     </tr>
     <tr>
@@ -2727,7 +2769,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td rowspan="3">Choices</td>
         <td>auto</td>
-        <td>let ffmpeg decide</td>
+        <td>let the active AMF implementation decide</td>
     </tr>
     <tr>
         <td>cabac</td>
@@ -2737,6 +2779,191 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>cavlc</td>
         <td>context adaptive variable-length coding - higher quality</td>
     </tr>
+</table>
+
+### amd_ltr_frames
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Number of native AMF long-term reference slots used for reference-frame invalidation.
+            Values 1 or 2 can improve recovery on lossy networks, while 0 disables the optional LTR path.
+            @note{This option only applies to the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            0
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td>@code{}
+            amd_ltr_frames = 1
+            @endcode</td>
+    </tr>
+</table>
+
+### amd_input_queue_size
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Number of frames the native AMF encoder keeps queued for input. The default `4` keeps the hardware fed
+            with little queueing; `1` can starve some drivers, while larger values up to `32` trade latency for
+            additional headroom.
+            @note{This option only applies to the native amdvce [encoder](#encoder) (not amdvce_legacy).}
+            @note{Leave at `0` to use the driver default.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            4
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Range</td>
+        <td>0-32 (0 = driver default)</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td>@code{}
+            amd_input_queue_size = 4
+            @endcode</td>
+    </tr>
+</table>
+
+### amd_smart_access_video
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Controls supported multi-hardware-instance encoding and AMD Smart Access Video after checking AMF
+            capability reporting. Automatic leaves both properties at the driver defaults.
+            @note{This option only applies to the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+    </tr>
+    <tr><td>enabled</td></tr>
+    <tr><td>disabled</td></tr>
+</table>
+
+### amd_lowlatency_mode
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Controls the native H.264 and HEVC AMF low-latency property. Automatic is recommended because the
+            ultralowlatency usage preset already provides a low-latency pipeline and some AMD drivers become
+            unstable when this additional property is forced.
+            @note{This option only applies to the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+    </tr>
+    <tr><td>enabled</td></tr>
+    <tr><td>disabled</td></tr>
+</table>
+
+### amd_high_motion_quality_boost
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Controls the native AMF high-motion quality boost. Automatic leaves the property at the AMD driver
+            default. To protect driver stability, the native path rejects explicit low-latency or high-motion
+            enablement while more than one native AMF session is active.
+            @note{This option only applies to the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+    </tr>
+    <tr><td>enabled</td></tr>
+    <tr><td>disabled</td></tr>
+</table>
+
+### amd_av1_screen_content
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Controls native AMF AV1 screen-content tools and palette mode. Automatic leaves both properties at
+            the AMD driver defaults.
+            @note{This option only applies to AV1 with the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>auto</td>
+    </tr>
+    <tr><td>enabled</td></tr>
+    <tr><td>disabled</td></tr>
+</table>
+
+### amd_av1_latency_mode
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td>
+            Controls the native AMF AV1 encoding-latency mode. Automatic leaves the property at the AMD driver
+            default.
+            @note{This option only applies to AV1 with the native amdvce [encoder](#encoder).}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td>@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="5">Choices</td>
+        <td>auto</td>
+    </tr>
+    <tr><td>none</td></tr>
+    <tr><td>power_saving</td></tr>
+    <tr><td>realtime</td></tr>
+    <tr><td>lowest</td></tr>
 </table>
 
 ## VideoToolbox Encoder

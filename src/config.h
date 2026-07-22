@@ -70,6 +70,14 @@ namespace config {
       std::optional<int> amd_preanalysis;
       std::optional<int> amd_vbaq;
       int amd_coder;
+      std::optional<int> amd_qvbr_quality_level;  ///< QVBR quality level, or driver default.
+      int amd_ltr_frames;  ///< Number of long-term reference slots enabled for native AMF.
+      int amd_input_queue_size;  ///< Native AMF input queue override, or zero for driver default.
+      std::optional<int> amd_smart_access_video;  ///< Smart Access Video and multi-instance override.
+      std::optional<int> amd_lowlatency_mode;  ///< H.264/HEVC low-latency property override.
+      std::optional<int> amd_high_motion_quality_boost;  ///< High-motion quality boost override.
+      std::optional<int> amd_av1_screen_content;  ///< AV1 screen-content tools override.
+      std::optional<int> amd_av1_latency_mode;  ///< AV1 encoding-latency mode override.
     } amd;
 
     struct {

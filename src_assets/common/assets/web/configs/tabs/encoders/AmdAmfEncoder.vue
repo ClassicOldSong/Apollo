@@ -45,8 +45,19 @@ const config = ref(props.config)
                 <option value="cqp">{{ $t('config.amd_rc_cqp') }}</option>
                 <option value="vbr_latency">{{ $t('config.amd_rc_vbr_latency') }}</option>
                 <option value="vbr_peak">{{ $t('config.amd_rc_vbr_peak') }}</option>
+                <option value="qvbr">{{ $t('config.amd_rc_qvbr') }}</option>
+                <option value="hqvbr">{{ $t('config.amd_rc_hqvbr') }}</option>
+                <option value="hqcbr">{{ $t('config.amd_rc_hqcbr') }}</option>
               </select>
               <div class="form-text">{{ $t('config.amd_rc_desc') }}</div>
+            </div>
+
+            <!-- AMF QVBR quality level -->
+            <div class="mb-3">
+              <label for="amd_qvbr_quality_level" class="form-label">{{ $t('config.amd_qvbr_quality_level') }}</label>
+              <input type="number" min="0" max="51" class="form-control" id="amd_qvbr_quality_level"
+                     v-model="config.amd_qvbr_quality_level" />
+              <div class="form-text">{{ $t('config.amd_qvbr_quality_level_desc') }}</div>
             </div>
 
             <!-- AMF HRD Enforcement -->
@@ -109,6 +120,87 @@ const config = ref(props.config)
                 <option value="cavlc">{{ $t('config.coder_cavlc') }}</option>
               </select>
               <div class="form-text">{{ $t('config.amd_coder_desc') }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Native AMF advanced options -->
+    <div class="mb-3 accordion">
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                  data-bs-target="#amd-native-advanced">
+            {{ $t('config.amd_native_group') }}
+          </button>
+        </h2>
+        <div id="amd-native-advanced" class="accordion-collapse collapse">
+          <div class="accordion-body">
+            <div class="mb-3">
+              <label for="amd_ltr_frames" class="form-label">{{ $t('config.amd_ltr_frames') }}</label>
+              <input type="number" min="0" max="2" class="form-control" id="amd_ltr_frames"
+                     v-model="config.amd_ltr_frames" />
+              <div class="form-text">{{ $t('config.amd_ltr_frames_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_input_queue_size" class="form-label">{{ $t('config.amd_input_queue_size') }}</label>
+              <input type="number" min="0" max="32" class="form-control" id="amd_input_queue_size"
+                     v-model="config.amd_input_queue_size" />
+              <div class="form-text">{{ $t('config.amd_input_queue_size_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_smart_access_video" class="form-label">{{ $t('config.amd_smart_access_video') }}</label>
+              <select id="amd_smart_access_video" class="form-select" v-model="config.amd_smart_access_video">
+                <option value="auto">{{ $t('config.ffmpeg_auto') }}</option>
+                <option value="enabled">{{ $t('config.enabled') }}</option>
+                <option value="disabled">{{ $t('config.disabled') }}</option>
+              </select>
+              <div class="form-text">{{ $t('config.amd_smart_access_video_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_lowlatency_mode" class="form-label">{{ $t('config.amd_lowlatency_mode') }}</label>
+              <select id="amd_lowlatency_mode" class="form-select" v-model="config.amd_lowlatency_mode">
+                <option value="auto">{{ $t('config.ffmpeg_auto') }}</option>
+                <option value="enabled">{{ $t('config.enabled') }}</option>
+                <option value="disabled">{{ $t('config.disabled') }}</option>
+              </select>
+              <div class="form-text">{{ $t('config.amd_lowlatency_mode_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_high_motion_quality_boost" class="form-label">{{ $t('config.amd_high_motion_quality_boost') }}</label>
+              <select id="amd_high_motion_quality_boost" class="form-select" v-model="config.amd_high_motion_quality_boost">
+                <option value="auto">{{ $t('config.ffmpeg_auto') }}</option>
+                <option value="enabled">{{ $t('config.enabled') }}</option>
+                <option value="disabled">{{ $t('config.disabled') }}</option>
+              </select>
+              <div class="form-text">{{ $t('config.amd_high_motion_quality_boost_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_av1_screen_content" class="form-label">{{ $t('config.amd_av1_screen_content') }}</label>
+              <select id="amd_av1_screen_content" class="form-select" v-model="config.amd_av1_screen_content">
+                <option value="auto">{{ $t('config.ffmpeg_auto') }}</option>
+                <option value="enabled">{{ $t('config.enabled') }}</option>
+                <option value="disabled">{{ $t('config.disabled') }}</option>
+              </select>
+              <div class="form-text">{{ $t('config.amd_av1_screen_content_desc') }}</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="amd_av1_latency_mode" class="form-label">{{ $t('config.amd_av1_latency_mode') }}</label>
+              <select id="amd_av1_latency_mode" class="form-select" v-model="config.amd_av1_latency_mode">
+                <option value="auto">{{ $t('config.ffmpeg_auto') }}</option>
+                <option value="none">none</option>
+                <option value="power_saving">power_saving</option>
+                <option value="realtime">realtime</option>
+                <option value="lowest">lowest</option>
+              </select>
+              <div class="form-text">{{ $t('config.amd_av1_latency_mode_desc') }}</div>
             </div>
           </div>
         </div>

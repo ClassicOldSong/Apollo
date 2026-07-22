@@ -3,6 +3,7 @@
  * @brief Definitions for handling video ram.
  */
 // standard includes
+#include <atomic>
 #include <cmath>
 
 // platform includes
@@ -21,6 +22,7 @@ extern "C" {
 // local includes
 #include "display.h"
 #include "misc.h"
+#include "src/amf/amf_d3d11.h"
 #include "src/config.h"
 #include "src/logging.h"
 #include "src/nvenc/nvenc_config.h"
@@ -43,6 +45,10 @@ static void free_frame(AVFrame *frame) {
 using frame_t = util::safe_ptr<AVFrame, free_frame>;
 
 namespace platf::dxgi {
+
+  namespace {
+    std::atomic<int> g_active_native_amf_encoders {0};
+  }
 
   template<class T>
   buf_t make_buffer(device_t::pointer device, const T &t) {
@@ -446,6 +452,10 @@ namespace platf::dxgi {
         // Draw captured frame
         draw(img_ctx.encoder_input_res, out_Y_or_YUV_viewports, out_UV_viewport);
 
+        // Release the active render-target references before AMF consumes this
+        // texture and before the conversion target rotates to another ring slot.
+        device_ctx->OMSetRenderTargets(0, nullptr, nullptr);
+
         // Release encoder mutex to allow capture code to reuse this image
         img_ctx.encoder_mutex->ReleaseSync(0);
 
@@ -481,11 +491,75 @@ namespace platf::dxgi {
       this->color_matrix = std::move(color_matrix);
     }
 
-    int init_output(ID3D11Texture2D *frame_texture, int width, int height) {
-      // The underlying frame pool owns the texture, so we must reference it for ourselves
-      frame_texture->AddRef();
-      output_texture.reset(frame_texture);
+    /**
+     * @brief Select or create cached render-target views for an AMF ring texture.
+     *
+     * @param frame_texture Texture reserved by native AMF.
+     * @return Zero when the texture is ready for conversion.
+     */
+    int set_output_texture(ID3D11Texture2D *frame_texture) {
+      if (!frame_texture) {
+        return -1;
+      }
+      if (output_texture == frame_texture) {
+        return 0;
+      }
 
+      if (output_texture) {
+        auto current = output_targets.find(output_texture);
+        if (current != output_targets.end()) {
+          current->second.cleared = rtvs_cleared;
+        }
+      }
+
+      auto [target_it, inserted] = output_targets.try_emplace(frame_texture);
+      auto &target = target_it->second;
+      if (inserted) {
+        frame_texture->AddRef();
+        target.texture.reset(frame_texture);
+
+        auto create_rtv = [&](render_target_t &view, DXGI_FORMAT view_format) -> bool {
+          if (view_format == DXGI_FORMAT_UNKNOWN) {
+            return true;
+          }
+
+          D3D11_RENDER_TARGET_VIEW_DESC rtv_desc {};
+          rtv_desc.Format = view_format;
+          rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+          const auto status = device->CreateRenderTargetView(frame_texture, &rtv_desc, &view);
+          if (FAILED(status)) {
+            BOOST_LOG(error) << "Failed to create render target view: " << util::log_hex(status);
+            return false;
+          }
+          return true;
+        };
+
+        if (!create_rtv(target.y_or_yuv, output_y_or_yuv_rtv_format) ||
+            !create_rtv(target.uv, output_uv_rtv_format)) {
+          output_targets.erase(target_it);
+          return -1;
+        }
+
+        if (output_rtv_simple_clear) {
+          const float y_black[] = {0.0f, 0.0f, 0.0f, 0.0f};
+          device_ctx->ClearRenderTargetView(target.y_or_yuv.get(), y_black);
+          if (target.uv) {
+            const float uv_black[] = {0.5f, 0.5f, 0.5f, 0.5f};
+            device_ctx->ClearRenderTargetView(target.uv.get(), uv_black);
+          }
+          target.cleared = true;
+        }
+      }
+
+      output_texture = frame_texture;
+      out_Y_or_YUV_rtv = target.y_or_yuv.get();
+      out_UV_rtv = target.uv.get();
+      rtvs_cleared = target.cleared;
+      return 0;
+    }
+
+
+    int init_output(ID3D11Texture2D *frame_texture, int width, int height) {
       HRESULT status = S_OK;
 
 #define create_vertex_shader_helper(x, y) \
@@ -633,33 +707,33 @@ namespace platf::dxgi {
         device_ctx->VSSetConstantBuffers(1, 1, &rotation);
       }
 
-      DXGI_FORMAT rtv_Y_or_YUV_format = DXGI_FORMAT_UNKNOWN;
-      DXGI_FORMAT rtv_UV_format = DXGI_FORMAT_UNKNOWN;
-      bool rtv_simple_clear = false;
+      output_y_or_yuv_rtv_format = DXGI_FORMAT_UNKNOWN;
+      output_uv_rtv_format = DXGI_FORMAT_UNKNOWN;
+      output_rtv_simple_clear = false;
 
       switch (format) {
         case DXGI_FORMAT_NV12:
-          rtv_Y_or_YUV_format = DXGI_FORMAT_R8_UNORM;
-          rtv_UV_format = DXGI_FORMAT_R8G8_UNORM;
-          rtv_simple_clear = true;
+          output_y_or_yuv_rtv_format = DXGI_FORMAT_R8_UNORM;
+          output_uv_rtv_format = DXGI_FORMAT_R8G8_UNORM;
+          output_rtv_simple_clear = true;
           break;
 
         case DXGI_FORMAT_P010:
-          rtv_Y_or_YUV_format = DXGI_FORMAT_R16_UNORM;
-          rtv_UV_format = DXGI_FORMAT_R16G16_UNORM;
-          rtv_simple_clear = true;
+          output_y_or_yuv_rtv_format = DXGI_FORMAT_R16_UNORM;
+          output_uv_rtv_format = DXGI_FORMAT_R16G16_UNORM;
+          output_rtv_simple_clear = true;
           break;
 
         case DXGI_FORMAT_AYUV:
-          rtv_Y_or_YUV_format = DXGI_FORMAT_R8G8B8A8_UINT;
+          output_y_or_yuv_rtv_format = DXGI_FORMAT_R8G8B8A8_UINT;
           break;
 
         case DXGI_FORMAT_R16_UINT:
-          rtv_Y_or_YUV_format = DXGI_FORMAT_R16_UINT;
+          output_y_or_yuv_rtv_format = DXGI_FORMAT_R16_UINT;
           break;
 
         case DXGI_FORMAT_Y410:
-          rtv_Y_or_YUV_format = DXGI_FORMAT_R10G10B10A2_UINT;
+          output_y_or_yuv_rtv_format = DXGI_FORMAT_R10G10B10A2_UINT;
           break;
 
         default:
@@ -667,45 +741,7 @@ namespace platf::dxgi {
           return -1;
       }
 
-      auto create_rtv = [&](auto &rt, DXGI_FORMAT rt_format) -> bool {
-        D3D11_RENDER_TARGET_VIEW_DESC rtv_desc = {};
-        rtv_desc.Format = rt_format;
-        rtv_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
-
-        auto status = device->CreateRenderTargetView(output_texture.get(), &rtv_desc, &rt);
-        if (FAILED(status)) {
-          BOOST_LOG(error) << "Failed to create render target view: " << util::log_hex(status);
-          return false;
-        }
-
-        return true;
-      };
-
-      // Create Y/YUV render target view
-      if (!create_rtv(out_Y_or_YUV_rtv, rtv_Y_or_YUV_format)) {
-        return -1;
-      }
-
-      // Create UV render target view if needed
-      if (rtv_UV_format != DXGI_FORMAT_UNKNOWN && !create_rtv(out_UV_rtv, rtv_UV_format)) {
-        return -1;
-      }
-
-      if (rtv_simple_clear) {
-        // Clear the RTVs to ensure the aspect ratio padding is black
-        const float y_black[] = {0.0f, 0.0f, 0.0f, 0.0f};
-        device_ctx->ClearRenderTargetView(out_Y_or_YUV_rtv.get(), y_black);
-        if (out_UV_rtv) {
-          const float uv_black[] = {0.5f, 0.5f, 0.5f, 0.5f};
-          device_ctx->ClearRenderTargetView(out_UV_rtv.get(), uv_black);
-        }
-        rtvs_cleared = true;
-      } else {
-        // Can't use ClearRenderTargetView(), will clear on first convert()
-        rtvs_cleared = false;
-      }
-
-      return 0;
+      return set_output_texture(frame_texture);
     }
 
     int init(std::shared_ptr<platf::display_t> display, adapter_t::pointer adapter_p, pix_fmt_e pix_fmt) {
@@ -935,8 +971,8 @@ namespace platf::dxgi {
     blend_t blend_disable;
     sampler_state_t sampler_linear;
 
-    render_target_t out_Y_or_YUV_rtv;
-    render_target_t out_UV_rtv;
+    ID3D11RenderTargetView *out_Y_or_YUV_rtv = nullptr;
+    ID3D11RenderTargetView *out_UV_rtv = nullptr;
     bool rtvs_cleared = false;
 
     // d3d_img_t::id -> encoder_img_ctx_t
@@ -963,7 +999,21 @@ namespace platf::dxgi {
     device_t device;
     device_ctx_t device_ctx;
 
-    texture2d_t output_texture;
+    /**
+     * @brief Cached D3D11 render targets for one native AMF input texture.
+     */
+    struct output_target_t {
+      texture2d_t texture;  ///< Referenced AMF input texture.
+      render_target_t y_or_yuv;  ///< Luma or packed-YUV render target.
+      render_target_t uv;  ///< Chroma render target.
+      bool cleared = false;  ///< Whether the texture received its initial black clear.
+    };
+
+    ID3D11Texture2D *output_texture = nullptr;
+    std::map<ID3D11Texture2D *, output_target_t> output_targets;
+    DXGI_FORMAT output_y_or_yuv_rtv_format = DXGI_FORMAT_UNKNOWN;  ///< Active luma/packed RTV format.
+    DXGI_FORMAT output_uv_rtv_format = DXGI_FORMAT_UNKNOWN;  ///< Active chroma RTV format.
+    bool output_rtv_simple_clear = false;  ///< Whether a direct RTV clear is supported.
   };
 
   class d3d_avcodec_encode_device_t: public avcodec_encode_device_t {
@@ -1102,6 +1152,173 @@ namespace platf::dxgi {
     std::unique_ptr<nvenc::nvenc_d3d11> nvenc_d3d;
     NV_ENC_BUFFER_FORMAT buffer_format = NV_ENC_BUFFER_FORMAT_UNDEFINED;
   };
+
+  /**
+   * @brief Native AMF encode device using the D3D11 conversion pipeline.
+   *
+   * Conversion renders directly into AMF-owned NV12 or P010 ring textures.
+   */
+  class d3d_amf_encode_device_t: public amf_encode_device_t {
+  public:
+    /**
+     * @brief Release the AMF runtime before decrementing active-session state.
+     */
+    ~d3d_amf_encode_device_t() override {
+      if (registered_active_encoder) {
+        amf = nullptr;
+        amf_d3d.reset();
+        const auto remaining = g_active_native_amf_encoders.fetch_sub(1, std::memory_order_acq_rel) - 1;
+        BOOST_LOG(info) << "AMF: native encoder session closed (active=" << remaining << ')';
+      }
+    }
+
+    /**
+     * @brief Initialize D3D11 conversion and create the native AMF adapter.
+     *
+     * @param display Active D3D display backend.
+     * @param adapter_p DXGI adapter used for conversion and encoding.
+     * @param pix_fmt Native AMF input pixel format.
+     * @return True on success.
+     */
+    bool init_device(std::shared_ptr<platf::display_t> display, adapter_t::pointer adapter_p, pix_fmt_e pix_fmt) {
+      if (base.init(display, adapter_p, pix_fmt)) {
+        return false;
+      }
+
+      multithread_t mt;
+      const auto status = base.device->QueryInterface(IID_ID3D11Multithread, (void **) &mt);
+      if (SUCCEEDED(status)) {
+        mt->SetMultithreadProtected(TRUE);
+      } else {
+        BOOST_LOG(warning) << "Failed to query ID3D11Multithread interface from device [0x"sv
+                           << util::hex(status).to_string_view() << ']';
+      }
+
+      amf_d3d = ::amf::create_amf_d3d11(base.device.get());
+      if (!amf_d3d) {
+        return false;
+      }
+
+      buffer_format = pix_fmt;
+      amf = amf_d3d.get();
+      return true;
+    }
+
+    /**
+     * @brief Configure and initialize native AMF for a client stream.
+     *
+     * @param client_config Negotiated stream configuration.
+     * @param colorspace Output colorimetry.
+     * @return True when the AMF session and conversion targets are ready.
+     */
+    bool init_encoder(const ::video::config_t &client_config, const ::video::sunshine_colorspace_t &colorspace) override {
+      if (!amf_d3d) {
+        return false;
+      }
+
+      ::amf::amf_config amf_cfg;
+      const auto active_encoder_count = g_active_native_amf_encoders.fetch_add(1, std::memory_order_acq_rel) + 1;
+      registered_active_encoder = true;
+      BOOST_LOG(info) << "AMF: creating native encoder session " << client_config.width << 'x'
+                      << client_config.height << '@' << client_config.framerate
+                      << " codec=" << client_config.videoFormat << " bitrate="
+                      << client_config.bitrate << "kbps (active=" << active_encoder_count << ')';
+
+      if (client_config.videoFormat == 0) {
+        amf_cfg.usage = config::video.amd.amd_usage_h264;
+        amf_cfg.quality_preset = config::video.amd.amd_quality_h264;
+        amf_cfg.rc_mode = config::video.amd.amd_rc_h264;
+      } else if (client_config.videoFormat == 1) {
+        amf_cfg.usage = config::video.amd.amd_usage_hevc;
+        amf_cfg.quality_preset = config::video.amd.amd_quality_hevc;
+        amf_cfg.rc_mode = config::video.amd.amd_rc_hevc;
+      } else {
+        amf_cfg.usage = config::video.amd.amd_usage_av1;
+        amf_cfg.quality_preset = config::video.amd.amd_quality_av1;
+        amf_cfg.rc_mode = config::video.amd.amd_rc_av1;
+      }
+
+      amf_cfg.vbaq = config::video.amd.amd_vbaq;
+      amf_cfg.enforce_hrd = config::video.amd.amd_enforce_hrd;
+      amf_cfg.qvbr_quality_level = config::video.amd.amd_qvbr_quality_level;
+      amf_cfg.h264_cabac = ::amf::lifecycle::resolve_h264_cabac(config::video.amd.amd_coder);
+
+      const auto preanalysis_plan = ::amf::lifecycle::resolve_preanalysis(
+        amf_cfg.rc_mode,
+        config::video.amd.amd_preanalysis);
+      amf_cfg.preanalysis = preanalysis_plan.enabled ? 1 : 0;
+      if (preanalysis_plan.enabled) {
+        amf_cfg.pa_lookahead_depth = preanalysis_plan.lookahead_depth;
+        if (preanalysis_plan.enabled_for_rate_control &&
+            (!config::video.amd.amd_preanalysis || !*config::video.amd.amd_preanalysis)) {
+          BOOST_LOG(info) << "AMF: enabling native PreAnalysis required by the selected rate-control mode";
+        }
+      }
+
+      amf_cfg.max_ltr_frames = config::video.amd.amd_ltr_frames;
+      if (config::video.amd.amd_input_queue_size > 0) {
+        amf_cfg.input_queue_size = config::video.amd.amd_input_queue_size;
+      }
+
+      auto amf_tristate = [](const std::optional<int> &value) -> std::optional<bool> {
+        return value ? std::optional<bool> {*value != 0} : std::nullopt;
+      };
+      amf_cfg.multi_hw_instance_encode = amf_tristate(config::video.amd.amd_smart_access_video);
+      amf_cfg.lowlatency_mode = amf_tristate(config::video.amd.amd_lowlatency_mode);
+      amf_cfg.high_motion_quality_boost_enable = amf_tristate(config::video.amd.amd_high_motion_quality_boost);
+      amf_cfg.av1_screen_content_tools = amf_tristate(config::video.amd.amd_av1_screen_content);
+      amf_cfg.av1_encoding_latency_mode = config::video.amd.amd_av1_latency_mode;
+      amf_cfg.enable_statistics_feedback = false;
+
+      if (active_encoder_count > 1 &&
+          ((amf_cfg.lowlatency_mode && *amf_cfg.lowlatency_mode) ||
+           (amf_cfg.high_motion_quality_boost_enable && *amf_cfg.high_motion_quality_boost_enable))) {
+        BOOST_LOG(error) << "AMF: unsafe low-latency/high-motion override requested with concurrent native sessions";
+        g_active_native_amf_encoders.fetch_sub(1, std::memory_order_acq_rel);
+        registered_active_encoder = false;
+        return false;
+      }
+
+      if (!amf_d3d->create_encoder(amf_cfg, client_config, colorspace, buffer_format)) {
+        g_active_native_amf_encoders.fetch_sub(1, std::memory_order_acq_rel);
+        registered_active_encoder = false;
+        return false;
+      }
+
+      base.apply_colorspace(colorspace);
+      return base.init_output(
+               static_cast<ID3D11Texture2D *>(amf_d3d->get_input_texture()),
+               client_config.width,
+               client_config.height) == 0;
+    }
+
+    /**
+     * @brief Convert a captured texture into the next free AMF ring surface.
+     *
+     * @param img_base Captured D3D image.
+     * @return Zero on success.
+     */
+    int convert(platf::img_t &img_base) override {
+      auto *render_target = amf_d3d->acquire_input_texture_for_render();
+      if (!render_target || base.set_output_texture(render_target) != 0) {
+        amf_d3d->cancel_input_texture_for_render();
+        return -1;
+      }
+
+      const auto result = base.convert(img_base);
+      if (result != 0) {
+        amf_d3d->cancel_input_texture_for_render();
+      }
+      return result;
+    }
+
+  private:
+    d3d_base_encode_device base;
+    std::unique_ptr<::amf::amf_d3d11> amf_d3d;
+    platf::pix_fmt_e buffer_format = platf::pix_fmt_e::unknown;
+    bool registered_active_encoder = false;
+  };
+
 
   bool set_cursor_texture(device_t::pointer device, gpu_cursor_t &cursor, util::buffer_t<std::uint8_t> &&cursor_img, DXGI_OUTDUPL_POINTER_SHAPE_INFO &shape_info) {
     // This cursor image may not be used
@@ -1929,6 +2146,20 @@ namespace platf::dxgi {
 
   std::unique_ptr<nvenc_encode_device_t> display_vram_t::make_nvenc_encode_device(pix_fmt_e pix_fmt) {
     auto device = std::make_unique<d3d_nvenc_encode_device_t>();
+    if (!device->init_device(shared_from_this(), adapter.get(), pix_fmt)) {
+      return nullptr;
+    }
+    return device;
+  }
+
+  /**
+   * @brief Create a native AMF device for this display.
+   *
+   * @param pix_fmt Native AMF input pixel format.
+   * @return Initialized platform AMF device, or nullptr on failure.
+   */
+  std::unique_ptr<amf_encode_device_t> display_vram_t::make_amf_encode_device(pix_fmt_e pix_fmt) {
+    auto device = std::make_unique<d3d_amf_encode_device_t>();
     if (!device->init_device(shared_from_this(), adapter.get(), pix_fmt)) {
       return nullptr;
     }
