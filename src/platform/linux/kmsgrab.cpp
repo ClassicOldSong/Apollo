@@ -37,10 +37,42 @@ namespace platf {
 
   namespace kms {
 
+    /**
+     * @brief Whether CAP_SYS_ADMIN is in our permitted set (evaluated once).
+     *
+     * When it isn't — e.g. the binary has no setcap and KMS capture relies on
+     * the kms-server-proxy helper instead — there is no point attempting to
+     * raise the capability. Doing so fails and, in the per-frame capture path,
+     * would log an error on every frame.
+     */
+    static bool has_cap_sys_admin() {
+      static const bool permitted = [] {
+        bool result = false;
+        if (cap_t caps = cap_get_proc()) {
+          cap_flag_value_t value = CAP_CLEAR;
+          cap_value_t sys_admin = CAP_SYS_ADMIN;
+          if (cap_get_flag(caps, sys_admin, CAP_PERMITTED, &value) == 0) {
+            result = (value == CAP_SET);
+          }
+          cap_free(caps);
+        }
+        return result;
+      }();
+      return permitted;
+    }
+
     class cap_sys_admin {
     public:
       cap_sys_admin() {
+        // If the capability isn't available to us, do nothing. Attempting to
+        // raise it would fail and spam the log; KMS capture falls back to the
+        // kms-server-proxy helper in that case.
+        if (!has_cap_sys_admin()) {
+          return;
+        }
+
         caps = cap_get_proc();
+        held = true;
 
         cap_value_t sys_admin = CAP_SYS_ADMIN;
         if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &sys_admin, CAP_SET) || cap_set_proc(caps)) {
@@ -49,6 +81,10 @@ namespace platf {
       }
 
       ~cap_sys_admin() {
+        if (!held) {
+          return;
+        }
+
         cap_value_t sys_admin = CAP_SYS_ADMIN;
         if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &sys_admin, CAP_CLEAR) || cap_set_proc(caps)) {
           BOOST_LOG(error) << "Failed to drop CAP_SYS_ADMIN";
@@ -56,7 +92,8 @@ namespace platf {
         cap_free(caps);
       }
 
-      cap_t caps;
+      cap_t caps = nullptr;
+      bool held = false;
     };
 
     class wrapper_fb {
@@ -401,8 +438,9 @@ namespace platf {
       fb_t fb(plane_t::pointer plane) {
         // Preferred path: read the framebuffer handles directly. This needs
         // CAP_SYS_ADMIN (or DRM master); without it drmModeGetFB2 succeeds but
-        // returns no handles.
-        {
+        // returns no handles, so only attempt it when the capability is
+        // available and otherwise go straight to the helper.
+        if (has_cap_sys_admin()) {
           cap_sys_admin admin;
 
           auto fb2 = drmModeGetFB2(fd.el, plane->fb_id);
