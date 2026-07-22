@@ -3,9 +3,13 @@
  * @brief Definitions for KMS screen capture.
  */
 // standard includes
+#include <algorithm>
+#include <cmath>
 #include <errno.h>
 #include <fcntl.h>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <thread>
 #include <unistd.h>
 
@@ -187,6 +191,75 @@ namespace platf {
 
     static int env_width;
     static int env_height;
+
+    // Optional capture-region config file. When present, KMS capture is
+    // restricted to the given sub-rectangle of the selected monitor.
+    constexpr auto region_file = "/tmp/region.txt";
+
+    /**
+     * @brief Sub-rectangle of the monitor to capture, in physical pixels.
+     */
+    struct region_t {
+      int x;  ///< Left edge, relative to the monitor.
+      int y;  ///< Top edge, relative to the monitor.
+      int w;  ///< Width.
+      int h;  ///< Height.
+
+      bool operator==(const region_t &other) const = default;
+    };
+
+    /**
+     * @brief Return the last modification time of the region file.
+     *
+     * @return Modification time, or std::nullopt when the file doesn't exist.
+     */
+    std::optional<fs::file_time_type> region_file_mtime() {
+      std::error_code ec;
+      auto time = fs::last_write_time(region_file, ec);
+      if (ec) {
+        return std::nullopt;
+      }
+      return time;
+    }
+
+    /**
+     * @brief Parse the capture region from the region file.
+     *
+     * The first non-comment line must contain four integers: `x y w h`
+     * (whitespace or comma separated), relative to the captured monitor.
+     *
+     * @return Parsed region, or std::nullopt when the file is missing or invalid.
+     */
+    std::optional<region_t> parse_region_file() {
+      std::ifstream file {region_file};
+      if (!file) {
+        return std::nullopt;
+      }
+
+      std::string line;
+      while (std::getline(file, line)) {
+        // Strip comments and treat commas as whitespace
+        if (auto hash = line.find('#'); hash != std::string::npos) {
+          line.resize(hash);
+        }
+        std::ranges::replace(line, ',', ' ');
+
+        if (line.find_first_not_of(" \t\r") == std::string::npos) {
+          continue;
+        }
+
+        region_t region;
+        std::istringstream ss {line};
+        if (ss >> region.x >> region.y >> region.w >> region.h) {
+          return region;
+        }
+
+        break;
+      }
+
+      BOOST_LOG(warning) << "Couldn't parse capture region file ["sv << region_file << "]: expected 'x y w h'"sv;
+      return std::nullopt;
+    }
 
     std::string_view plane_type(std::uint64_t val) {
       switch (val) {
@@ -833,6 +906,8 @@ namespace platf {
               offset_y = crtc->y;
             }
 
+            apply_region();
+
             plane_id = plane->plane_id;
             crtc_id = plane->crtc_id;
             crtc_index = card.get_crtc_index_by_id(plane->crtc_id);
@@ -892,6 +967,50 @@ namespace platf {
         }
 
         return 0;
+      }
+
+      /**
+       * @brief Restrict capture to the sub-rectangle described by the region file.
+       *
+       * Must be called after the monitor dimensions and offsets are finalized.
+       * When the region file is missing or invalid, the full monitor is captured.
+       */
+      void apply_region() {
+        region_mtime = region_file_mtime();
+        capture_region = std::nullopt;
+
+        auto region = parse_region_file();
+        if (!region) {
+          return;
+        }
+
+        auto mon_width = width;
+        auto mon_height = height;
+
+        region->x = std::clamp(region->x, 0, mon_width - 16);
+        region->y = std::clamp(region->y, 0, mon_height - 16);
+        region->w = std::clamp(region->w, 16, mon_width - region->x);
+        region->h = std::clamp(region->h, 16, mon_height - region->y);
+
+        // Chroma subsampling requires even frame dimensions
+        region->w &= ~1;
+        region->h &= ~1;
+
+        // Crop the captured area and shift the origin so absolute mouse input
+        // still maps to the correct desktop pixels.
+        img_offset_x += region->x;
+        img_offset_y += region->y;
+        offset_x += region->x;
+        offset_y += region->y;
+
+        width = region->w;
+        height = region->h;
+
+        capture_region = *region;
+
+        BOOST_LOG(info) << "KMS capture region: "sv << region->w << 'x' << region->h
+                        << " at ("sv << region->x << ',' << region->y << ") of "sv
+                        << mon_width << 'x' << mon_height << " monitor"sv;
       }
 
       bool is_hdr() {
@@ -1162,6 +1281,16 @@ namespace platf {
       }
 
       inline capture_e refresh(file_t *file, egl::surface_descriptor_t *sd, std::optional<std::chrono::steady_clock::time_point> &frame_timestamp) {
+        // Check for a change to the capture region file (rate-limited)
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_region_check >= 1120ms) {
+          last_region_check = now;
+          if (region_file_mtime() != region_mtime) {
+            BOOST_LOG(info) << "Reinitializing capture after region file change"sv;
+            return capture_e::reinit;
+          }
+        }
+
         // Check for a change in HDR metadata
         if (connector_id) {
           auto connector_props = card.connector_props(*connector_id);
@@ -1248,6 +1377,10 @@ namespace platf {
 
       int cursor_plane_id;
       cursor_t captured_cursor {};
+
+      std::optional<region_t> capture_region;  ///< Active capture region, relative to the monitor.
+      std::optional<fs::file_time_type> region_mtime;  ///< Region file mtime at last (re)init.
+      std::chrono::steady_clock::time_point last_region_check {};  ///< Last time the region file was polled.
 
       card_t card;
     };
@@ -1571,8 +1704,10 @@ namespace platf {
             img->serial = captured_cursor.serial;
           }
 
-          img->x = captured_cursor.x;
-          img->y = captured_cursor.y;
+          // Cursor coordinates are relative to the monitor; shift them into the
+          // cropped region when one is active.
+          img->x = captured_cursor.x - (capture_region ? capture_region->x : 0);
+          img->y = captured_cursor.y - (capture_region ? capture_region->y : 0);
           img->src_w = captured_cursor.src_w;
           img->src_h = captured_cursor.src_h;
           img->width = captured_cursor.dst_w;
