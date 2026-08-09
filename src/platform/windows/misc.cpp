@@ -1491,7 +1491,10 @@ namespace platf {
       memcpy(WSA_CMSG_DATA(cm), &pktInfo, sizeof(pktInfo));
     }
 
-    if (send_info.block_count > 1) {
+    // Only request USO when the user opted in. Some NIC drivers (notably VirtIO) accept the
+    // UDP_SEND_MSG_SIZE control message but silently drop the datagram instead of segmenting
+    // it, which breaks video streaming without any error being reported.
+    if (send_info.enable_uso && send_info.block_count > 1) {
       cmbuflen += WSA_CMSG_SPACE(sizeof(DWORD));
 
       cm = WSA_CMSG_NXTHDR(&msg, cm);

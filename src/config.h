@@ -149,6 +149,15 @@ namespace config {
     std::string fallback_mode;
     bool isolated_virtual_display_option;
     bool ignore_encoder_probe_failure;
+
+    /**
+     * @brief Whether to use UDP segmentation offload (USO) when sending batched video packets on Windows.
+     *
+     * Some NIC drivers (notably VirtIO) accept the UDP_SEND_MSG_SIZE control message but silently
+     * drop the datagram instead of segmenting it, which results in no video ever reaching the client.
+     * Set to false to send video as regular MTU-sized packets instead.
+     */
+    bool enable_uso = true;
   };
 
   struct audio_t {
