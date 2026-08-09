@@ -1519,6 +1519,7 @@ namespace stream {
             peer_address,
             session->video.peer.port(),
             session->localAddress,
+            config::video.enable_uso,
           };
 
           size_t next_shard_to_send = 0;

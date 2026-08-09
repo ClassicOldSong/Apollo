@@ -675,6 +675,14 @@ namespace platf {
     boost::asio::ip::address &source_address;
 
     /**
+     * @brief Whether to use UDP segmentation offload (USO) for the batch.
+     *
+     * Only supported on Windows and only meaningful when more than one message
+     * block is sent in a single call.
+     */
+    bool enable_uso;
+
+    /**
      * @brief Returns a payload buffer descriptor for the given payload offset.
      * @param offset The offset in the total payload data (bytes).
      * @return Buffer descriptor describing the region at the given offset.
