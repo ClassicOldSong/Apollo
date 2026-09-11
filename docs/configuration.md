@@ -1880,6 +1880,64 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### pacing_max_bitrate_kbps
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Optional cap for the RTP video send pacer in kilobits per second.
+            A value of 0 keeps the legacy LAN-oriented pacing behavior. For WAN testing,
+            set this slightly above the client stream bitrate so video packets are spread
+            over more of each frame interval instead of being sent in a short burst.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            0
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Range</td>
+        <td colspan="2">0-10000000</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            pacing_max_bitrate_kbps = 50000
+            @endcode</td>
+    </tr>
+</table>
+
+### video_max_batch_size_kb
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Maximum amount of RTP video data sent in one batched socket operation.
+            Lower values reduce packet burst size, which can help WAN and Wi-Fi paths.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            64
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Range</td>
+        <td colspan="2">16, 32, or 64. A value of 0 uses the default.</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            video_max_batch_size_kb = 16
+            @endcode</td>
+    </tr>
+</table>
+
 ### qp
 
 <table>

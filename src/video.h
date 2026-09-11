@@ -262,6 +262,7 @@ namespace video {
     void *channel_data = nullptr;
     bool after_ref_frame_invalidation = false;
     std::optional<std::chrono::steady_clock::time_point> frame_timestamp;
+    std::chrono::steady_clock::time_point packet_enqueue_timestamp;
   };
 
   struct packet_raw_avcodec: packet_raw_t {

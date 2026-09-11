@@ -533,6 +533,8 @@ namespace config {
     APPS_JSON_PATH,
 
     20,  // fecPercentage
+    0,  // pacing_max_bitrate_kbps
+    64,  // video_max_batch_size_kb
 
     ENCRYPTION_MODE_NEVER,  // lan_encryption_mode
     ENCRYPTION_MODE_OPPORTUNISTIC,  // wan_encryption_mode
@@ -1245,6 +1247,14 @@ namespace config {
 
     path_f(vars, "file_apps", stream.file_apps);
     int_between_f(vars, "fec_percentage", stream.fec_percentage, {1, 255});
+    int_between_f(vars, "pacing_max_bitrate_kbps", stream.pacing_max_bitrate_kbps, {0, 10000000});
+    int_between_f(vars, "video_max_batch_size_kb", stream.video_max_batch_size_kb, {0, 64});
+    if (stream.video_max_batch_size_kb == 0) {
+      stream.video_max_batch_size_kb = 64;
+    } else if (stream.video_max_batch_size_kb != 16 && stream.video_max_batch_size_kb != 32 && stream.video_max_batch_size_kb != 64) {
+      BOOST_LOG(warning) << "config: unsupported video_max_batch_size_kb value: " << stream.video_max_batch_size_kb << ", using 64";
+      stream.video_max_batch_size_kb = 64;
+    }
 
     map_int_int_f(vars, "keybindings"s, input.keybindings);
 

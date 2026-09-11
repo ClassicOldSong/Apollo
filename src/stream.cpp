@@ -4,6 +4,7 @@
  */
 
 // standard includes
+#include <atomic>
 #include <fstream>
 #include <future>
 #include <queue>
@@ -1333,6 +1334,11 @@ namespace stream {
     platf::adjust_thread_priority(platf::thread_priority_e::high);
 
     logging::min_max_avg_periodic_logger<double> frame_processing_latency_logger(debug, "Frame processing latency", "ms");
+    logging::min_max_avg_periodic_logger<double> packet_queue_latency_logger(debug, "Network: video packet queue wait", "ms");
+    logging::min_max_avg_periodic_logger<double> ratecontrol_sleep_logger(debug, "Network: rate control sleep", "ms");
+    logging::min_max_avg_periodic_logger<double> ratecontrol_late_logger(debug, "Network: rate control late", "ms");
+    logging::min_max_avg_periodic_logger<double> ratecontrol_batch_packets_logger(debug, "Network: video send batch size", "packets");
+    logging::min_max_avg_periodic_logger<double> ratecontrol_frame_packets_logger(debug, "Network: frame packets sent", "packets");
 
     logging::time_delta_periodic_logger frame_send_batch_latency_logger(debug, "Network: each send_batch() latency");
     logging::time_delta_periodic_logger frame_fec_latency_logger(debug, "Network: each FEC block latency");
@@ -1356,6 +1362,7 @@ namespace stream {
       frame_network_latency_logger.first_point_now();
 
       auto session = (session_t *) packet->channel_data;
+      packet_queue_latency_logger.collect_and_log(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - packet->packet_enqueue_timestamp).count());
       auto lowseq = session->video.lowseq;
 
       std::string_view payload {(char *) packet->data(), packet->data_size()};
@@ -1460,14 +1467,38 @@ namespace stream {
       }
 
       try {
-        // Use around 80% of 1Gbps          1Gbps            percent    ms     packet      byte
-        size_t ratecontrol_packets_in_1ms = std::giga::num * 80 / 100 / 1000 / blocksize / 8;
+        size_t pacing_bps;
+        if (config::stream.pacing_max_bitrate_kbps > 0) {
+          pacing_bps = (size_t) config::stream.pacing_max_bitrate_kbps * 1000ull;
+
+          // A cap below the negotiated encoder bitrate makes the sender fall behind forever.
+          size_t session_floor_bps = (size_t) session->config.monitor.bitrate * 1000ull * 110 / 100;
+          if (pacing_bps < session_floor_bps) {
+            static std::atomic_flag pacing_clamp_warned;
+            if (!pacing_clamp_warned.test_and_set()) {
+              BOOST_LOG(warning) << "pacing_max_bitrate_kbps ("sv << config::stream.pacing_max_bitrate_kbps
+                                 << " kbps) is below the negotiated stream bitrate ("sv << session->config.monitor.bitrate
+                                 << " kbps); clamping the pacer to 110% of the stream bitrate"sv;
+            }
+            pacing_bps = session_floor_bps;
+          }
+        } else {
+          // Use around 80% of 1Gbps.
+          pacing_bps = (size_t) (std::giga::num * 80 / 100);
+        }
+
+        size_t ratecontrol_packets_in_1ms = pacing_bps / 1000 / blocksize / 8;
+        if (ratecontrol_packets_in_1ms == 0) {
+          ratecontrol_packets_in_1ms = 1;
+        }
 
         // Send less than 64K in a single batch.
         // On Windows, batches above 64K seem to bypass SO_SNDBUF regardless of its size,
         // appear in "Other I/O" and begin waiting for interrupts.
         // This gives inconsistent performance so we'd rather avoid it.
-        size_t send_batch_size = 64 * 1024 / blocksize;
+        size_t max_batch_size_bytes = 64 * 1024;
+        max_batch_size_bytes = std::min<size_t>(max_batch_size_bytes, (size_t) config::stream.video_max_batch_size_kb * 1024);
+        size_t send_batch_size = std::max<size_t>(1, max_batch_size_bytes / blocksize);
         // Also don't exceed 64 packets, which can happen when Moonlight requests
         // unusually small packet size.
         // Generic Segmentation Offload on Linux can't do more than 64.
@@ -1583,13 +1614,18 @@ namespace stream {
 
                 auto now = std::chrono::steady_clock::now();
                 if (now < due) {
-                  timer->sleep_for(due - now);
+                  auto sleep_time = due - now;
+                  ratecontrol_sleep_logger.collect_and_log(std::chrono::duration<double, std::milli>(sleep_time).count());
+                  timer->sleep_for(sleep_time);
+                } else {
+                  ratecontrol_late_logger.collect_and_log(std::chrono::duration<double, std::milli>(now - due).count());
                 }
 
                 ratecontrol_group_packets_sent = 0;
               }
 
               size_t current_batch_size = x - next_shard_to_send + 1;
+              ratecontrol_batch_packets_logger.collect_and_log((double) current_batch_size);
               batch_info.block_offset = next_shard_to_send;
               batch_info.block_count = current_batch_size;
 
@@ -1625,6 +1661,7 @@ namespace stream {
           ratecontrol_next_frame_start = ratecontrol_frame_start +
                                          std::chrono::duration_cast<std::chrono::nanoseconds>(1ms) *
                                            ratecontrol_frame_packets_sent / ratecontrol_packets_in_1ms;
+          ratecontrol_frame_packets_logger.collect_and_log((double) ratecontrol_frame_packets_sent);
 
           frame_network_latency_logger.second_point_now_and_log();
 
