@@ -18,6 +18,7 @@
 // local includes
 #include "graphics.h"
 #include "src/logging.h"
+#include "src/config.h"
 #include "src/platform/common.h"
 #include "src/round_robin.h"
 #include "src/utility.h"
@@ -224,24 +225,34 @@ namespace wl {
       return true;
     }
 
-    // Find render node
-    drmDevice *devices[16];
-    int n = drmGetDevices2(0, devices, 16);
-    if (n <= 0) {
-      BOOST_LOG(error) << "No DRM devices found"sv;
-      return false;
-    }
-
     int drm_fd = -1;
-    for (int i = 0; i < n; i++) {
-      if (devices[i]->available_nodes & (1 << DRM_NODE_RENDER)) {
-        drm_fd = open(devices[i]->nodes[DRM_NODE_RENDER], O_RDWR);
-        if (drm_fd >= 0) {
-          break;
+    if (!config::video.adapter_name.empty()) {
+      // Respect the selected capture GPU. Picking the first enumerated GPU
+      // can allocate DMA-BUF modifiers unsupported by the compositor GPU.
+      drm_fd = open(config::video.adapter_name.c_str(), O_RDWR | O_CLOEXEC);
+      if (drm_fd < 0) {
+        BOOST_LOG(error) << "Failed to open selected Wayland render node ["
+                         << config::video.adapter_name << "]";
+        return false;
+      }
+      BOOST_LOG(info) << "Wayland capture render node: " << config::video.adapter_name;
+    } else {
+      drmDevice *devices[16];
+      int n = drmGetDevices2(0, devices, 16);
+      if (n <= 0) {
+        BOOST_LOG(error) << "No DRM devices found"sv;
+        return false;
+      }
+      for (int i = 0; i < n; i++) {
+        if (devices[i]->available_nodes & (1 << DRM_NODE_RENDER)) {
+          drm_fd = open(devices[i]->nodes[DRM_NODE_RENDER], O_RDWR | O_CLOEXEC);
+          if (drm_fd >= 0) {
+            break;
+          }
         }
       }
+      drmFreeDevices(devices, n);
     }
-    drmFreeDevices(devices, n);
 
     if (drm_fd < 0) {
       BOOST_LOG(error) << "Failed to open DRM render node"sv;

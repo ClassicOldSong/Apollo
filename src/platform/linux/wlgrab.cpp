@@ -245,7 +245,7 @@ namespace wl {
       img->height = height;
       img->pixel_pitch = 4;
       img->row_pitch = img->pixel_pitch * width;
-      img->data = new std::uint8_t[height * img->row_pitch];
+      img->data = new std::uint8_t[height * img->row_pitch] {};
 
       return img;
     }
@@ -376,7 +376,13 @@ namespace platf {
       return nullptr;
     }
 
-    if (hwdevice_type == platf::mem_type_e::vaapi || hwdevice_type == platf::mem_type_e::cuda) {
+    // GPU-only images require the corresponding GPU converter. Without the
+    // CUDA converter, NVENC still works through FFmpeg's CPU-frame upload.
+    bool use_vram = hwdevice_type == platf::mem_type_e::vaapi;
+#ifdef SUNSHINE_BUILD_CUDA
+    use_vram = use_vram || hwdevice_type == platf::mem_type_e::cuda;
+#endif
+    if (use_vram) {
       auto wlr = std::make_shared<wl::wlr_vram_t>();
       if (wlr->init(hwdevice_type, display_name, config)) {
         return nullptr;
