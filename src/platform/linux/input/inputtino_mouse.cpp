@@ -27,7 +27,10 @@ namespace platf::mouse {
 
   void move_abs(input_raw_t *raw, const touch_port_t &touch_port, float x, float y) {
     if (raw->mouse) {
-      (*raw->mouse).move_abs(x, y, touch_port.width, touch_port.height);
+      // x/y are local to the streamed display while the absolute pointer device spans the whole
+      // desktop, so the display offset must be applied (same as the Windows/macOS backends).
+      // Without it absolute input always lands on the monitor at 0,0 (issue #711).
+      (*raw->mouse).move_abs(x + touch_port.offset_x, y + touch_port.offset_y, touch_port.width, touch_port.height);
     }
   }
 
