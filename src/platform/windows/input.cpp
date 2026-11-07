@@ -776,6 +776,33 @@ namespace platf {
   }
 
   /**
+   * @brief Convert a normalized touch port coordinate to an absolute desktop pixel location.
+   * @details The touch port offset is relative to the top-left corner of the virtual screen
+   *          (that is what `MOUSEEVENTF_VIRTUALDESK` expects), but `InjectSyntheticPointerInput()`
+   *          takes absolute desktop coordinates where the primary display is at 0x0 and the virtual
+   *          screen origin may be negative. All values are physical pixels since the process is
+   *          per-monitor DPI aware.
+   * @param touchPort The current viewport for translating to screen coordinates.
+   * @param x The normalized 0.0-1.0 X coordinate.
+   * @param y The normalized 0.0-1.0 Y coordinate.
+   * @return The pixel location, clamped to the streamed display.
+   */
+  POINT touchport_to_desktop(const touch_port_t &touchPort, float x, float y) {
+    auto virtual_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
+    auto virtual_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
+    // Round to the nearest pixel rather than truncating towards zero
+    LONG pixel_x = std::lround(x * touchPort.width) + touchPort.offset_x;
+    LONG pixel_y = std::lround(y * touchPort.height) + touchPort.offset_y;
+
+    // Keep the location on the streamed display (a coordinate of 1.0 would land one pixel past the edge)
+    pixel_x = std::clamp<LONG>(pixel_x, touchPort.offset_x, touchPort.offset_x + std::max<LONG>(touchPort.width - 1, 0));
+    pixel_y = std::clamp<LONG>(pixel_y, touchPort.offset_y, touchPort.offset_y + std::max<LONG>(touchPort.height - 1, 0));
+
+    return {pixel_x + virtual_x, pixel_y + virtual_y};
+  }
+
+  /**
    * @brief Populate common `POINTER_INFO` members shared between pen and touch events.
    * @param pointerInfo The pointer info to populate.
    * @param touchPort The current viewport for translating to screen coordinates.
@@ -788,13 +815,11 @@ namespace platf {
       case LI_TOUCH_EVENT_HOVER:
         pointerInfo.pointerFlags &= ~POINTER_FLAG_INCONTACT;
         pointerInfo.pointerFlags |= POINTER_FLAG_INRANGE | POINTER_FLAG_UPDATE;
-        pointerInfo.ptPixelLocation.x = x * touchPort.width + touchPort.offset_x;
-        pointerInfo.ptPixelLocation.y = y * touchPort.height + touchPort.offset_y;
+        pointerInfo.ptPixelLocation = touchport_to_desktop(touchPort, x, y);
         break;
       case LI_TOUCH_EVENT_DOWN:
         pointerInfo.pointerFlags |= POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_DOWN;
-        pointerInfo.ptPixelLocation.x = x * touchPort.width + touchPort.offset_x;
-        pointerInfo.ptPixelLocation.y = y * touchPort.height + touchPort.offset_y;
+        pointerInfo.ptPixelLocation = touchport_to_desktop(touchPort, x, y);
         break;
       case LI_TOUCH_EVENT_UP:
         // We expect to get another LI_TOUCH_EVENT_HOVER if the pointer remains in range
@@ -803,8 +828,7 @@ namespace platf {
         break;
       case LI_TOUCH_EVENT_MOVE:
         pointerInfo.pointerFlags |= POINTER_FLAG_INRANGE | POINTER_FLAG_INCONTACT | POINTER_FLAG_UPDATE;
-        pointerInfo.ptPixelLocation.x = x * touchPort.width + touchPort.offset_x;
-        pointerInfo.ptPixelLocation.y = y * touchPort.height + touchPort.offset_y;
+        pointerInfo.ptPixelLocation = touchport_to_desktop(touchPort, x, y);
         break;
       case LI_TOUCH_EVENT_CANCEL:
       case LI_TOUCH_EVENT_CANCEL_ALL:
@@ -984,17 +1008,30 @@ namespace platf {
         float rotationAngleDegs = touch.rotation == LI_ROT_UNKNOWN ? 45 : touch.rotation;
 
         float majorAxisAngle = rotationAngleDegs * (M_PI / 180);
-        float minorAxisAngle = majorAxisAngle + (M_PI / 2);
 
-        // Estimate the contact rectangle
-        float contactWidth = (std::cos(majorAxisAngle) * touch.contactAreaMajor) + (std::cos(minorAxisAngle) * touch.contactAreaMinor);
-        float contactHeight = (std::sin(majorAxisAngle) * touch.contactAreaMajor) + (std::sin(minorAxisAngle) * touch.contactAreaMinor);
+        // The contact area is an ellipse whose axes are already in host pixels (scaled per axis
+        // by the core). Compute the half extents of its rotated bounding box.
+        float semiMajor = touch.contactAreaMajor / 2;
+        float semiMinor = touch.contactAreaMinor / 2;
+        float cosAngle = std::cos(majorAxisAngle);
+        float sinAngle = std::sin(majorAxisAngle);
+        float halfWidth = std::hypot(semiMajor * cosAngle, semiMinor * sinAngle);
+        float halfHeight = std::hypot(semiMajor * sinAngle, semiMinor * cosAngle);
 
-        // Convert into screen coordinates centered at the touch location and constrained by screen dimensions
-        touchInfo.rcContact.left = std::max<LONG>(touch_port.offset_x, touchInfo.pointerInfo.ptPixelLocation.x - std::floor(contactWidth / 2));
-        touchInfo.rcContact.right = std::min<LONG>(touch_port.offset_x + touch_port.width, touchInfo.pointerInfo.ptPixelLocation.x + std::ceil(contactWidth / 2));
-        touchInfo.rcContact.top = std::max<LONG>(touch_port.offset_y, touchInfo.pointerInfo.ptPixelLocation.y - std::floor(contactHeight / 2));
-        touchInfo.rcContact.bottom = std::min<LONG>(touch_port.offset_y + touch_port.height, touchInfo.pointerInfo.ptPixelLocation.y + std::ceil(contactHeight / 2));
+        // Convert into screen coordinates centered at the touch location, at least one pixel in size
+        auto &location = touchInfo.pointerInfo.ptPixelLocation;
+        LONG left = location.x - std::max<LONG>(std::lround(halfWidth), 1);
+        LONG right = location.x + std::max<LONG>(std::lround(halfWidth), 1);
+        LONG top = location.y - std::max<LONG>(std::lround(halfHeight), 1);
+        LONG bottom = location.y + std::max<LONG>(std::lround(halfHeight), 1);
+
+        // Constrain the contact area to the streamed display
+        LONG display_x = GetSystemMetrics(SM_XVIRTUALSCREEN) + touch_port.offset_x;
+        LONG display_y = GetSystemMetrics(SM_YVIRTUALSCREEN) + touch_port.offset_y;
+        touchInfo.rcContact.left = std::max<LONG>(left, display_x);
+        touchInfo.rcContact.right = std::min<LONG>(right, display_x + touch_port.width);
+        touchInfo.rcContact.top = std::max<LONG>(top, display_y);
+        touchInfo.rcContact.bottom = std::min<LONG>(bottom, display_y + touch_port.height);
 
         touchInfo.touchMask |= TOUCH_MASK_CONTACTAREA;
       }

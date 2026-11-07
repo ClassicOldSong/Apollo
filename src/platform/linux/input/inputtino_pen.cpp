@@ -63,7 +63,9 @@ namespace platf::pen {
 
       bool is_touching = pen.eventType == LI_TOUCH_EVENT_DOWN || pen.eventType == LI_TOUCH_EVENT_MOVE;
 
-      (*raw->pen).place_tool(tool, pen.x, pen.y, is_touching ? pen.pressureOrDistance : -1, is_touching ? -1 : pen.pressureOrDistance, tilt_x, tilt_y);
+      auto x = to_display(pen.x);
+      auto y = to_display(pen.y);
+      (*raw->pen).place_tool(tool, x, y, is_touching ? pen.pressureOrDistance : -1, is_touching ? -1 : pen.pressureOrDistance, tilt_x, tilt_y);
     }
   }
 }  // namespace platf::pen

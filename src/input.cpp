@@ -9,6 +9,7 @@ extern "C" {
 }
 
 // standard includes
+#include <algorithm>
 #include <bitset>
 #include <chrono>
 #include <cmath>
@@ -170,7 +171,7 @@ namespace input {
         touch_port_event {std::move(touch_port_event)},
         feedback_queue {std::move(feedback_queue)},
         mouse_left_button_timeout {},
-        touch_port {{0, 0, 0, 0}, 0, 0, 1.0f},
+        touch_port {},
         accumulated_vscroll_delta {},
         accumulated_hscroll_delta {} {
     }
@@ -450,14 +451,78 @@ namespace input {
     platf::move_mouse(platf_input, util::endian::big(packet->deltaX), util::endian::big(packet->deltaY));
   }
 
+  touch_scale_t compute_touch_scale(int stream_width, int stream_height, int display_width, int display_height) {
+    if (stream_width <= 0 || stream_height <= 0 || display_width <= 0 || display_height <= 0) {
+      return {1.0f, 1.0f, 0.0f, 0.0f, (float) std::max(stream_width, 0), (float) std::max(stream_height, 0)};
+    }
+
+    float wt = stream_width;
+    float ht = stream_height;
+    float wd = display_width;
+    float hd = display_height;
+
+    // The encoder aspect-fits the display into the stream
+    auto scalar = std::min(wt / wd, ht / hd);
+    auto content_width = wd * scalar;
+    auto content_height = hd * scalar;
+
+    return {
+      wd / content_width,
+      hd / content_height,
+      (wt - content_width) * 0.5f,
+      (ht - content_height) * 0.5f,
+      content_width,
+      content_height,
+    };
+  }
+
+  touch_port_t make_touch_port(int offset_x, int offset_y, int stream_width, int stream_height, int display_width, int display_height, int env_width, int env_height) {
+    return touch_port_t {
+      {offset_x, offset_y, stream_width, stream_height},
+      env_width,
+      env_height,
+      display_width,
+      display_height,
+      compute_touch_scale(stream_width, stream_height, display_width, display_height),
+    };
+  }
+
+  std::pair<float, float> client_to_display(const touch_port_t &port, float x, float y) {
+    auto &scale = port.scale;
+
+    // Client normalized -> client stream pixels, clamped to the active video area
+    float sx = std::clamp(x, 0.0f, 1.0f) * port.width;
+    float sy = std::clamp(y, 0.0f, 1.0f) * port.height;
+    sx = std::clamp(sx, scale.content_x, scale.content_x + scale.content_width);
+    sy = std::clamp(sy, scale.content_y, scale.content_y + scale.content_height);
+
+    // Client stream pixels -> host display pixels
+    return {
+      std::clamp((sx - scale.content_x) * scale.scale_x, 0.0f, (float) port.display_width),
+      std::clamp((sy - scale.content_y) * scale.scale_y, 0.0f, (float) port.display_height),
+    };
+  }
+
+  std::pair<float, float> client_contact_area_scalar(const touch_port_t &port) {
+    return {port.width * port.scale.scale_x, port.height * port.scale.scale_y};
+  }
+
+  platf::touch_port_t platform_touch_port(const touch_port_t &port) {
+    return {port.offset_x, port.offset_y, port.env_width, port.env_height};
+  }
+
+  platf::touch_port_t platform_display_port(const touch_port_t &port) {
+    return {port.offset_x, port.offset_y, port.display_width, port.display_height};
+  }
+
   /**
-   * @brief Converts client coordinates on the specified surface into screen coordinates.
+   * @brief Converts normalized client coordinates into display-local host pixels using the current touch port.
    * @param input The input context.
-   * @param val The cartesian coordinate pair to convert.
-   * @param size The size of the client's surface containing the value.
+   * @param x Normalized client X coordinate (0..1).
+   * @param y Normalized client Y coordinate (0..1).
    * @return The host-relative coordinate pair if a touchport is available.
    */
-  std::optional<std::pair<float, float>> client_to_touchport(std::shared_ptr<input_t> &input, const std::pair<float, float> &val, const std::pair<float, float> &size) {
+  std::optional<std::pair<float, float>> client_to_touchport(std::shared_ptr<input_t> &input, float x, float y) {
     auto &touch_port_event = input->touch_port_event;
     auto &touch_port = input->touch_port;
     if (touch_port_event->peek()) {
@@ -468,19 +533,7 @@ namespace input {
       return std::nullopt;
     }
 
-    auto scalarX = touch_port.width / size.first;
-    auto scalarY = touch_port.height / size.second;
-
-    float x = std::clamp(val.first, 0.0f, size.first) * scalarX;
-    float y = std::clamp(val.second, 0.0f, size.second) * scalarY;
-
-    auto offsetX = touch_port.client_offsetX;
-    auto offsetY = touch_port.client_offsetY;
-
-    x = std::clamp(x, offsetX, (size.first * scalarX) - offsetX);
-    y = std::clamp(y, offsetY, (size.second * scalarY) - offsetY);
-
-    return std::pair {(x - offsetX) * touch_port.scalar_inv, (y - offsetY) * touch_port.scalar_inv};
+    return client_to_display(touch_port, x, y);
   }
 
   /**
@@ -539,18 +592,12 @@ namespace input {
     auto width = (float) util::endian::big(packet->width);
     auto height = (float) util::endian::big(packet->height);
 
-    auto tpcoords = client_to_touchport(input, {x, y}, {width, height});
+    auto tpcoords = client_to_touchport(input, x / width, y / height);
     if (!tpcoords) {
       return;
     }
 
-    auto &touch_port = input->touch_port;
-    platf::touch_port_t abs_port {
-      touch_port.offset_x,
-      touch_port.offset_y,
-      touch_port.env_width,
-      touch_port.env_height
-    };
+    auto abs_port = platform_touch_port(input->touch_port);
 
     platf::abs_mouse(platf_input, abs_port, tpcoords->first, tpcoords->second);
   }
@@ -880,20 +927,14 @@ namespace input {
     }
 
     // Convert the client normalized coordinates to touchport coordinates
-    auto coords = client_to_touchport(input, {from_clamped_netfloat(packet->x, 0.0f, 1.0f) * 65535.f, from_clamped_netfloat(packet->y, 0.0f, 1.0f) * 65535.f}, {65535.f, 65535.f});
+    auto coords = client_to_touchport(input, from_clamped_netfloat(packet->x, 0.0f, 1.0f), from_clamped_netfloat(packet->y, 0.0f, 1.0f));
     if (!coords) {
       return;
     }
 
-    auto &touch_port = input->touch_port;
-    platf::touch_port_t abs_port {
-      touch_port.offset_x,
-      touch_port.offset_y,
-      touch_port.env_width,
-      touch_port.env_height
-    };
+    auto abs_port = platform_display_port(input->touch_port);
 
-    // Renormalize the coordinates
+    // Renormalize the coordinates against the streamed display (see platform_display_port())
     coords->first /= abs_port.width;
     coords->second /= abs_port.height;
 
@@ -903,12 +944,12 @@ namespace input {
       rotation %= 360;
     }
 
-    // Normalize the contact area based on the touchport
+    // Scale the contact area into host pixels with the same per-axis ratios as the coordinates
     auto contact_area = scale_client_contact_area(
-      {from_clamped_netfloat(packet->contactAreaMajor, 0.0f, 1.0f) * 65535.f,
-       from_clamped_netfloat(packet->contactAreaMinor, 0.0f, 1.0f) * 65535.f},
+      {from_clamped_netfloat(packet->contactAreaMajor, 0.0f, 1.0f),
+       from_clamped_netfloat(packet->contactAreaMinor, 0.0f, 1.0f)},
       rotation,
-      {abs_port.width / 65535.f, abs_port.height / 65535.f}
+      client_contact_area_scalar(input->touch_port)
     );
 
     platf::touch_input_t touch {
@@ -936,20 +977,14 @@ namespace input {
     }
 
     // Convert the client normalized coordinates to touchport coordinates
-    auto coords = client_to_touchport(input, {from_clamped_netfloat(packet->x, 0.0f, 1.0f) * 65535.f, from_clamped_netfloat(packet->y, 0.0f, 1.0f) * 65535.f}, {65535.f, 65535.f});
+    auto coords = client_to_touchport(input, from_clamped_netfloat(packet->x, 0.0f, 1.0f), from_clamped_netfloat(packet->y, 0.0f, 1.0f));
     if (!coords) {
       return;
     }
 
-    auto &touch_port = input->touch_port;
-    platf::touch_port_t abs_port {
-      touch_port.offset_x,
-      touch_port.offset_y,
-      touch_port.env_width,
-      touch_port.env_height
-    };
+    auto abs_port = platform_display_port(input->touch_port);
 
-    // Renormalize the coordinates
+    // Renormalize the coordinates against the streamed display (see platform_display_port())
     coords->first /= abs_port.width;
     coords->second /= abs_port.height;
 
@@ -959,12 +994,12 @@ namespace input {
       rotation %= 360;
     }
 
-    // Normalize the contact area based on the touchport
+    // Scale the contact area into host pixels with the same per-axis ratios as the coordinates
     auto contact_area = scale_client_contact_area(
-      {from_clamped_netfloat(packet->contactAreaMajor, 0.0f, 1.0f) * 65535.f,
-       from_clamped_netfloat(packet->contactAreaMinor, 0.0f, 1.0f) * 65535.f},
+      {from_clamped_netfloat(packet->contactAreaMajor, 0.0f, 1.0f),
+       from_clamped_netfloat(packet->contactAreaMinor, 0.0f, 1.0f)},
       rotation,
-      {abs_port.width / 65535.f, abs_port.height / 65535.f}
+      client_contact_area_scalar(input->touch_port)
     );
 
     platf::pen_input_t pen {
