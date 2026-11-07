@@ -4,6 +4,10 @@
  */
 #pragma once
 
+// standard includes
+#include <algorithm>
+#include <set>
+
 // lib includes
 #include <boost/locale.hpp>
 #include <inputtino/input.hpp>
@@ -94,7 +98,20 @@ namespace platf {
     // for each client.
     inputtino::Result<inputtino::TouchScreen> touch;
     inputtino::Result<inputtino::PenTablet> pen;
+
+    // Pointer IDs of the fingers currently placed on the touch screen, so they can all be
+    // released on LI_TOUCH_EVENT_CANCEL_ALL.
+    std::set<std::uint32_t> active_fingers;
   };
+
+  /**
+   * @brief Clamp a coordinate normalized against the streamed display.
+   * @details The compositor binds the absolute touch/pen device to a single output, so the
+   *          coordinate is relative to that output and must not include the display offset.
+   */
+  inline float to_display(float value) {
+    return std::clamp(value, 0.0f, 1.0f);
+  }
 
   inline float deg2rad(float degree) {
     return degree * (M_PI / 180.f);

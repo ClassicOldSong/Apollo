@@ -39,7 +39,10 @@ namespace platf::touch {
             } else if (adjusted_angle < -90) {
               adjusted_angle += 360;
             }
-            (*raw->touch).place_finger(touch.pointerId, touch.x, touch.y, touch.pressureOrDistance, adjusted_angle);
+            auto x = to_display(touch.x);
+            auto y = to_display(touch.y);
+            (*raw->touch).place_finger(touch.pointerId, x, y, touch.pressureOrDistance, adjusted_angle);
+            raw->active_fingers.insert(touch.pointerId);
             break;
           }
         case LI_TOUCH_EVENT_CANCEL:
@@ -47,9 +50,17 @@ namespace platf::touch {
         case LI_TOUCH_EVENT_HOVER_LEAVE:
           {
             (*raw->touch).release_finger(touch.pointerId);
+            raw->active_fingers.erase(touch.pointerId);
             break;
           }
-          // TODO: LI_TOUCH_EVENT_CANCEL_ALL
+        case LI_TOUCH_EVENT_CANCEL_ALL:
+          {
+            for (auto pointer_id : raw->active_fingers) {
+              (*raw->touch).release_finger(pointer_id);
+            }
+            raw->active_fingers.clear();
+            break;
+          }
       }
     }
   }
