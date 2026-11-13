@@ -43,7 +43,10 @@ namespace {
         0x09, 0x22, 0xA1, 0x02,  // Finger, logical collection
         0x09, 0x42, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x01, 0x81, 0x02,  // Tip Switch
         0x09, 0x32, 0x81, 0x02,  // In Range
-        0x95, 0x06, 0x81, 0x03,  // padding
+        // Confidence: without it the HID driver marks each contact a hand rather than a finger, and the
+        // Dock (unlike AppKit) ignores every contact that is not a finger
+        0x09, 0x47, 0x81, 0x02,
+        0x95, 0x05, 0x81, 0x03,  // padding
         0x75, 0x08, 0x95, 0x01, 0x09, 0x51, 0x25, 0x7F, 0x81, 0x02,  // Contact Identifier
         0x05, 0x01, 0x26, 0xFF, 0x7F, 0x75, 0x10, 0x55, 0x0E, 0x65, 0x11, 0x35, 0x00,  // 0..32767, units of 0.1 mm
       };
@@ -146,7 +149,7 @@ namespace {
     r.count = std::min<uint8_t>(f.count, max_contacts);
     for (int i = 0; i < r.count; i++) {
       const auto &c = f.contacts[i];
-      r.c[i] = {(uint8_t) (c.flags & 3), (uint8_t) (c.id & 0x7f), c.x, c.y, c.width, c.height};
+      r.c[i] = {(uint8_t) ((c.flags & 3) | 4), (uint8_t) (c.id & 0x7f), c.x, c.y, c.width, c.height};
     }
     IOReturn e = IOHIDUserDeviceHandleReportWithTimeStamp(device, mach_absolute_time(), (const uint8_t *) &r, sizeof r);
     if (e != kIOReturnSuccess) {
