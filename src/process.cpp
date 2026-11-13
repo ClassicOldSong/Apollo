@@ -1526,7 +1526,12 @@ namespace proc {
     }
 
     // Virtual Display entry
-  #ifdef _WIN32
+  #if defined(_WIN32) || defined(__APPLE__)
+    #ifdef __APPLE__
+    if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
+      initVDisplayDriver();
+    }
+    #endif
     if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
       proc::ctx_t ctx;
       ctx.idx = std::to_string(i);
