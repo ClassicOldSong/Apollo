@@ -840,6 +840,7 @@ namespace proc {
 #elif defined(__APPLE__)
     bool used_virtual_display = _launch_session && _launch_session->virtual_display;
     if (used_virtual_display) {
+      platf::touchscreen::reset();
       // Displays back on first, so macOS never has a moment with no display at all
       VDISPLAY::restoreDisplays();
       if (VDISPLAY::removeVirtualDisplay(_launch_session->unique_id.c_str())) {

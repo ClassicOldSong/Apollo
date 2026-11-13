@@ -45,6 +45,9 @@ set(PLATFORM_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/platform/macos/publish.cpp"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/sc_video.h"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/sc_video.mm"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/touch_protocol.h"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/touchscreen.h"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/touchscreen.mm"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/virtual_display.h"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/virtual_display.mm"
         "${CMAKE_SOURCE_DIR}/third-party/TPCircularBuffer/TPCircularBuffer.c"
@@ -61,5 +64,6 @@ endif()
 # The files written for this fork use ARC; the rest of the macOS code is manual retain/release
 set_source_files_properties(
         "${CMAKE_SOURCE_DIR}/src/platform/macos/sc_video.mm"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/touchscreen.mm"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/virtual_display.mm"
         PROPERTIES COMPILE_OPTIONS "-fobjc-arc")

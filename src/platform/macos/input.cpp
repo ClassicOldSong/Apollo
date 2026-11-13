@@ -19,6 +19,7 @@
 #include "src/input.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/platform/macos/touchscreen.h"
 #include "src/utility.h"
 
 /**
@@ -324,7 +325,7 @@ const KeyCodeMap kKeyCodesMap[] = {
         return id;
       }
     }
-    return CGDisplayIsActive(macos_input->display) ? macos_input->display : CGMainDisplayID();
+    return macos_input && CGDisplayIsActive(macos_input->display) ? macos_input->display : CGMainDisplayID();
   }
 
   // returns current mouse location:
@@ -496,7 +497,8 @@ const KeyCodeMap kKeyCodesMap[] = {
    * @param touch The touch event.
    */
   void touch_update(client_input_t *input, const touch_port_t &touch_port, const touch_input_t &touch) {
-    // Unimplemented feature - platform_caps::pen_touch
+    // x and y arrive normalised to the captured display; the touchscreen covers exactly that display
+    touchscreen::update(current_display(nullptr), touch.eventType, touch.pointerId, touch.x, touch.y, touch.contactAreaMajor / touch_port.width, touch.contactAreaMinor / touch_port.height);
   }
 
   /**
@@ -506,7 +508,9 @@ const KeyCodeMap kKeyCodesMap[] = {
    * @param pen The pen event.
    */
   void pen_update(client_input_t *input, const touch_port_t &touch_port, const pen_input_t &pen) {
-    // Unimplemented feature - platform_caps::pen_touch
+    // A pen touches the screen like a finger (macOS 27 has no stylus path for a HID touchscreen yet)
+    constexpr uint32_t pen_pointer = 0xFFFF0000;
+    touchscreen::update(current_display(nullptr), pen.eventType, pen_pointer, pen.x, pen.y, pen.contactAreaMajor / touch_port.width, pen.contactAreaMinor / touch_port.height);
   }
 
   /**
@@ -608,6 +612,7 @@ const KeyCodeMap kKeyCodesMap[] = {
    * @return Capability flags.
    */
   platform_caps::caps_t get_capabilities() {
-    return 0;
+    // Advertise touch only when a real touchscreen can be made; otherwise the client turns touch into mouse input
+    return touchscreen::available() ? platform_caps::pen_touch : 0;
   }
 }  // namespace platf

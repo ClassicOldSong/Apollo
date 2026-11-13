@@ -33,6 +33,7 @@
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
 #elif defined(__APPLE__)
+  #include "platform/macos/touchscreen.h"
   #include "platform/macos/virtual_display.h"
 #endif
 
