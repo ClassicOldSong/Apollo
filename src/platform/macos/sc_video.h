@@ -35,3 +35,8 @@ API_AVAILABLE(macos(14.0))
 - (void)stop;
 
 @end
+
+/**
+ * A retained sample buffer holding one black frame of that size and pixel format, or NULL.
+ */
+CMSampleBufferRef make_black_sample(int width, int height, OSType pixelFormat);

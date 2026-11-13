@@ -2,6 +2,9 @@
  * @file src/platform/macos/display.mm
  * @brief Definitions for display capture on macOS.
  */
+// standard includes
+#include <atomic>
+
 // local includes
 #include "src/config.h"
 #include "src/logging.h"
@@ -104,7 +107,7 @@ namespace platf {
         return 1;
       }
 
-      auto signal = [av_capture capture:^(CMSampleBufferRef sampleBuffer) {
+      auto fill = [img](CMSampleBufferRef sampleBuffer) {
         auto new_sample_buffer = std::make_shared<av_sample_buf_t>(sampleBuffer);
         auto new_pixel_buffer = std::make_shared<av_pixel_buf_t>(new_sample_buffer->buf);
 
@@ -126,12 +129,35 @@ namespace platf {
         img->pixel_pitch = img->row_pitch / img->width;
 
         old_data_retainer = nullptr;
+      };
 
+      // A locked screen (as after a restart) can give no frames at all; use black rather than hang
+      auto taken = std::make_shared<std::atomic<bool>>(false);
+      auto signal = [av_capture capture:^(CMSampleBufferRef sampleBuffer) {
+        if (!taken->exchange(true)) {
+          fill(sampleBuffer);
+        }
         // returning false here stops capture backend
         return false;
       }];
-
-      dispatch_semaphore_wait(signal, DISPATCH_TIME_FOREVER);
+      if (!signal) {
+        return 1;
+      }
+      // AVVideo cannot be abandoned mid-capture, so only ScreenCaptureKit capture gets the time limit
+      bool limited = [(id) av_capture isKindOfClass:[SCVideo class]];
+      if (dispatch_semaphore_wait(signal, limited ? dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC) : DISPATCH_TIME_FOREVER) != 0) {
+        if (taken->exchange(true)) {
+          dispatch_semaphore_wait(signal, DISPATCH_TIME_FOREVER);  // a frame came just now and is being filled in
+        } else {
+          BOOST_LOG(warning) << "No picture from the display in 5 s (locked?), so the encoder test uses black"sv;
+          CMSampleBufferRef black = make_black_sample(av_capture.frameWidth, av_capture.frameHeight, av_capture.pixelFormat);
+          if (!black) {
+            return 1;
+          }
+          fill(black);
+          CFRelease(black);
+        }
+      }
 
       return 0;
     }

@@ -8,6 +8,33 @@
   #error sc_video.mm must be built with -fobjc-arc
 #endif
 
+CMSampleBufferRef make_black_sample(int width, int height, OSType pixelFormat) {
+  NSDictionary *attrs = @{(id) kCVPixelBufferIOSurfacePropertiesKey: @{}};
+  CVPixelBufferRef pb = NULL;
+  if (CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat, (__bridge CFDictionaryRef) attrs, &pb) != kCVReturnSuccess) {
+    return NULL;
+  }
+  CVPixelBufferLockBaseAddress(pb, 0);
+  if (CVPixelBufferIsPlanar(pb)) {
+    // 4:2:0 YUV: black is luma 16 (video range) or 0 (full range), chroma 128
+    uint8_t luma = pixelFormat == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange ? 16 : 0;
+    memset(CVPixelBufferGetBaseAddressOfPlane(pb, 0), luma, CVPixelBufferGetBytesPerRowOfPlane(pb, 0) * CVPixelBufferGetHeightOfPlane(pb, 0));
+    memset(CVPixelBufferGetBaseAddressOfPlane(pb, 1), 128, CVPixelBufferGetBytesPerRowOfPlane(pb, 1) * CVPixelBufferGetHeightOfPlane(pb, 1));
+  } else {
+    memset(CVPixelBufferGetBaseAddress(pb), 0, CVPixelBufferGetBytesPerRow(pb) * CVPixelBufferGetHeight(pb));
+  }
+  CVPixelBufferUnlockBaseAddress(pb, 0);
+  CMVideoFormatDescriptionRef fd = NULL;
+  CMSampleBufferRef sb = NULL;
+  CMSampleTimingInfo timing = {kCMTimeInvalid, CMClockGetTime(CMClockGetHostTimeClock()), kCMTimeInvalid};
+  if (CMVideoFormatDescriptionCreateForImageBuffer(kCFAllocatorDefault, pb, &fd) == noErr) {
+    CMSampleBufferCreateReadyWithImageBuffer(kCFAllocatorDefault, pb, fd, &timing, &sb);
+    CFRelease(fd);
+  }
+  CVPixelBufferRelease(pb);
+  return sb;
+}
+
 static const int64_t repeat_after = 100 * NSEC_PER_MSEC;
 
 @implementation SCVideo {
@@ -18,7 +45,7 @@ static const int64_t repeat_after = 100 * NSEC_PER_MSEC;
   dispatch_semaphore_t _signal;
   dispatch_source_t _repeat;
   CMSampleBufferRef _last;  // last complete frame, retained
-  uint64_t _lastDelivered;  // dispatch_time of the last callback
+  uint64_t _lastDelivered;  // nanoseconds (CLOCK_UPTIME_RAW) at the last callback
 }
 
 + (BOOL)isAvailable {
@@ -29,8 +56,8 @@ static const int64_t repeat_after = 100 * NSEC_PER_MSEC;
 }
 
 // SCShareableContent is asynchronous; a display made a moment ago can take a little while to appear.
-static SCDisplay *find_display(CGDirectDisplayID displayID) {
-  for (int attempt = 0; attempt < 30; attempt++) {
+static SCDisplay *find_display(CGDirectDisplayID displayID, int attempts) {
+  for (int attempt = 0; attempt < attempts; attempt++) {
     __block SCDisplay *found = nil;
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
     [SCShareableContent getShareableContentExcludingDesktopWindows:NO
@@ -57,19 +84,24 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
   if (!self) {
     return nil;
   }
-  SCDisplay *display = find_display(displayID);
-  if (!display) {
-    return nil;
-  }
-  _filter = [[SCContentFilter alloc] initWithDisplay:display excludingWindows:@[]];
-  CGRect rect = _filter.contentRect;
-  float scale = _filter.pointPixelScale;
-
   self.displayID = displayID;
   self.frameRate = frameRate > 0 ? frameRate : 60;
   self.pixelFormat = kCVPixelFormatType_32BGRA;
-  self.frameWidth = (int) lround(rect.size.width * scale);
-  self.frameHeight = (int) lround(rect.size.height * scale);
+  SCDisplay *display = find_display(displayID, 30);
+  if (display) {
+    _filter = [[SCContentFilter alloc] initWithDisplay:display excludingWindows:@[]];
+    CGRect rect = _filter.contentRect;
+    float scale = _filter.pointPixelScale;
+    self.frameWidth = (int) lround(rect.size.width * scale);
+    self.frameHeight = (int) lround(rect.size.height * scale);
+  } else {
+    // Not shareable right now (the screen is locked after a restart): capture sends black until it is
+    NSLog(@"SCVideo: display %u not shareable yet", displayID);
+    CGDisplayModeRef mode = CGDisplayCopyDisplayMode(displayID);
+    self.frameWidth = mode ? (int) CGDisplayModeGetPixelWidth(mode) : (int) CGDisplayPixelsWide(displayID);
+    self.frameHeight = mode ? (int) CGDisplayModeGetPixelHeight(mode) : (int) CGDisplayPixelsHigh(displayID);
+    CGDisplayModeRelease(mode);
+  }
   _queue = dispatch_queue_create("apollo.sc-video", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INTERACTIVE, 0));
   return self;
 }
@@ -103,29 +135,39 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
     _signal = dispatch_semaphore_create(0);
     dispatch_semaphore_t signal = _signal;
 
-    _stream = [[SCStream alloc] initWithFilter:_filter configuration:[self configuration] delegate:self];
-    NSError *error = nil;
-    if (![_stream addStreamOutput:self type:SCStreamOutputTypeScreen sampleHandlerQueue:_queue error:&error]) {
-      NSLog(@"SCVideo: addStreamOutput failed: %@", error);
-      _stream = nil;
-      return nil;
+    if (!_filter) {
+      SCDisplay *display = find_display(self.displayID, 1);
+      if (display) {
+        _filter = [[SCContentFilter alloc] initWithDisplay:display excludingWindows:@[]];
+      }
     }
-    dispatch_semaphore_t started = dispatch_semaphore_create(0);
-    __block NSError *startError = nil;
-    [_stream startCaptureWithCompletionHandler:^(NSError *e) {
-      startError = e;
-      dispatch_semaphore_signal(started);
-    }];
-    dispatch_semaphore_wait(started, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
-    if (startError) {
-      NSLog(@"SCVideo: startCapture failed: %@", startError);
-      _stream = nil;
-      return nil;
+    if (_filter) {
+      _stream = [[SCStream alloc] initWithFilter:_filter configuration:[self configuration] delegate:self];
+      NSError *error = nil;
+      if (![_stream addStreamOutput:self type:SCStreamOutputTypeScreen sampleHandlerQueue:_queue error:&error]) {
+        NSLog(@"SCVideo: addStreamOutput failed: %@", error);
+        _stream = nil;
+        return nil;
+      }
+      dispatch_semaphore_t started = dispatch_semaphore_create(0);
+      __block NSError *startError = nil;
+      [_stream startCaptureWithCompletionHandler:^(NSError *e) {
+        startError = e;
+        dispatch_semaphore_signal(started);
+      }];
+      dispatch_semaphore_wait(started, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC));
+      if (startError) {
+        NSLog(@"SCVideo: startCapture failed: %@", startError);
+        _stream = nil;
+        return nil;
+      }
     }
+    // With no filter there is no stream (nil), and the timer below sends black frames
 
     // ScreenCaptureKit sends nothing while the screen is still, but the callback is also how capture
     // learns it should stop, so repeat the last frame when none has come for a while.
     SCStream *stream = _stream;
+    _lastDelivered = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
     _repeat = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _queue);
     dispatch_source_set_timer(_repeat, dispatch_time(DISPATCH_TIME_NOW, repeat_after), repeat_after, repeat_after / 10);
     __weak SCVideo *weakSelf = self;
@@ -170,8 +212,15 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
 - (void)repeatLastFrame:(SCStream *)stream {
   CMSampleBufferRef last = nil;
   @synchronized(self) {
-    if (stream != _stream || !_last || dispatch_time(DISPATCH_TIME_NOW, 0) - _lastDelivered < (uint64_t) repeat_after) {
+    uint64_t since = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - _lastDelivered;
+    if (stream != _stream || since < (uint64_t) repeat_after) {
       return;
+    }
+    if (!_last) {
+      // Nothing at all, as while the screen is locked after a restart: send black rather than hang
+      if (since < (uint64_t) NSEC_PER_SEC || !(_last = make_black_sample(self.frameWidth, self.frameHeight, self.pixelFormat))) {
+        return;
+      }
     }
     last = (CMSampleBufferRef) CFRetain(_last);
   }
@@ -186,7 +235,7 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
       return;
     }
     callback = _callback;
-    _lastDelivered = dispatch_time(DISPATCH_TIME_NOW, 0);
+    _lastDelivered = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
   }
   if (callback && !callback(sampleBuffer)) {
     @synchronized(self) {
