@@ -140,8 +140,8 @@ void mainThreadLoop(const std::shared_ptr<safe::event_t<bool>> &shutdown_event) 
 int main(int argc, char *argv[]) {
 #ifdef __APPLE__
   // A copy of this executable started by VDISPLAY::isolateDisplay() to turn the displays back on if we die
-  if (VDISPLAY::isDisplayGuardInvocation(argc, argv)) {
-    return VDISPLAY::displayGuardMain(argc, argv);
+  if (VDISPLAY::isHelperInvocation(argc, argv)) {
+    return VDISPLAY::helperMain(argc, argv);
   }
 #endif
   lifetime::argv = argv;

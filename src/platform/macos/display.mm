@@ -8,6 +8,7 @@
 #include "src/platform/common.h"
 #include "src/platform/macos/av_img_t.h"
 #include "src/platform/macos/av_video.h"
+#include "src/platform/macos/sc_video.h"
 #include "src/platform/macos/misc.h"
 #include "src/platform/macos/nv12_zero_device.h"
 
@@ -22,7 +23,7 @@ namespace platf {
   using namespace std::literals;
 
   struct av_display_t: public display_t {
-    AVVideo *av_capture {};
+    id<FrameSource> av_capture {};
     CGDirectDisplayID display_id {};
 
     ~av_display_t() override {
@@ -80,7 +81,7 @@ namespace platf {
 
     std::unique_ptr<avcodec_encode_device_t> make_avcodec_encode_device(pix_fmt_e pix_fmt) override {
       if (pix_fmt == pix_fmt_e::yuv420p) {
-        av_capture.pixelFormat = kCVPixelFormatType_32BGRA;
+        [av_capture setPixelFormat:kCVPixelFormatType_32BGRA];
 
         return std::make_unique<avcodec_encode_device_t>();
       } else if (pix_fmt == pix_fmt_e::nv12 || pix_fmt == pix_fmt_e::p010) {
@@ -143,11 +144,11 @@ namespace platf {
      * height --> the intended capture height
      */
     static void setResolution(void *display, int width, int height) {
-      [static_cast<AVVideo *>(display) setFrameWidth:width frameHeight:height];
+      [static_cast<id<FrameSource>>(display) setFrameWidth:width frameHeight:height];
     }
 
     static void setPixelFormat(void *display, OSType pixelFormat) {
-      static_cast<AVVideo *>(display).pixelFormat = pixelFormat;
+      [static_cast<id<FrameSource>>(display) setPixelFormat:pixelFormat];
     }
   };
 
@@ -177,15 +178,24 @@ namespace platf {
     }
     BOOST_LOG(info) << "Configuring selected display ("sv << display->display_id << ") to stream"sv;
 
-    display->av_capture = [[AVVideo alloc] initWithDisplay:display->display_id frameRate:config.framerate];
+    // ScreenCaptureKit first: AVCaptureScreenInput gets no size (so no frames) from a CGVirtualDisplay
+    if ([SCVideo isAvailable]) {
+      display->av_capture = [[SCVideo alloc] initWithDisplay:display->display_id frameRate:config.framerate];
+      if (display->av_capture) {
+        BOOST_LOG(info) << "Capturing with ScreenCaptureKit"sv;
+      }
+    }
+    if (!display->av_capture) {
+      display->av_capture = [[AVVideo alloc] initWithDisplay:display->display_id frameRate:config.framerate];
+    }
 
     if (!display->av_capture) {
       BOOST_LOG(error) << "Video setup failed."sv;
       return nullptr;
     }
 
-    display->width = display->av_capture.frameWidth;
-    display->height = display->av_capture.frameHeight;
+    display->width = [display->av_capture frameWidth];
+    display->height = [display->av_capture frameHeight];
     // We also need set env_width and env_height for absolute mouse coordinates
     display->env_width = display->width;
     display->env_height = display->height;

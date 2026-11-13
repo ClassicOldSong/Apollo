@@ -13,7 +13,20 @@ struct CaptureSession {
   NSCondition *captureStopped;
 };
 
-@interface AVVideo: NSObject <AVCaptureVideoDataOutputSampleBufferDelegate>
+typedef bool (^FrameCallbackBlock)(CMSampleBufferRef);
+
+/**
+ * What display.mm and nv12_zero_device need from a capture backend (AVVideo or SCVideo).
+ */
+@protocol FrameSource <NSObject>
+@property (nonatomic, assign) OSType pixelFormat;
+@property (nonatomic, assign) int frameWidth;
+@property (nonatomic, assign) int frameHeight;
+- (void)setFrameWidth:(int)frameWidth frameHeight:(int)frameHeight;
+- (dispatch_semaphore_t)capture:(FrameCallbackBlock)frameCallback;
+@end
+
+@interface AVVideo: NSObject <AVCaptureVideoDataOutputSampleBufferDelegate, FrameSource>
 
 #define kMaxDisplays 32
 
@@ -23,7 +36,6 @@ struct CaptureSession {
 @property (nonatomic, assign) int frameWidth;
 @property (nonatomic, assign) int frameHeight;
 
-typedef bool (^FrameCallbackBlock)(CMSampleBufferRef);
 
 @property (nonatomic, assign) AVCaptureSession *session;
 @property (nonatomic, assign) NSMapTable<AVCaptureConnection *, AVCaptureVideoDataOutput *> *videoOutputs;

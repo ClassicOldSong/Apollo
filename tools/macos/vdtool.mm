@@ -35,8 +35,8 @@ static void report(const char *when) {
 }
 
 int main(int argc, char **argv) {
-  if (VDISPLAY::isDisplayGuardInvocation(argc, argv)) {
-    return VDISPLAY::displayGuardMain(argc, argv);
+  if (VDISPLAY::isHelperInvocation(argc, argv)) {
+    return VDISPLAY::helperMain(argc, argv);
   }
   @autoreleasepool {
     if (argc < 3) {

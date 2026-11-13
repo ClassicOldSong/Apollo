@@ -96,27 +96,31 @@ namespace VDISPLAY {
       return false;
     }
 
-    // Picks the mode whose backing store is width x height pixels and whose point size is closest to pixels / scale.
-    CGDisplayModeRef find_mode(CGDirectDisplayID display, uint32_t width, uint32_t height, uint32_t scale, double hz) {
-      NSDictionary *opts = @{(__bridge NSString *) kCGDisplayShowDuplicateLowResolutionModes: @YES};
-      NSArray *modes = CFBridgingRelease(CGDisplayCopyAllDisplayModes(display, (__bridge CFDictionaryRef) opts));
-      CGDisplayModeRef best = nullptr;
-      double best_score = 1e18;
-      for (id m in modes) {
-        auto mode = (__bridge CGDisplayModeRef) m;
-        if (CGDisplayModeGetPixelWidth(mode) != width || CGDisplayModeGetPixelHeight(mode) != height) {
-          continue;
-        }
-        double dw = (double) CGDisplayModeGetWidth(mode) - (double) width / scale;
-        double dh = (double) CGDisplayModeGetHeight(mode) - (double) height / scale;
-        double score = dw * dw + dh * dh + fabs(CGDisplayModeGetRefreshRate(mode) - hz);
-        if (score < best_score) {
-          best_score = score;
-          best = mode;
-        }
-      }
-      return best ? CGDisplayModeRetain(best) : nullptr;
+    std::string self_path() {
+      char exe[PATH_MAX];
+      uint32_t size = sizeof exe;
+      return _NSGetExecutablePath(exe, &size) == 0 ? exe : "";
     }
+
+    pid_t spawn_helper(const std::vector<std::string> &helper_args) {
+      std::vector<std::string> args {self_path()};
+      args.insert(args.end(), helper_args.begin(), helper_args.end());
+      std::vector<char *> argv;
+      for (auto &a : args) {
+        argv.push_back(a.data());
+      }
+      argv.push_back(nullptr);
+      posix_spawn_file_actions_t actions;
+      posix_spawn_file_actions_init(&actions);
+      posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
+      pid_t pid = 0;
+      if (args[0].empty() || posix_spawn(&pid, args[0].c_str(), &actions, nullptr, argv.data(), environ) != 0) {
+        pid = 0;
+      }
+      posix_spawn_file_actions_destroy(&actions);
+      return pid;
+    }
+
   }  // namespace
 
   std::string lastError() {
@@ -149,14 +153,25 @@ namespace VDISPLAY {
       queue = dispatch_queue_create("apollo.virtual-display", DISPATCH_QUEUE_SERIAL);
     }
 
+    // The display's size in points. macOS 27.2 gives a virtual display its HiDPI mode only when that mode is
+    // at least about 525 points high (1200x525 is HiDPI, 1200x520 falls back to 1x). For a shorter client
+    // (a 2244x1008 phone is 504 points high) the display is made a little larger, like a "looks like"
+    // scaled mode, and capture scales it down to the client's size.
+    uint32_t pt_w = width / scale, pt_h = height / scale;
+    if (scale > 1 && pt_h < 540) {
+      pt_w = (uint32_t) lround(pt_w * 540.0 / pt_h);
+      pt_h = 540;
+    }
+    uint32_t px_w = pt_w * scale, px_h = pt_h * scale;
+
     auto descriptor = [[CGVirtualDisplayDescriptor alloc] init];
     descriptor.queue = queue;
     descriptor.name = [NSString stringWithUTF8String:(client_name && *client_name) ? client_name : "Apollo"];
-    descriptor.maxPixelsWide = width;
-    descriptor.maxPixelsHigh = height;
+    descriptor.maxPixelsWide = px_w;
+    descriptor.maxPixelsHigh = px_h;
     // A Retina density (220 pixels per inch), but never a panel under about 120 mm on its short side:
     // WindowServer leaves smaller virtual displays offline (27.2: 1440x810 at 220 ppi never came online).
-    double mm_w = width * 25.4 / 220.0, mm_h = height * 25.4 / 220.0;
+    double mm_w = px_w * 25.4 / 220.0, mm_h = px_h * 25.4 / 220.0;
     double grow = std::max(1.0, 120.0 / std::min(mm_w, mm_h));
     descriptor.sizeInMillimeters = CGSizeMake(mm_w * grow, mm_h * grow);
     descriptor.vendorID = 0x1209;
@@ -173,16 +188,10 @@ namespace VDISPLAY {
       return {};
     }
 
-    // With hiDPI set, each mode is a point size and macOS backs it with twice the pixels;
-    // the plain pixel-size mode is offered too, for scale 1.
+    // With hiDPI set, a mode is a point size and macOS backs it with twice the pixels, and picks it by default.
     auto settings = [[CGVirtualDisplaySettings alloc] init];
     settings.hiDPI = scale > 1 ? 1 : 0;
-    NSMutableArray *modes = [NSMutableArray array];
-    if (scale > 1) {
-      [modes addObject:[[CGVirtualDisplayMode alloc] initWithWidth:width / 2 height:height / 2 refreshRate:hz]];
-    }
-    [modes addObject:[[CGVirtualDisplayMode alloc] initWithWidth:width height:height refreshRate:hz]];
-    settings.modes = modes;
+    settings.modes = @[[[CGVirtualDisplayMode alloc] initWithWidth:pt_w height:pt_h refreshRate:hz]];
     if (![display applySettings:settings]) {
       last_error = "applySettings refused the modes";
       return {};
@@ -195,15 +204,6 @@ namespace VDISPLAY {
       displays.erase(uid);
       last_error = "display " + std::to_string(display_id) + " did not come online";
       return {};
-    }
-
-    if (auto mode = find_mode(display_id, width, height, scale, hz)) {
-      CGDisplayConfigRef config;
-      if (CGBeginDisplayConfiguration(&config) == kCGErrorSuccess) {
-        CGConfigureDisplayWithDisplayMode(config, display_id, mode, nullptr);
-        CGCompleteDisplayConfiguration(config, kCGConfigureForSession);
-      }
-      CGDisplayModeRelease(mode);
     }
 
     return std::to_string(display_id);
@@ -242,27 +242,11 @@ namespace VDISPLAY {
 
     // Starts a copy of this executable that turns the displays back on if this process dies.
     void start_guard(const std::vector<CGDirectDisplayID> &ids) {
-      char exe[PATH_MAX];
-      uint32_t size = sizeof exe;
-      if (_NSGetExecutablePath(exe, &size) != 0) {
-        return;
-      }
-      std::vector<std::string> args {exe, "--display-guard", std::to_string(getpid())};
+      std::vector<std::string> args {"--display-guard", std::to_string(getpid())};
       for (auto d : ids) {
         args.push_back(std::to_string(d));
       }
-      std::vector<char *> argv;
-      for (auto &a : args) {
-        argv.push_back(a.data());
-      }
-      argv.push_back(nullptr);
-      posix_spawn_file_actions_t actions;
-      posix_spawn_file_actions_init(&actions);
-      posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
-      if (posix_spawn(&guard_pid, exe, &actions, nullptr, argv.data(), environ) != 0) {
-        guard_pid = 0;
-      }
-      posix_spawn_file_actions_destroy(&actions);
+      guard_pid = spawn_helper(args);
     }
 
     void stop_guard() {
@@ -304,11 +288,12 @@ namespace VDISPLAY {
     stop_guard();
   }
 
-  bool isDisplayGuardInvocation(int argc, char **argv) {
+  bool isHelperInvocation(int argc, char **argv) {
     return argc >= 3 && !strcmp(argv[1], "--display-guard");
   }
 
-  int displayGuardMain(int argc, char **argv) {
+  int helperMain(int argc, char **argv) {
+
     pid_t parent = atoi(argv[2]);
     std::vector<CGDirectDisplayID> ids;
     for (int i = 3; i < argc; i++) {

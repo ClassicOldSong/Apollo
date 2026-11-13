@@ -23,7 +23,8 @@ namespace VDISPLAY {
   void closeVDisplayDevice();
 
   /**
-   * @brief Creates a HiDPI virtual display whose backing store is exactly width x height pixels.
+   * @brief Creates a HiDPI virtual display for a width x height client. Its backing store is exactly that size,
+   * except for clients under about 1080 pixels high, which get a slightly larger display of the same shape.
    * @param client_uid Stable id of the client, used for the display's serial number so macOS remembers its arrangement.
    * @param client_name Shown as the display's name.
    * @param fps Refresh rate in millihertz (60000 = 60 Hz).
@@ -64,9 +65,9 @@ namespace VDISPLAY {
   std::string displayUUID(uint32_t display_id);
 
   /**
-   * @brief isolateDisplay() starts a copy of the host as `<exe> --display-guard <pid> <display ids>`,
-   * which turns the displays back on if the host dies. main() hands that invocation to displayGuardMain().
+   * @brief isolateDisplay() starts a copy of the host as `<exe> --display-guard <pid> <display ids>`, which
+   * turns the displays back on if the host dies. main() hands that invocation to helperMain() before anything else.
    */
-  bool isDisplayGuardInvocation(int argc, char **argv);
-  int displayGuardMain(int argc, char **argv);
+  bool isHelperInvocation(int argc, char **argv);
+  int helperMain(int argc, char **argv);
 }  // namespace VDISPLAY
