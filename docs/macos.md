@@ -1,7 +1,9 @@
 # Apollo on macOS
 
-This fork gives Apollo a real macOS host: Artemis's virtual display, the client's resolution in HiDPI, the
-Mac's own displays off for the stream, and macOS 27's native touch. Branch `macos`.
+Apollo's features on a macOS host: Artemis's virtual display, the client's resolution in HiDPI, the Mac's own
+displays off for the stream, and macOS 27's native touch (direct touches, as on a touchscreen Mac).
+
+Tested on an M1 Mac mini (macOS 27.2.1 and 27.3 beta 26C5035r) with Artemis on Android phones.
 
 ## Build (on the Mac)
 
@@ -36,8 +38,14 @@ tools/macos/touchd/build.sh            # build/ApolloTouch.app, found next to bu
 
 ## Capture (`src/platform/macos/sc_video.mm`)
 
-ScreenCaptureKit, preferred over AVFoundation. `AVCaptureScreenInput` gets no frames from a virtual display
-because `CGDisplayCopyDisplayMode()` returns NULL for a `CGVirtualDisplay` in the process that made it.
+- ScreenCaptureKit, preferred over AVFoundation. `AVCaptureScreenInput` gets no frames from a virtual display
+  because `CGDisplayCopyDisplayMode()` returns NULL for a `CGVirtualDisplay` in the process that made it.
+- ScreenCaptureKit sends nothing while the screen is still, so the last frame is repeated every 100 ms;
+  without that the end of a session waits for a frame that never comes.
+- While the Mac is locked (as after a restart with automatic login) displays are not shareable at all:
+  capture sends black until they are, so the host still starts and the encoder test still passes.
+- A host that crashes can leave its virtual display behind, and macOS refuses a second display with the same
+  vendor, product and serial, so creation falls back to a neighbouring serial.
 
 ## Touch (`touchscreen.mm`, `touch_protocol.h`, `tools/macos/touchd`)
 
@@ -56,9 +64,25 @@ What macOS 27 does (read from the 27.2 system, not documented by Apple):
   when Apollo goes.
 - Apollo advertises touch to the client only if the helper can make a device; otherwise the client keeps
   turning touch into mouse input.
-- Signing: `tools/macos/touchd/build.sh --sign "Developer ID Application: ..." --profile <file>` with a
-  Developer ID profile for App ID `com.vaguelystrange.apollo.touch` that has the HID Virtual Device capability.
-- Test: `apollo-touchd --selftest <display uuid>` plays a tap, a drag and a pinch;
+- Signing: the App ID's HID Virtual Device capability is **development only** (a Developer ID profile leaves
+  the entitlement out), so the helper is signed with an Apple Development certificate and a macOS App
+  Development profile that lists the Mac it runs on:
+  `tools/macos/touchd/build.sh --sign "<Apple Development identity>" --profile <file.provisionprofile>`.
+  The bundle id is taken from the profile. Each user needs their own Apple Developer account for this until
+  Apple grants the capability for distribution; without a signed helper touch falls back to the mouse.
+- Contacts carry Tip Switch, In Range and **Confidence**. Without Confidence the HID driver types each
+  contact as a hand instead of a finger; AppKit apps still take those, but the Dock (and other system UI)
+  ignores every contact that is not a finger.
+- Contact ids are reused like a real touchscreen's: BackBoard uses them as path indexes and drops any contact
+  whose id is 30 or more.
+- WindowServer attaches a new digitizer a moment after it appears and drops contacts sent before that, so
+  the helper waits briefly after making the device.
+- An activated `IOHIDUserDevice` has to be cancelled, and the cancel finished, before its last release, or
+  the process aborts.
+- macOS 27.3 adds touch behaviour of its own on top, such as the traffic-light zoom
+  (`NSStoplightZoomInteraction`); it works over Apollo unchanged.
+- Test: `apollo-touchd --selftest <display uuid>` plays a tap, a drag and a pinch, `--tap <uuid> <x> <y>
+  <seconds>` holds one finger at a point, `--attach <uuid> <seconds>` only makes the device;
   `tools/macos/touchprobe/touchprobe.mm` logs what an app receives (direct touch events, gesture recognizers,
   `NSScreen.touchCapabilities`).
 

@@ -4,14 +4,14 @@
 #   tools/macos/touchd/build.sh                       unsigned build (the touchscreen cannot be made)
 #   tools/macos/touchd/build.sh --sign "<identity>" --profile <file.provisionprofile>
 #
-# KEYCHAIN=<file> picks the keychain that holds the identity.
+# KEYCHAIN=<file> picks the keychain that holds the identity. The bundle id comes from the profile's App ID
+# (BUNDLE_ID overrides it).
 #
 # The App ID's HID Virtual Device capability is development only, so the real build is signed with an
 # Apple Development identity and a macOS App Development profile that lists the Mac it runs on.
 set -e
 cd "$(dirname "$0")/../../.."
 OUT=${OUT:-build/ApolloTouch.app}
-BUNDLE_ID=${BUNDLE_ID:-com.vaguelystrange.apollo.touch}
 SIGN=""; PROFILE=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -20,6 +20,19 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument $1"; exit 2;;
   esac
 done
+
+TMP=$(mktemp -d)
+if [ -n "$SIGN" ]; then
+  [ -f "$PROFILE" ] || { echo "a --profile is needed with --sign"; exit 2; }
+  security cms -D -i "$PROFILE" > "$TMP/profile.plist"
+  TEAM=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$TMP/profile.plist")
+  APPID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$TMP/profile.plist")
+  HID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.hid.virtual.device" "$TMP/profile.plist" 2>/dev/null || true)
+  BUNDLE_ID=${BUNDLE_ID:-${APPID#$TEAM.}}
+  [ "$APPID" = "$TEAM.$BUNDLE_ID" ] || { echo "profile is for $APPID, bundle is $TEAM.$BUNDLE_ID"; exit 2; }
+  [ "$HID" = "true" ] || { echo "profile does not grant com.apple.developer.hid.virtual.device"; exit 2; }
+fi
+BUNDLE_ID=${BUNDLE_ID:-apollo.touch}
 
 rm -rf "$OUT"
 mkdir -p "$OUT/Contents/MacOS"
@@ -43,19 +56,12 @@ PLIST
 
 if [ -z "$SIGN" ]; then
   codesign -f -s - "$OUT"
+  rm -rf "$TMP"
   echo "built $OUT (ad-hoc, no HID entitlement)"
   exit 0
 fi
 
-[ -f "$PROFILE" ] || { echo "a --profile is needed with --sign"; exit 2; }
 cp "$PROFILE" "$OUT/Contents/embedded.provisionprofile"
-TMP=$(mktemp -d)
-security cms -D -i "$PROFILE" > "$TMP/profile.plist"
-TEAM=$(/usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" "$TMP/profile.plist")
-APPID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$TMP/profile.plist")
-HID=$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.hid.virtual.device" "$TMP/profile.plist" 2>/dev/null || true)
-[ "$APPID" = "$TEAM.$BUNDLE_ID" ] || { echo "profile is for $APPID, bundle is $TEAM.$BUNDLE_ID"; exit 2; }
-[ "$HID" = "true" ] || { echo "profile does not grant com.apple.developer.hid.virtual.device"; exit 2; }
 cat > "$TMP/ent.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
