@@ -38,7 +38,8 @@
       return screen.localizedName;
     }
   }
-  return nil;
+  // NSScreen can lag behind a display made a moment ago (the virtual display, on macOS 27.3)
+  return [NSString stringWithFormat:@"Display %u", displayID];
 }
 
 - (id)initWithDisplay:(CGDirectDisplayID)displayID frameRate:(int)frameRate {
