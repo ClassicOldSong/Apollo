@@ -2,6 +2,7 @@
 //
 //   apollo-touchd                      serve Apollo on fd 3 (see src/platform/macos/touch_protocol.h)
 //   apollo-touchd --selftest <uuid>    make a touchscreen on that display and play a tap, a drag and a pinch
+//   apollo-touchd --tap <uuid> <x> <y> <seconds>   hold one finger at x, y (0 to 1) for that long
 //   apollo-touchd --attach <uuid> <s>  make a touchscreen on that display and keep it, untouched, for s seconds
 //
 // WindowServer (SkyLight's WSHIDDisplayEventListener and BackBoard's direct touch processor) takes any HID
@@ -273,6 +274,24 @@ int main(int argc, char **argv) {
       printf("touchscreen made for display %s\n", argv[2]);
       fflush(stdout);
       usleep((useconds_t) (atof(argv[3]) * 1e6));
+      destroy_device();
+      return 0;
+    }
+    if (argc >= 6 && !strcmp(argv[1], "--tap")) {
+      // --tap <uuid> <x> <y> <seconds> [wait]: after wait seconds (1.5), one finger down at x, y (0 to 1) for that long
+      char error[128];
+      if (!create_device(argv[2], 267, 120, error, sizeof error)) {
+        fprintf(stderr, "%s\n", error);
+        return 1;
+      }
+      usleep((useconds_t) ((argc > 6 ? atof(argv[6]) : 1.5) * 1e6));
+      const uint16_t size = at(0.01), x = at(atof(argv[3])), y = at(atof(argv[4]));
+      send_frame(frame_of({{1, 3, x, y, size, size}}));
+      usleep((useconds_t) (atof(argv[5]) * 1e6));
+      send_frame(frame_of({{1, 0, x, y, size, size}}));
+      send_frame(frame_of({}));
+      printf("tap at %s, %s\n", argv[3], argv[4]);
+      usleep(1000000);
       destroy_device();
       return 0;
     }
