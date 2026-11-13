@@ -183,11 +183,17 @@ namespace VDISPLAY {
     descriptor.productID = 0xA011;
     // The display's identity includes its size: macOS reapplies the mode it last used for an identity,
     // and a display whose remembered mode is not on offer never comes online.
-    descriptor.serialNum = fnv1a((uid + "/" + std::to_string(width) + "x" + std::to_string(height) + "/" + std::to_string(scale)).c_str()) | 1;
+    uint32_t serial = fnv1a((uid + "/" + std::to_string(width) + "x" + std::to_string(height) + "/" + std::to_string(scale)).c_str()) | 1;
     descriptor.terminationHandler = ^(id, id) {
     };
 
-    auto display = [[CGVirtualDisplay alloc] initWithDescriptor:descriptor];
+    // A host that crashes can leave its display behind (macOS 27.3, screen locked), and a second display
+    // with the same identity is refused, so fall back to a neighbouring serial number
+    CGVirtualDisplay *display = nil;
+    for (uint32_t attempt = 0; attempt < 4 && !(display && display.displayID); attempt++) {
+      descriptor.serialNum = serial + attempt * 2;
+      display = [[CGVirtualDisplay alloc] initWithDescriptor:descriptor];
+    }
     if (!display || !display.displayID) {
       last_error = "CGVirtualDisplay init failed";
       return {};
