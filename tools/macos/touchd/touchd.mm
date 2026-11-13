@@ -130,6 +130,8 @@ namespace {
     });
     IOHIDUserDeviceSetDispatchQueue(device, queue);
     IOHIDUserDeviceActivate(device);
+    // WindowServer attaches the digitizer a moment later and drops contacts that arrive before that
+    usleep(300000);
     return true;
   }
 
@@ -214,6 +216,15 @@ namespace {
   }
 
   int serve() {
+    // A datagram socket gives no end-of-file when Apollo goes, so also watch for its exit
+    dispatch_source_t parent = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, getppid(), DISPATCH_PROC_EXIT, queue);
+    dispatch_source_set_event_handler(parent, ^{
+      _exit(0);  // the device goes with the process
+    });
+    dispatch_resume(parent);
+    if (getppid() == 1) {
+      return 0;
+    }
     uint8_t buf[512];
     for (;;) {
       ssize_t n = recv(helper_fd, buf, sizeof buf, 0);

@@ -47,7 +47,16 @@ namespace platf::touchscreen {
     int sock = -1;
     uint32_t device_display = 0;  // display the touchscreen was made for
     std::map<uint32_t, contact_state_t> contacts;  // by client pointer id
-    uint8_t next_id = 1;
+
+    // Contact ids are reused like a real touchscreen's: BackBoard uses them as path indexes and drops any
+    // contact whose id is 30 or more (MAX_PATH_COUNT)
+    uint8_t free_id() {
+      for (uint8_t id = 1;; id++) {
+        if (std::none_of(contacts.begin(), contacts.end(), [id](const auto &c) { return c.second.id == id; })) {
+          return id;
+        }
+      }
+    }
 
     int available_state = -1;  // -1 unknown, 0 no, 1 yes
     std::chrono::steady_clock::time_point available_checked;
@@ -79,18 +88,14 @@ namespace platf::touchscreen {
 
     void stop_helper_locked() {
       if (sock >= 0) {
-        close(sock);  // the helper exits when its end closes, taking the device with it
+        close(sock);
         sock = -1;
       }
       if (helper_pid > 0) {
+        // A datagram socket gives the helper no end-of-file, so end it; the device goes with it
+        kill(helper_pid, SIGTERM);
         int status;
-        for (int i = 0; i < 50 && waitpid(helper_pid, &status, WNOHANG) == 0; i++) {
-          usleep(10000);
-        }
-        if (waitpid(helper_pid, &status, WNOHANG) == 0) {
-          kill(helper_pid, SIGTERM);
-          waitpid(helper_pid, &status, 0);
-        }
+        waitpid(helper_pid, &status, 0);
         helper_pid = 0;
       }
       device_display = 0;
@@ -111,6 +116,7 @@ namespace platf::touchscreen {
         return false;
       }
       fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+      fcntl(fds[1], F_SETFD, FD_CLOEXEC);  // the dup to helper_fd is inherited, the original is not
       posix_spawn_file_actions_t actions;
       posix_spawn_file_actions_init(&actions);
       posix_spawn_file_actions_adddup2(&actions, fds[1], tp::helper_fd);
@@ -235,8 +241,7 @@ namespace platf::touchscreen {
         if (event_type == ev_move || contacts.size() >= tp::max_contacts) {
           return;
         }
-        it = contacts.emplace(pointer_id, contact_state_t {next_id, {}}).first;
-        next_id = next_id % 126 + 1;
+        it = contacts.emplace(pointer_id, contact_state_t {free_id(), {}}).first;
       }
       // Contact size: at least about a fingertip, so a client that sends none still looks like a finger
       uint16_t w = std::max(axis(major), axis(0.008f)), h = std::max(axis(minor), axis(0.008f));

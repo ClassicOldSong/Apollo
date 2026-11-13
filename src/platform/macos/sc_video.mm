@@ -8,12 +8,17 @@
   #error sc_video.mm must be built with -fobjc-arc
 #endif
 
+static const int64_t repeat_after = 100 * NSEC_PER_MSEC;
+
 @implementation SCVideo {
   SCContentFilter *_filter;
   SCStream *_stream;
   dispatch_queue_t _queue;
   FrameCallbackBlock _callback;
   dispatch_semaphore_t _signal;
+  dispatch_source_t _repeat;
+  CMSampleBufferRef _last;  // last complete frame, retained
+  uint64_t _lastDelivered;  // dispatch_time of the last callback
 }
 
 + (BOOL)isAvailable {
@@ -117,6 +122,17 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
       _stream = nil;
       return nil;
     }
+
+    // ScreenCaptureKit sends nothing while the screen is still, but the callback is also how capture
+    // learns it should stop, so repeat the last frame when none has come for a while.
+    SCStream *stream = _stream;
+    _repeat = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _queue);
+    dispatch_source_set_timer(_repeat, dispatch_time(DISPATCH_TIME_NOW, repeat_after), repeat_after, repeat_after / 10);
+    __weak SCVideo *weakSelf = self;
+    dispatch_source_set_event_handler(_repeat, ^{
+      [weakSelf repeatLastFrame:stream];
+    });
+    dispatch_resume(_repeat);
     return signal;
   }
 }
@@ -137,12 +153,40 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
   if (!CMSampleBufferGetImageBuffer(sampleBuffer)) {
     return;
   }
+  @synchronized(self) {
+    if (stream != _stream) {
+      return;
+    }
+    CFRetain(sampleBuffer);
+    if (_last) {
+      CFRelease(_last);
+    }
+    _last = sampleBuffer;
+  }
+  [self deliver:sampleBuffer stream:stream];
+}
+
+// Runs on _queue, like the sample handler
+- (void)repeatLastFrame:(SCStream *)stream {
+  CMSampleBufferRef last = nil;
+  @synchronized(self) {
+    if (stream != _stream || !_last || dispatch_time(DISPATCH_TIME_NOW, 0) - _lastDelivered < (uint64_t) repeat_after) {
+      return;
+    }
+    last = (CMSampleBufferRef) CFRetain(_last);
+  }
+  [self deliver:last stream:stream];
+  CFRelease(last);
+}
+
+- (void)deliver:(CMSampleBufferRef)sampleBuffer stream:(SCStream *)stream {
   FrameCallbackBlock callback;
   @synchronized(self) {
     if (stream != _stream) {
       return;
     }
     callback = _callback;
+    _lastDelivered = dispatch_time(DISPATCH_TIME_NOW, 0);
   }
   if (callback && !callback(sampleBuffer)) {
     @synchronized(self) {
@@ -163,6 +207,14 @@ static SCDisplay *find_display(CGDirectDisplayID displayID) {
 }
 
 - (void)stopLocked {
+  if (_repeat) {
+    dispatch_source_cancel(_repeat);
+    _repeat = nil;
+  }
+  if (_last) {
+    CFRelease(_last);
+    _last = nil;
+  }
   if (_stream) {
     SCStream *stream = _stream;
     _stream = nil;
