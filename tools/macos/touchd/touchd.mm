@@ -82,7 +82,7 @@ namespace {
   IOHIDUserDeviceRef device;
   dispatch_queue_t queue;
 
-  bool create(const char *uuid, int width_mm, int height_mm, char *error, size_t error_len) {
+  bool create_device(const char *uuid, int width_mm, int height_mm, char *error, size_t error_len) {
     if (device) {
       CFRelease(device);
       device = nullptr;
@@ -137,7 +137,7 @@ namespace {
   }
 
   frame_msg_t frame_of(std::initializer_list<contact_t> contacts) {
-    frame_msg_t f {frame, (uint8_t) contacts.size(), {}};
+    frame_msg_t f {touch_protocol::frame, (uint8_t) contacts.size(), {}};
     int i = 0;
     for (auto &c : contacts) {
       f.contacts[i++] = c;
@@ -151,7 +151,7 @@ namespace {
 
   int selftest(const char *uuid, double hold) {
     char error[128];
-    if (!create(uuid, 267, 120, error, sizeof error)) {
+    if (!create_device(uuid, 267, 120, error, sizeof error)) {
       fprintf(stderr, "%s\n", error);
       return 1;
     }
@@ -207,24 +207,24 @@ namespace {
         break;  // Apollo closed the socket or died
       }
       switch (buf[0]) {
-        case create:
+        case touch_protocol::create:
           if (n >= (ssize_t) sizeof(create_msg_t)) {
             create_msg_t m;
             memcpy(&m, buf, sizeof m);
             m.display_uuid[sizeof m.display_uuid - 1] = 0;
             char error[128] = {};
-            bool ok = create(m.display_uuid, m.width_mm, m.height_mm, error, sizeof error);
+            bool ok = create_device(m.display_uuid, m.width_mm, m.height_mm, error, sizeof error);
             reply(ok, ok ? nullptr : error);
           }
           break;
-        case frame:
+        case touch_protocol::frame:
           if (n >= 2) {
             frame_msg_t f {};
             memcpy(&f, buf, std::min<size_t>(n, sizeof f));
             send_frame(f);
           }
           break;
-        case destroy:
+        case touch_protocol::destroy:
           if (device) {
             CFRelease(device);
             device = nullptr;
