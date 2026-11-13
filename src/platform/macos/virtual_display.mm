@@ -64,6 +64,7 @@ namespace VDISPLAY {
     std::mutex lock;
     std::map<std::string, CGVirtualDisplay *> displays;  // by client uid
     std::vector<CGDirectDisplayID> turned_off;
+    std::string last_error;
     dispatch_queue_t queue;
 
     uint32_t fnv1a(const char *s) {
@@ -118,6 +119,10 @@ namespace VDISPLAY {
     }
   }  // namespace
 
+  std::string lastError() {
+    return last_error;
+  }
+
   DRIVER_STATUS openVDisplayDevice() {
     return NSClassFromString(@"CGVirtualDisplay") ? DRIVER_STATUS::OK : DRIVER_STATUS::FAILED;
   }
@@ -128,6 +133,7 @@ namespace VDISPLAY {
 
   std::string createVirtualDisplay(const char *client_uid, const char *client_name, uint32_t width, uint32_t height, uint32_t fps, uint32_t scale) {
     if (openVDisplayDevice() != DRIVER_STATUS::OK || !width || !height) {
+      last_error = "CGVirtualDisplay unavailable or no size given";
       return {};
     }
     if (scale < 1) {
@@ -148,16 +154,22 @@ namespace VDISPLAY {
     descriptor.name = [NSString stringWithUTF8String:(client_name && *client_name) ? client_name : "Apollo"];
     descriptor.maxPixelsWide = width;
     descriptor.maxPixelsHigh = height;
-    // About 220 pixels per inch, a Retina density, so macOS treats it as a HiDPI panel.
-    descriptor.sizeInMillimeters = CGSizeMake(width * 25.4 / 220.0, height * 25.4 / 220.0);
+    // A Retina density (220 pixels per inch), but never a panel under about 120 mm on its short side:
+    // WindowServer leaves smaller virtual displays offline (27.2: 1440x810 at 220 ppi never came online).
+    double mm_w = width * 25.4 / 220.0, mm_h = height * 25.4 / 220.0;
+    double grow = std::max(1.0, 120.0 / std::min(mm_w, mm_h));
+    descriptor.sizeInMillimeters = CGSizeMake(mm_w * grow, mm_h * grow);
     descriptor.vendorID = 0x1209;
     descriptor.productID = 0xA011;
-    descriptor.serialNum = fnv1a(uid.c_str()) | 1;
+    // The display's identity includes its size: macOS reapplies the mode it last used for an identity,
+    // and a display whose remembered mode is not on offer never comes online.
+    descriptor.serialNum = fnv1a((uid + "/" + std::to_string(width) + "x" + std::to_string(height) + "/" + std::to_string(scale)).c_str()) | 1;
     descriptor.terminationHandler = ^(id, id) {
     };
 
     auto display = [[CGVirtualDisplay alloc] initWithDescriptor:descriptor];
     if (!display || !display.displayID) {
+      last_error = "CGVirtualDisplay init failed";
       return {};
     }
 
@@ -172,6 +184,7 @@ namespace VDISPLAY {
     [modes addObject:[[CGVirtualDisplayMode alloc] initWithWidth:width height:height refreshRate:hz]];
     settings.modes = modes;
     if (![display applySettings:settings]) {
+      last_error = "applySettings refused the modes";
       return {};
     }
 
@@ -179,6 +192,8 @@ namespace VDISPLAY {
     displays[uid] = display;
 
     if (!wait_online(display_id, 3.0)) {
+      displays.erase(uid);
+      last_error = "display " + std::to_string(display_id) + " did not come online";
       return {};
     }
 

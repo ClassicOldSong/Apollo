@@ -50,8 +50,8 @@ int main(int argc, char **argv) {
     double secs = argc > 6 ? atof(argv[6]) : 5;
     [NSApplication sharedApplication];
     report("before");
-    std::string id = VDISPLAY::createVirtualDisplay("vdtool-client", "Apollo test", w, h, hz * 1000, scale);
-    printf("created display %s\n", id.c_str());
+    std::string id = VDISPLAY::createVirtualDisplay(getenv("UID_") ? getenv("UID_") : "vdtool-client", "Apollo test", w, h, hz * 1000, scale);
+    printf("created display %s %s\n", id.c_str(), id.empty() ? VDISPLAY::lastError().c_str() : "");
     if (id.empty()) {
       return 1;
     }

@@ -38,6 +38,11 @@ namespace VDISPLAY {
   bool removeVirtualDisplay(const char *client_uid);
 
   /**
+   * @brief Why the last createVirtualDisplay() failed.
+   */
+  std::string lastError();
+
+  /**
    * @brief Removes every virtual display this process made.
    */
   void removeAllVirtualDisplays();

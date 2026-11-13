@@ -393,7 +393,7 @@ namespace proc {
           this->display_name = display_id;
           config::video.output_name = display_id;
         } else {
-          BOOST_LOG(warning) << "Virtual Display creation failed"sv;
+          BOOST_LOG(warning) << "Virtual Display creation failed: "sv << VDISPLAY::lastError();
         }
       } else {
         launch_session->virtual_display = false;
