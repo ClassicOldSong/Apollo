@@ -11,3 +11,10 @@ FIND_LIBRARY(VIDEO_TOOLBOX_LIBRARY VideoToolbox)
 if(SUNSHINE_ENABLE_TRAY)
     FIND_LIBRARY(COCOA Cocoa REQUIRED)
 endif()
+
+# Homebrew opus: sources include <opus/...>, and the library is linked by name
+find_path(OPUS_INCLUDE_DIR opus/opus_multistream.h REQUIRED)
+find_library(OPUS_LIBRARY opus REQUIRED)
+include_directories(SYSTEM "${OPUS_INCLUDE_DIR}")
+get_filename_component(OPUS_LIBRARY_DIR "${OPUS_LIBRARY}" DIRECTORY)
+link_directories("${OPUS_LIBRARY_DIR}")

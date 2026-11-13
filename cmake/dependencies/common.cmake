@@ -12,13 +12,15 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/moonlight-common-c/enet")
 # web server
 add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/Simple-Web-Server")
 
+# Resolve OpenSSL before subprojects run their own find_package(OpenSSL), so OPENSSL_ROOT_DIR is honoured
+find_package(OpenSSL REQUIRED)
+include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
+
 # libdisplaydevice
 add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/libdisplaydevice")
 
 # common dependencies
 include("${CMAKE_MODULE_PATH}/dependencies/nlohmann_json.cmake")
-find_package(OpenSSL REQUIRED)
-include_directories(SYSTEM ${OPENSSL_INCLUDE_DIR})
 find_package(PkgConfig REQUIRED)
 find_package(Threads REQUIRED)
 pkg_check_modules(CURL REQUIRED libcurl)
