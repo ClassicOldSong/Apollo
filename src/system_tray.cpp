@@ -46,6 +46,25 @@
   #include <boost/process/v1/environment.hpp>
   #include <tray/src/tray.h>
 
+  #if defined(__APPLE__) || defined(__MACH__)
+    #include <pthread.h>
+
+// AppKit traps (SIGTRAP) when the status item is changed off the main thread, and the
+// update_tray_* calls come from the HTTP and stream threads. Hand them to the main queue,
+// which the main thread drains while it runs tray_loop().
+static void tray_update_on_main(struct tray *t) {
+  if (pthread_main_np()) {
+    tray_update(t);
+    return;
+  }
+  dispatch_async_f(dispatch_get_main_queue(), t, [](void *p) {
+    tray_update(static_cast<struct tray *>(p));
+  });
+}
+
+    #define tray_update tray_update_on_main
+  #endif
+
   // local includes
   #include "config.h"
   #include "confighttp.h"
