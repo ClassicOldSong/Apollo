@@ -4,8 +4,10 @@
 #   tools/macos/touchd/build.sh                       unsigned build (the touchscreen cannot be made)
 #   tools/macos/touchd/build.sh --sign "<identity>" --profile <file.provisionprofile>
 #
-# The real build is signed with a Developer ID identity and a Developer ID provisioning profile whose
-# App ID has the HID Virtual Device capability; the entitlements are taken from that profile.
+# KEYCHAIN=<file> picks the keychain that holds the identity.
+#
+# The App ID's HID Virtual Device capability is development only, so the real build is signed with an
+# Apple Development identity and a macOS App Development profile that lists the Mac it runs on.
 set -e
 cd "$(dirname "$0")/../../.."
 OUT=${OUT:-build/ApolloTouch.app}
@@ -63,7 +65,8 @@ cat > "$TMP/ent.plist" <<PLIST
   <key>com.apple.developer.hid.virtual.device</key><true/>
 </dict></plist>
 PLIST
-codesign -f --timestamp --options runtime --entitlements "$TMP/ent.plist" -s "$SIGN" "$OUT"
+KC_ARGS=(); [ -n "$KEYCHAIN" ] && KC_ARGS=(--keychain "$KEYCHAIN")
+codesign -f --timestamp --options runtime "${KC_ARGS[@]}" --entitlements "$TMP/ent.plist" -s "$SIGN" "$OUT"
 codesign -dv --entitlements - "$OUT" 2>&1 | grep -E "Identifier|TeamIdentifier|hid"
 rm -rf "$TMP"
 echo "built and signed $OUT"

@@ -80,13 +80,22 @@ namespace {
 #pragma pack(pop)
 
   IOHIDUserDeviceRef device;
+  dispatch_semaphore_t device_cancelled;
   dispatch_queue_t queue;
 
-  bool create_device(const char *uuid, int width_mm, int height_mm, char *error, size_t error_len) {
-    if (device) {
-      CFRelease(device);
-      device = nullptr;
+  // An activated device has to be cancelled, and the cancel finished, before its last release
+  void destroy_device() {
+    if (!device) {
+      return;
     }
+    IOHIDUserDeviceCancel(device);
+    dispatch_semaphore_wait(device_cancelled, dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC));
+    CFRelease(device);
+    device = nullptr;
+  }
+
+  bool create_device(const char *uuid, int width_mm, int height_mm, char *error, size_t error_len) {
+    destroy_device();
     NSDictionary *props = @{
       @kIOHIDReportDescriptorKey: descriptor(width_mm, height_mm),
       @kIOHIDVendorIDKey: @0x1209,
@@ -113,6 +122,11 @@ namespace {
         return kIOReturnSuccess;
       }
       return kIOReturnUnsupported;
+    });
+    dispatch_semaphore_t cancelled = dispatch_semaphore_create(0);
+    device_cancelled = cancelled;
+    IOHIDUserDeviceSetCancelHandler(device, ^{
+      dispatch_semaphore_signal(cancelled);
     });
     IOHIDUserDeviceSetDispatchQueue(device, queue);
     IOHIDUserDeviceActivate(device);
@@ -162,7 +176,7 @@ namespace {
     // tap in the middle
     send_frame(frame_of({{1, 3, at(0.5), at(0.5), size, size}}));
     usleep(60000);
-    send_frame(frame_of({{1, 2, at(0.5), at(0.5), size, size}}));
+    send_frame(frame_of({{1, 0, at(0.5), at(0.5), size, size}}));
     send_frame(frame_of({}));
     printf("tap\n");
     usleep(700000);
@@ -171,7 +185,7 @@ namespace {
       send_frame(frame_of({{2, 3, at(0.2 + s * 0.02), at(0.6), size, size}}));
       usleep(16000);
     }
-    send_frame(frame_of({{2, 2, at(0.8), at(0.6), size, size}}));
+    send_frame(frame_of({{2, 0, at(0.8), at(0.6), size, size}}));
     send_frame(frame_of({}));
     printf("drag\n");
     usleep(700000);
@@ -181,12 +195,12 @@ namespace {
       send_frame(frame_of({{3, 3, at(0.5 - d), at(0.5), size, size}, {4, 3, at(0.5 + d), at(0.5), size, size}}));
       usleep(16000);
     }
-    send_frame(frame_of({{3, 2, at(0.26), at(0.5), size, size}, {4, 2, at(0.74), at(0.5), size, size}}));
+    send_frame(frame_of({{3, 0, at(0.26), at(0.5), size, size}, {4, 0, at(0.74), at(0.5), size, size}}));
     send_frame(frame_of({}));
     printf("pinch\n");
     fflush(stdout);
     usleep((useconds_t) (hold * 1e6));
-    CFRelease(device);
+    destroy_device();
     return 0;
   }
 
@@ -225,17 +239,12 @@ namespace {
           }
           break;
         case touch_protocol::destroy:
-          if (device) {
-            CFRelease(device);
-            device = nullptr;
-          }
+          destroy_device();
           reply(true, nullptr);
           break;
       }
     }
-    if (device) {
-      CFRelease(device);
-    }
+    destroy_device();
     return 0;
   }
 }  // namespace
