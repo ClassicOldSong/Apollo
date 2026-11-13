@@ -114,9 +114,14 @@ namespace VDISPLAY {
       posix_spawn_file_actions_init(&actions);
       posix_spawn_file_actions_addopen(&actions, 0, "/dev/null", O_RDONLY, 0);
       pid_t pid = 0;
-      if (args[0].empty() || posix_spawn(&pid, args[0].c_str(), &actions, nullptr, argv.data(), environ) != 0) {
+      // Its own session, so whatever kills the host's process group (a closed terminal, tmux) spares it
+      posix_spawnattr_t attr;
+      posix_spawnattr_init(&attr);
+      posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSID);
+      if (args[0].empty() || posix_spawn(&pid, args[0].c_str(), &actions, &attr, argv.data(), environ) != 0) {
         pid = 0;
       }
+      posix_spawnattr_destroy(&attr);
       posix_spawn_file_actions_destroy(&actions);
       return pid;
     }
@@ -300,6 +305,8 @@ namespace VDISPLAY {
       ids.push_back((CGDirectDisplayID) strtoul(argv[i], nullptr, 10));
     }
     // SIGTERM means the parent restored the displays itself.
+    signal(SIGHUP, SIG_IGN);
+    signal(SIGINT, SIG_IGN);
     signal(SIGTERM, [](int) {
       _exit(0);
     });
