@@ -2,6 +2,7 @@
 //
 //   apollo-touchd                      serve Apollo on fd 3 (see src/platform/macos/touch_protocol.h)
 //   apollo-touchd --selftest <uuid>    make a touchscreen on that display and play a tap, a drag and a pinch
+//   apollo-touchd --attach <uuid> <s>  make a touchscreen on that display and keep it, untouched, for s seconds
 //
 // WindowServer (SkyLight's WSHIDDisplayEventListener and BackBoard's direct touch processor) takes any HID
 // service that conforms to digitizer page 0x0D usage 4 or 1 and has a "displayUUID" property holding a
@@ -263,6 +264,18 @@ namespace {
 int main(int argc, char **argv) {
   @autoreleasepool {
     queue = dispatch_queue_create("apollo-touchd", DISPATCH_QUEUE_SERIAL);
+    if (argc >= 4 && !strcmp(argv[1], "--attach")) {
+      char error[128];
+      if (!create_device(argv[2], 267, 120, error, sizeof error)) {
+        fprintf(stderr, "%s\n", error);
+        return 1;
+      }
+      printf("touchscreen made for display %s\n", argv[2]);
+      fflush(stdout);
+      usleep((useconds_t) (atof(argv[3]) * 1e6));
+      destroy_device();
+      return 0;
+    }
     if (argc >= 3 && !strcmp(argv[1], "--selftest")) {
       return selftest(argv[2], argc > 3 ? atof(argv[3]) : 2.0);
     }
