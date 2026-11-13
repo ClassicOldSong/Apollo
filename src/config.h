@@ -149,6 +149,7 @@ namespace config {
     std::string fallback_mode;
     bool isolated_virtual_display_option;
     bool ignore_encoder_probe_failure;
+    int macos_vdisplay_scale;  ///< macOS virtual display: 2 = HiDPI (UI at half the pixel size), 1 = one point per pixel
   };
 
   struct audio_t {

@@ -41,6 +41,8 @@
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
+#elif defined(__APPLE__)
+  #include "platform/macos/virtual_display.h"
 #endif
 
 using namespace std::literals;
@@ -930,7 +932,7 @@ namespace nvhttp {
 
       tree.put("root.Permission", std::to_string((uint32_t)named_cert_p->perm));
 
-    #ifdef _WIN32
+    #if defined(_WIN32) || defined(__APPLE__)
       tree.put("root.VirtualDisplayCapable", true);
       if (!!(named_cert_p->perm & PERM::_all_actions)) {
         tree.put("root.VirtualDisplayDriverReady", proc::vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK);

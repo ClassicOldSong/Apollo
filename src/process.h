@@ -32,6 +32,8 @@
 
 #ifdef _WIN32
   #include "platform/windows/virtual_display.h"
+#elif defined(__APPLE__)
+  #include "platform/macos/virtual_display.h"
 #endif
 
 #define VIRTUAL_DISPLAY_UUID "8902CB19-674A-403D-A587-41B092E900BA"
@@ -42,7 +44,7 @@
 namespace proc {
   using file_t = util::safe_ptr_v2<FILE, int, fclose>;
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
   extern VDISPLAY::DRIVER_STATUS vDisplayDriverStatus;
 #endif
 

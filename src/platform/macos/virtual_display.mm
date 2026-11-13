@@ -5,6 +5,7 @@
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
 
+#include <dlfcn.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
 #include <signal.h>
@@ -51,7 +52,12 @@
 @end
 
 extern char **environ;
-extern "C" CGError SLSConfigureDisplayEnabled(CGDisplayConfigRef config, CGDirectDisplayID display, bool enabled);
+// SkyLight's display on/off switch (what System Settings and BetterDisplay use); looked up at run time.
+static CGError SLSConfigureDisplayEnabled(CGDisplayConfigRef config, CGDirectDisplayID display, bool enabled) {
+  using fn_t = CGError (*)(CGDisplayConfigRef, CGDirectDisplayID, bool);
+  static fn_t fn = (fn_t) dlsym(dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY), "SLSConfigureDisplayEnabled");
+  return fn ? fn(config, display, enabled) : kCGErrorFailure;
+}
 
 namespace VDISPLAY {
   namespace {

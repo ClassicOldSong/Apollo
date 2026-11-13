@@ -76,6 +76,12 @@ namespace proc {
       }
     }
   }
+#elif defined(__APPLE__)
+  VDISPLAY::DRIVER_STATUS vDisplayDriverStatus = VDISPLAY::DRIVER_STATUS::UNKNOWN;
+
+  void initVDisplayDriver() {
+    vDisplayDriverStatus = VDISPLAY::openVDisplayDevice();
+  }
 #endif
 
   class deinit_t: public platf::deinit_t {
@@ -340,6 +346,62 @@ namespace proc {
     // It is already handled by Windows properly.
     if (this->virtual_display) {
       display_device::reset_persistence();
+    }
+
+#elif defined(__APPLE__)
+    if (
+      config::video.headless_mode        // Headless mode
+      || launch_session->virtual_display // User requested virtual display
+      || _app.virtual_display            // App is configured to use virtual display
+    ) {
+      if (vDisplayDriverStatus != VDISPLAY::DRIVER_STATUS::OK) {
+        initVDisplayDriver();
+      }
+
+      if (vDisplayDriverStatus == VDISPLAY::DRIVER_STATUS::OK) {
+        int target_fps = launch_session->fps ? launch_session->fps : 60000;
+        if (target_fps < 1000) {
+          target_fps *= 1000;
+        }
+        if (config::video.double_refreshrate) {
+          target_fps *= 2;
+        }
+
+        auto display_id = VDISPLAY::createVirtualDisplay(
+          launch_session->unique_id.c_str(),
+          (_app.use_app_identity ? _app.name : launch_session->device_name).c_str(),
+          render_width,
+          render_height,
+          target_fps,
+          config::video.macos_vdisplay_scale
+        );
+        launch_session->virtual_display = true;
+
+        if (!display_id.empty()) {
+          BOOST_LOG(info) << "Virtual Display created: id "sv << display_id << ", "sv << render_width << 'x' << render_height << ", UUID "sv << VDISPLAY::displayUUID(std::stoul(display_id));
+
+          // As "ensure only display" does on Windows: the other displays go dark until the stream ends
+          if (config::video.isolated_virtual_display_option || config::video.dd.configuration_option == config::video_t::dd_t::config_option_e::ensure_only_display) {
+            if (VDISPLAY::isolateDisplay(std::stoul(display_id))) {
+              BOOST_LOG(info) << "Virtual Display is now the only display"sv;
+            } else {
+              BOOST_LOG(warning) << "Could not turn off the other displays"sv;
+            }
+          }
+
+          this->virtual_display = true;
+          this->display_name = display_id;
+          config::video.output_name = display_id;
+        } else {
+          BOOST_LOG(warning) << "Virtual Display creation failed"sv;
+        }
+      } else {
+        launch_session->virtual_display = false;
+      }
+    }
+
+    if (!this->virtual_display) {
+      display_device::configure_display(config::video, *launch_session);
     }
 
 #else
@@ -773,6 +835,22 @@ namespace proc {
       if (used_virtual_display) {
         display_device::reset_persistence();
       } else {
+        display_device::revert_configuration();
+      }
+#elif defined(__APPLE__)
+    bool used_virtual_display = _launch_session && _launch_session->virtual_display;
+    if (used_virtual_display) {
+      // Displays back on first, so macOS never has a moment with no display at all
+      VDISPLAY::restoreDisplays();
+      if (VDISPLAY::removeVirtualDisplay(_launch_session->unique_id.c_str())) {
+        BOOST_LOG(info) << "Virtual Display removed successfully";
+      } else if (this->virtual_display) {
+        BOOST_LOG(warning) << "Virtual Display remove failed";
+      }
+    }
+
+    if (proc::proc.get_last_run_app_name().length() > 0 && has_run) {
+      if (!used_virtual_display) {
         display_device::revert_configuration();
       }
 #else

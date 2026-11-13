@@ -26,6 +26,8 @@
 #ifdef _WIN32
   #include "platform/windows/misc.h"
   #include "platform/windows/virtual_display.h"
+#elif defined(__APPLE__)
+  #include "platform/macos/virtual_display.h"
 #endif
 
 #define PROBE_DISPLAY_UUID "38F72B96-B00C-4F21-8B6C-E1BFF1602B0E"
@@ -136,6 +138,12 @@ void mainThreadLoop(const std::shared_ptr<safe::event_t<bool>> &shutdown_event) 
 }
 
 int main(int argc, char *argv[]) {
+#ifdef __APPLE__
+  // A copy of this executable started by VDISPLAY::isolateDisplay() to turn the displays back on if we die
+  if (VDISPLAY::isDisplayGuardInvocation(argc, argv)) {
+    return VDISPLAY::displayGuardMain(argc, argv);
+  }
+#endif
   lifetime::argv = argv;
 
   task_pool_util::TaskPool::task_id_t force_shutdown = nullptr;
