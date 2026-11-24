@@ -21,6 +21,7 @@
 #include "src/globals.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "viiper_gamepad.h"
 
 #ifdef __MINGW32__
 // DECLARE_HANDLE(HSYNTHETICPOINTERDEVICE);
@@ -442,10 +443,12 @@ namespace platf {
 
   struct input_raw_t {
     ~input_raw_t() {
+      viiper.reset();
       delete vigem;
     }
 
     vigem_t *vigem;
+    std::unique_ptr<viiper::context_t> viiper;  ///< libVIIPER Switch 2 Pro context, created on first use.
 
     decltype(CreateSyntheticPointerDevice) *fnCreateSyntheticPointerDevice;
     decltype(InjectSyntheticPointerInput) *fnInjectSyntheticPointerInput;
@@ -1175,6 +1178,16 @@ namespace platf {
   int alloc_gamepad(input_t &input, const gamepad_id_t &id, const gamepad_arrival_t &metadata, feedback_queue_t feedback_queue) {
     auto raw = (input_raw_t *) input.get();
 
+    if (viiper::should_emulate_ns2pro(config::input.gamepad, metadata.type)) {
+      if (!raw->viiper) {
+        raw->viiper = std::make_unique<viiper::context_t>();
+      }
+      if (raw->viiper->alloc_gamepad(id, feedback_queue, metadata.type) == 0) {
+        return 0;
+      }
+      BOOST_LOG(warning) << "Switch controller emulation through libVIIPER failed; falling back to ViGEmBus"sv;
+    }
+
     if (!raw->vigem) {
       return 0;
     }
@@ -1228,6 +1241,11 @@ namespace platf {
 
   void free_gamepad(input_t &input, int nr) {
     auto raw = (input_raw_t *) input.get();
+
+    if (raw->viiper && raw->viiper->has_gamepad(nr)) {
+      raw->viiper->free_gamepad(nr);
+      return;
+    }
 
     if (!raw->vigem) {
       return;
@@ -1487,7 +1505,13 @@ namespace platf {
    * @param gamepad_state The gamepad button/axis state sent from the client.
    */
   void gamepad_update(input_t &input, int nr, const gamepad_state_t &gamepad_state) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    if (raw->viiper && raw->viiper->has_gamepad(nr)) {
+      raw->viiper->update(nr, gamepad_state);
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1625,7 +1649,13 @@ namespace platf {
    * @param motion The motion event.
    */
   void gamepad_motion(input_t &input, const gamepad_motion_t &motion) {
-    auto vigem = ((input_raw_t *) input.get())->vigem;
+    auto raw = (input_raw_t *) input.get();
+    if (raw->viiper && raw->viiper->has_gamepad(motion.id.globalIndex)) {
+      raw->viiper->motion(motion);
+      return;
+    }
+
+    auto vigem = raw->vigem;
 
     // If there is no gamepad support
     if (!vigem) {
@@ -1731,6 +1761,7 @@ namespace platf {
         supported_gamepad_t {"auto", true, ""},
         supported_gamepad_t {"x360", false, ""},
         supported_gamepad_t {"ds4", false, ""},
+        supported_gamepad_t {"switch", false, ""},
       };
 
       return gps;
@@ -1744,7 +1775,9 @@ namespace platf {
     static std::vector gps {
       supported_gamepad_t {"auto", true, reason},
       supported_gamepad_t {"x360", enabled, reason},
-      supported_gamepad_t {"ds4", enabled, reason}
+      supported_gamepad_t {"ds4", enabled, reason},
+      // Switch 2 Pro via libVIIPER; falls back to ViGEmBus if libVIIPER/usbip-win2 is missing
+      supported_gamepad_t {"switch", true, ""}
     };
 
     for (auto &[name, is_enabled, reason_disabled] : gps) {

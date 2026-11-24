@@ -37,6 +37,7 @@ const config = ref(props.config)
           <template #windows>
             <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
             <option value="x360">{{ $t('config.gamepad_x360') }}</option>
+            <option value="switch">{{ $t('config.gamepad_switch_viiper') }}</option>
           </template>
         </PlatformLayout>
       </select>
