@@ -252,9 +252,10 @@ namespace platf::viiper {
   std::uint32_t ns2pro_buttons(std::uint32_t button_flags, std::uint8_t left_trigger, std::uint8_t right_trigger, bool by_label) {
     std::uint32_t result = 0;
     if (by_label) {
-      // The client already reports a Nintendo controller by its printed labels
-      // (Nintendo A arrives as Moonlight A), so keep labels instead of positions.
-      static constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 4> face {{{A, NS2_A}, {B, NS2_B}, {X, NS2_X}, {Y, NS2_Y}}};
+      // A Nintendo client reports A/B by their printed labels (Nintendo A arrives
+      // as Moonlight A) but X/Y by position (Nintendo X, top, arrives as
+      // Moonlight Y, top), so keep A/B and swap X/Y back to their labels.
+      static constexpr std::array<std::pair<std::uint32_t, std::uint32_t>, 4> face {{{A, NS2_A}, {B, NS2_B}, {X, NS2_Y}, {Y, NS2_X}}};
       for (const auto &[from, to] : face) {
         if (button_flags & from) {
           result |= to;
