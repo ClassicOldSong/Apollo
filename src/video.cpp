@@ -826,9 +826,10 @@ namespace video {
       },
       {
         // SDR-specific options
-        {"profile"s, [](const config_t &cfg) {
-           if (cfg.profile == 66) return "baseline"s;
-           if (cfg.profile == 77) return "main"s;
+        {"profile"s, [](const config_t &) {
+           // video::config_t has no user-selectable H.264 profile field, and this
+           // option group is only used for SDR 4:2:0 (4:4:4 uses sdr444_options),
+           // so High is the only profile that makes sense here.
            return "high"s;
          }},
       },
