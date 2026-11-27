@@ -157,8 +157,9 @@ namespace platf::viiper {
      * @brief Enable input reports on every virtual Switch 2 Pro Controller's WinUSB interface.
      *
      * Mirrors the USB start-up a host performs on a real controller: enable buttons,
-     * sticks, motion and rumble, select the Pro report, then enable reports. Runs on a
-     * detached thread because Windows needs a moment to enumerate the new device.
+     * sticks, motion and rumble, select the Common report (the one with motion), then
+     * enable reports. Runs on a detached thread because Windows needs a moment to
+     * enumerate the new device.
      */
     void enable_ns2pro_reports() {
       using winusb_handle = void *;
@@ -229,7 +230,7 @@ namespace platf::viiper {
             set_policy(winusb, 0x02, 0x03 /* PIPE_TRANSFER_TIMEOUT */, sizeof(timeout_ms), &timeout_ms);
             set_policy(winusb, 0x82, 0x03 /* PIPE_TRANSFER_TIMEOUT */, sizeof(timeout_ms), &timeout_ms);
             bool ok = send_ns2_command(winusb, write_pipe, read_pipe, 0x0C, 0, 0x04, 0x27, error);  // enable buttons, sticks, IMU, rumble
-            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 1, 0x0A, 0x09, error);  // select Pro report (0x09)
+            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 1, 0x0A, 0x05, error);  // select Common report (0x05); the Pro report (0x09) has no motion data
             ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 2, 0x03, 0x01, error);  // enable USB input reports
             if (ok) {
               ++enabled;
