@@ -139,11 +139,12 @@ namespace platf::viiper {
      * @brief Send one Switch 2 command on the bulk OUT pipe and drain its reply.
      */
     template<class write_fn_t, class read_fn_t>
-    bool send_ns2_command(void *winusb, write_fn_t write_pipe, read_fn_t read_pipe, std::uint8_t cmd, std::uint8_t seq, std::uint8_t sub, std::uint8_t arg) {
+    bool send_ns2_command(void *winusb, write_fn_t write_pipe, read_fn_t read_pipe, std::uint8_t cmd, std::uint8_t seq, std::uint8_t sub, std::uint8_t arg, std::string &error) {
       // Header: command, 0x91 (USB transport), sequence, subcommand, 0, payload length, 0, 0; then payload.
       std::array<UCHAR, 12> packet {cmd, 0x91, seq, sub, 0x00, 0x04, 0x00, 0x00, arg, 0x00, 0x00, 0x00};
       ULONG written = 0;
       if (!write_pipe(winusb, 0x02, packet.data(), static_cast<ULONG>(packet.size()), &written, nullptr)) {
+        error = "WinUsb_WritePipe(cmd 0x" + std::format("{:02X}", cmd) + ") failed, error " + std::to_string(GetLastError());
         return false;
       }
       std::array<UCHAR, 64> reply {};
@@ -183,15 +184,21 @@ namespace platf::viiper {
       // DeviceInterfaceGUID that libVIIPER advertises in the Switch 2 Pro MS OS descriptor.
       static const GUID ns2pro_winusb_guid {0x7D8F1E5C, 0x9D89, 0x4E0D, {0xA2, 0xF0, 0x6D, 0x10, 0xF1, 0xF8, 0x9A, 0x8F}};
 
-      for (int attempt = 0; attempt < 20; ++attempt) {
+      // Why the last attempt failed, for the final log line.
+      std::string error = "no Switch 2 Pro WinUSB interface found";
+
+      // Up to 15 s: Windows can be slow to enumerate a new USBIP device.
+      for (int attempt = 0; attempt < 60; ++attempt) {
         std::this_thread::sleep_for(250ms);
 
         HDEVINFO set = SetupDiGetClassDevsW(&ns2pro_winusb_guid, nullptr, nullptr, DIGCF_PRESENT | DIGCF_DEVICEINTERFACE);
         if (set == INVALID_HANDLE_VALUE) {
+          error = "SetupDiGetClassDevsW failed, error " + std::to_string(GetLastError());
           continue;
         }
 
         int enabled = 0;
+        int held_by_other_app = 0;
         SP_DEVICE_INTERFACE_DATA iface {.cbSize = sizeof(SP_DEVICE_INTERFACE_DATA)};
         for (DWORD i = 0; SetupDiEnumDeviceInterfaces(set, nullptr, &ns2pro_winusb_guid, i, &iface); ++i) {
           DWORD size = 0;
@@ -203,22 +210,33 @@ namespace platf::viiper {
             continue;
           }
 
-          HANDLE file = CreateFileW(detail->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+          // WinUsb_Initialize requires a handle opened with FILE_FLAG_OVERLAPPED. The pipe
+          // calls below pass no OVERLAPPED, so they still run synchronously.
+          HANDLE file = CreateFileW(detail->DevicePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OVERLAPPED, nullptr);
           if (file == INVALID_HANDLE_VALUE) {
-            // Another program (e.g. Steam) already owns the interface and will initialize it.
+            const DWORD err = GetLastError();
+            if (err == ERROR_ACCESS_DENIED || err == ERROR_SHARING_VIOLATION) {
+              // WinUSB allows one handle: another program (e.g. Steam) owns the interface and initializes it.
+              ++held_by_other_app;
+            } else {
+              error = "CreateFileW failed, error " + std::to_string(err);
+            }
             continue;
           }
           winusb_handle winusb = nullptr;
           if (winusb_init(file, &winusb)) {
             ULONG timeout_ms = 500;
+            set_policy(winusb, 0x02, 0x03 /* PIPE_TRANSFER_TIMEOUT */, sizeof(timeout_ms), &timeout_ms);
             set_policy(winusb, 0x82, 0x03 /* PIPE_TRANSFER_TIMEOUT */, sizeof(timeout_ms), &timeout_ms);
-            bool ok = send_ns2_command(winusb, write_pipe, read_pipe, 0x0C, 0, 0x04, 0x27);  // enable buttons, sticks, IMU, rumble
-            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 1, 0x0A, 0x09);  // select Pro report (0x09)
-            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 2, 0x03, 0x01);  // enable USB input reports
+            bool ok = send_ns2_command(winusb, write_pipe, read_pipe, 0x0C, 0, 0x04, 0x27, error);  // enable buttons, sticks, IMU, rumble
+            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 1, 0x0A, 0x09, error);  // select Pro report (0x09)
+            ok = ok && send_ns2_command(winusb, write_pipe, read_pipe, 0x03, 2, 0x03, 0x01, error);  // enable USB input reports
             if (ok) {
               ++enabled;
             }
             winusb_free(winusb);
+          } else {
+            error = "WinUsb_Initialize failed, error " + std::to_string(GetLastError());
           }
           CloseHandle(file);
         }
@@ -228,8 +246,12 @@ namespace platf::viiper {
           BOOST_LOG(info) << "Enabled input reports on "sv << enabled << " Switch 2 Pro controller(s)"sv;
           return;
         }
+        if (held_by_other_app > 0) {
+          BOOST_LOG(info) << "Switch 2 Pro controller is held by another app (e.g. Steam), which enables its input reports"sv;
+          return;
+        }
       }
-      BOOST_LOG(warning) << "Couldn't enable Switch 2 Pro input reports over WinUSB; the host app must do it"sv;
+      BOOST_LOG(warning) << "Couldn't enable Switch 2 Pro input reports over WinUSB ("sv << error << "); the host app must do it"sv;
     }
 
     void log_cb(int level, const char *message) {
