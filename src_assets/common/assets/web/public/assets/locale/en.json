@@ -283,6 +283,7 @@
     "gamepad_ds4_manual": "DS4 selection options",
     "gamepad_ds5": "DS5 (PS5)",
     "gamepad_switch": "Nintendo Pro (Switch)",
+    "gamepad_switch_viiper": "Nintendo Switch 2 Pro (needs libVIIPER + usbip-win2)",
     "gamepad_manual": "Manual DS4 options",
     "gamepad_x360": "X360 (Xbox 360)",
     "gamepad_xone": "XOne (Xbox One)",
